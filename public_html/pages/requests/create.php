@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') !== 'save_workflow' 
     $destinations = array_filter(array_map('trim', $destinationRaw), function($d) {
         return !empty($d);
     });
-    $destination = implode(' → ', $destinations);
+    $destination = implode(' -> ', $destinations);
     
     // Count passengers properly - filter out empty values
     $passengerIds = array_filter($passengerIds, function($p) {
@@ -1390,7 +1390,7 @@ ob_start();
                     destinations.push(val);
                 }
             });
-            return destinations.join(' → ');
+            return destinations.join(' -> ');
         }
     }
     
@@ -1547,7 +1547,7 @@ ob_start();
             .then(data => {
                 if (data.conflict) {
                     vehicleCapacityAlert.querySelector('.message').textContent = 
-                        `⚠️ ${data.message} - This vehicle may not be available for the selected dates.`;
+                        `[!]  ${data.message} - This vehicle may not be available for the selected dates.`;
                     vehicleCapacityAlert.classList.remove('d-none');
                     vehicleCapacityAlert.classList.remove('alert-warning');
                     vehicleCapacityAlert.classList.add('alert-danger');

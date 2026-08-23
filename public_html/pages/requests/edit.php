@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $destinations = array_filter(array_map('trim', $destinationRaw), function($d) {
         return !empty($d);
     });
-    $destination = implode(' → ', $destinations);
+    $destination = implode(' -> ', $destinations);
     
     // Count passengers properly - filter out empty values
     $passengerIds = array_filter($passengerIds, function($p) {
@@ -474,7 +474,7 @@ require_once INCLUDES_PATH . '/header.php';
                                     $existingDest = post('destination', $request->destination);
                                     $destinations = post('destinations', []);
                                     if (empty($destinations) && $existingDest) {
-                                        $destinations = array_map('trim', explode('→', $existingDest));
+                                        $destinations = array_map('trim', explode('->', $existingDest));
                                     }
                                     if (empty($destinations)) {
                                         $destinations = [''];
@@ -1008,7 +1008,7 @@ require_once INCLUDES_PATH . '/header.php';
                         destinations.push(val);
                     }
                 });
-                document.getElementById('destinationCombined').value = destinations.join(' → ');
+                document.getElementById('destinationCombined').value = destinations.join(' -> ');
             });
         }
         
