@@ -403,7 +403,7 @@ require_once INCLUDES_PATH . '/header.php';
                                 <?= e($req->requester_name) ?>
                                 <small class="d-block text-muted"><?= e($req->department_name) ?></small>
                             </td>
-                            <td title="<?= e($req->destination) ?>"><?= e(strlen($req->destination) > 30 ? substr($req->destination, 0, 30) . '...' : $req->destination) ?></td>
+                            <td><?= e($req->destination) ?></td>
                             <td>
                                 <?php if ($req->plate_number): ?>
                                 <strong><?= e($req->plate_number) ?></strong>

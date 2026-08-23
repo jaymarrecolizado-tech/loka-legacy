@@ -149,8 +149,9 @@ $pdf->Ln();
 
 $pdf->SetFillColor(248, 248, 248);
 $pdf->SetTextColor(0, 0, 0);
-$pdf->SetFont('helvetica', '', 6);
+$pdf->SetFont('helvetica', '', 6.5);
 
+$lineHeight = 4;
 $fill = false;
 foreach ($trips as $trip) {
     $duration = $trip->actual_duration
@@ -164,19 +165,27 @@ foreach ($trips as $trip) {
         $trip->id,
         $date,
         $time,
-        strlen($trip->destination) > 28 ? substr($trip->destination, 0, 28) . '..' : $trip->destination,
+        $trip->destination ?: '-',
         $trip->plate_number ?: '-',
-        strlen($trip->requester_name) > 15 ? substr($trip->requester_name, 0, 15) . '..' : $trip->requester_name,
-        strlen($trip->department_name ?: '-') > 12 ? substr($trip->department_name ?: '-', 0, 12) . '..' : ($trip->department_name ?: '-'),
-        ucfirst(substr($trip->status, 0, 8)),
+        $trip->requester_name ?: '-',
+        $trip->department_name ?: '-',
+        ucfirst($trip->status),
         $duration,
         $trip->mileage_actual ? number_format($trip->mileage_actual) . ' km' : '-'
     ];
 
+    // Full text with wrapping - no truncation. Row height = tallest cell.
+    $rowMax = 1;
     foreach ($rowData as $i => $val) {
-        $pdf->Cell($colWidths[$i], 5, $val, 1, 0, 'L', $fill);
+        $n = $pdf->getNumLines($val, $colWidths[$i]);
+        if ($n > $rowMax) $rowMax = $n;
     }
-    $pdf->Ln();
+    $rowH = $rowMax * $lineHeight;
+
+    foreach ($rowData as $i => $val) {
+        $pdf->MultiCell($colWidths[$i], $lineHeight, $val, 1, 'L', $fill, 0, '', '', true, 0, false, true, $rowH, 'M');
+    }
+    $pdf->Ln($rowH);
     $fill = !$fill;
 }
 

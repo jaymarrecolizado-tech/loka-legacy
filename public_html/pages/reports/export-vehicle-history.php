@@ -101,17 +101,23 @@ $pdf->Cell(50, 6, number_format($vehicleInfo->mileage ?? 0) . ' km', 1, 0);
 $pdf->Cell(20, 6, 'Fuel:', 1, 0);
 $pdf->Cell(0, 6, ucfirst($vehicleInfo->fuel_type ?: '-'), 1, 1);
 
-// Calculate stats
+// Calculate stats (km falls back to odometer difference when actual is missing)
 $totalHours = 0;
 $completedTrips = 0;
 $totalKm = 0;
 $totalFuel = 0;
 $totalFuelCost = 0;
+$tripKm = function ($t) {
+    if (!empty($t->mileage_actual)) return (float)$t->mileage_actual;
+    if (!empty($t->mileage_end) && !empty($t->mileage_start)) return max(0, (float)$t->mileage_end - (float)$t->mileage_start);
+    return null;
+};
 foreach ($trips as $t) {
     if ($t->status === 'completed') $completedTrips++;
     if ($t->actual_duration) $totalHours += $t->actual_duration / 60;
     elseif ($t->planned_duration) $totalHours += $t->planned_duration / 60;
-    if ($t->mileage_actual) $totalKm += $t->mileage_actual;
+    $km = $tripKm($t);
+    if ($km !== null) $totalKm += $km;
     if ($t->fuel_consumed) $totalFuel += $t->fuel_consumed;
     if ($t->fuel_cost) $totalFuelCost += $t->fuel_cost;
 }
@@ -138,8 +144,8 @@ $pdf->Ln(5);
 $pdf->SetFont('helvetica', 'B', 10);
 $pdf->Cell(0, 7, 'TRIP HISTORY', 0, 1);
 
-$columns = ['ID', 'Date/Time', 'Destination', 'Purpose', 'Requester', 'Dept', 'Driver', 'Status', 'Duration', 'Km', 'Dispatch', 'Arrival'];
-$colWidths = [10, 26, 34, 28, 22, 20, 20, 16, 15, 14, 20, 20];
+$columns = ['ID', 'Date/Time', 'Destination', 'Purpose', 'Requester', 'Dept', 'Driver', 'Status', 'Pax', 'Duration', 'Km', 'Fuel (L)', 'Fuel Cost', 'Dispatch', 'Arrival'];
+$colWidths = [9, 24, 30, 30, 21, 20, 20, 15, 9, 15, 14, 12, 14, 17, 17];
 
 $pdf->SetFont('helvetica', 'B', 7);
 $pdf->SetFillColor(13, 110, 253);
@@ -151,35 +157,48 @@ $pdf->Ln();
 
 $pdf->SetFillColor(248, 248, 248);
 $pdf->SetTextColor(0, 0, 0);
-$pdf->SetFont('helvetica', '', 6);
+$pdf->SetFont('helvetica', '', 6.5);
 
+$lineHeight = 4;
 $fill = false;
 foreach ($trips as $trip) {
-    $duration = $trip->actual_duration 
+    $duration = $trip->actual_duration
         ? floor($trip->actual_duration / 60) . 'h ' . ($trip->actual_duration % 60) . 'm'
         : ($trip->planned_duration ? floor($trip->planned_duration / 60) . 'h ' . ($trip->planned_duration % 60) . 'm' : '-');
-    
+
     $scheduled = date('m/d H:i', strtotime($trip->start_datetime));
-    
+    $km = $tripKm($trip);
+
     $rowData = [
         $trip->id,
         $scheduled,
-        strlen($trip->destination) > 24 ? substr($trip->destination, 0, 24) . '..' : $trip->destination,
-        strlen($trip->purpose) > 20 ? substr($trip->purpose, 0, 20) . '..' : $trip->purpose,
-        strlen($trip->requester_name) > 15 ? substr($trip->requester_name, 0, 15) . '..' : $trip->requester_name,
-        strlen($trip->department_name ?: '-') > 14 ? substr($trip->department_name ?: '-', 0, 14) . '..' : ($trip->department_name ?: '-'),
-        strlen($trip->driver_name ?: '-') > 14 ? substr($trip->driver_name ?: '-', 0, 14) . '..' : ($trip->driver_name ?: '-'),
-        ucfirst(substr($trip->status, 0, 8)),
+        $trip->destination ?: '-',
+        $trip->purpose ?: '-',
+        $trip->requester_name ?: '-',
+        $trip->department_name ?: '-',
+        $trip->driver_name ?: '-',
+        ucfirst($trip->status),
+        $trip->passenger_count ?: '-',
         $duration,
-        $trip->mileage_actual ? number_format($trip->mileage_actual) : '-',
+        $km !== null ? number_format($km) : '-',
+        $trip->fuel_consumed ? number_format($trip->fuel_consumed, 2) : '-',
+        $trip->fuel_cost ? 'P' . number_format($trip->fuel_cost, 2) : '-',
         $trip->actual_dispatch_datetime ? date('m/d H:i', strtotime($trip->actual_dispatch_datetime)) : '-',
         $trip->actual_arrival_datetime ? date('m/d H:i', strtotime($trip->actual_arrival_datetime)) : '-'
     ];
-    
+
+    // Full text with wrapping - no truncation. Row height = tallest cell.
+    $rowMax = 1;
     foreach ($rowData as $i => $val) {
-        $pdf->Cell($colWidths[$i], 5, $val, 1, 0, 'L', $fill);
+        $n = $pdf->getNumLines($val, $colWidths[$i]);
+        if ($n > $rowMax) $rowMax = $n;
     }
-    $pdf->Ln();
+    $rowH = $rowMax * $lineHeight;
+
+    foreach ($rowData as $i => $val) {
+        $pdf->MultiCell($colWidths[$i], $lineHeight, $val, 1, 'L', $fill, 0, '', '', true, 0, false, true, $rowH, 'M');
+    }
+    $pdf->Ln($rowH);
     $fill = !$fill;
 }
 

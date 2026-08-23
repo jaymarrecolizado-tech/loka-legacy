@@ -291,7 +291,7 @@ require_once INCLUDES_PATH . '/header.php';
                                 <small class="text-muted d-block">to <?= formatDateTime($trip->end_datetime) ?></small>
                             </td>
                             <td title="<?= e($trip->destination) ?>"><?= e($trip->destination) ?></td>
-                            <td title="<?= e($trip->purpose) ?>"><?= e(strlen($trip->purpose) > 40 ? substr($trip->purpose, 0, 40) . '...' : $trip->purpose) ?></td>
+                            <td><?= e($trip->purpose) ?></td>
                             <td>
                                 <?= e($trip->requester_name) ?>
                                 <small class="text-muted d-block"><?= e($trip->department_name) ?></small>
