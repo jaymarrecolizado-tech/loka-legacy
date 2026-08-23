@@ -1,0 +1,20 @@
+# Secrets
+.env
+
+# Runtime data
+logs/*
+!logs/.gitignore
+cache/*
+!cache/.gitignore
+
+# Database dumps / archives
+*.sql
+*.zip
+
+# Node / build artifacts
+node_modules/
+assets/dist/.vite/
+
+# OS junk
+Thumbs.db
+.DS_Store

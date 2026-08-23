@@ -1,0 +1,17 @@
+{
+  "assets/js/admin.js": {
+    "file": "js/admin-DGc2GTmr.js",
+    "name": "admin",
+    "src": "assets/js/admin.js",
+    "isEntry": true,
+    "imports": [
+      "assets/js/app.js"
+    ]
+  },
+  "assets/js/app.js": {
+    "file": "js/app-Cibps0MK.js",
+    "name": "app",
+    "src": "assets/js/app.js",
+    "isEntry": true
+  }
+}

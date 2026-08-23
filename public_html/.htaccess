@@ -1,0 +1,137 @@
+# LOKA Fleet Management - Production .htaccess for Hostinger
+
+# =============================================================================
+# DDoS & Attack Protection Settings
+# =============================================================================
+
+# Limit request size (prevents large payload attacks)
+# 1MB max request body - sufficient for normal forms
+<IfModule mod_core.c>
+    LimitRequestBody 1048576
+</IfModule>
+
+# Limit request fields (server-level only; not allowed in .htaccess on XAMPP)
+# LimitRequestFields 50
+# LimitRequestFieldSize 8190
+# LimitRequestLine 8190
+
+# Request timeouts (prevents Slowloris attacks)
+# These settings may not work on all hosts - silently ignored if unsupported
+<IfModule mod_reqtimeout.c>
+    # Header timeout: 20-40 seconds to receive headers
+    # Body timeout: 20 seconds to receive body data
+    # MinRate: Minimum speed at which client must send data
+    RequestReadTimeout header=20-40,MinRate=500 body=20,MinRate=500
+</IfModule>
+
+# =============================================================================
+# Directory & File Security
+# =============================================================================
+
+# Prevent directory browsing
+Options -Indexes
+
+# =============================================================================
+# URL Routing
+# =============================================================================
+
+# Enable Rewrite Engine
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /Projects/pred-loka-old-boots/public_html/
+
+    # Force HTTPS - disabled for local XAMPP
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Force www (optional - remove if you prefer non-www)
+    # RewriteCond %{HTTP_HOST} ^lokafleet\.dictr2\.online [NC]
+    # RewriteRule ^(.*)$ https://www.%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+    
+    # Prevent direct access to config files
+    RewriteRule ^config/ - [F,L]
+    RewriteRule ^classes/ - [F,L]
+    RewriteRule ^includes/ - [F,L]
+    RewriteRule ^cron/ - [F,L]
+    
+    # Route all requests through index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Security Headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "DENY"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Protect sensitive files
+<FilesMatch "\.(php|sql|log|md|example|env|zip|ini|sh|bak)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Dotfiles (.env, .git*, .htaccess, etc.)
+<FilesMatch "^\.">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Allow access to index.php and assets
+<FilesMatch "^(index\.php|.*\.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot))$">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Allow from all
+    </IfModule>
+</FilesMatch>
+
+# PHP Settings (if allowed by Hostinger)
+<IfModule mod_php8.c>
+    # Reduce execution time to prevent hanging connections
+    php_value max_execution_time 30
+    php_value max_input_time 30
+
+    # Memory limit - keep reasonable
+    php_value memory_limit 128M
+
+    # File upload limits - reduced for security
+    # LOKA doesn't require large file uploads
+    php_value upload_max_filesize 2M
+    php_value post_max_size 2M
+    php_value max_file_uploads 5
+
+    # Limit max input variables (prevents hash collision attacks)
+    php_value max_input_vars 1000
+</IfModule>
+
+# Enable Gzip Compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+
+# Browser Caching
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+</IfModule>
