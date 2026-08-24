@@ -18,12 +18,19 @@ foreach ($settingsData as $s) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
     
+    // Clamp to sane bounds so a bad value can't disable or brick the booking rules
+    $clamp = function ($val, $min, $max, $default) {
+        $val = (int) trim((string)$val);
+        if ($val < $min || $val > $max) return (string)$default;
+        return (string)$val;
+    };
+
     $settingsToUpdate = [
         'system_name' => post('system_name', APP_NAME),
-        'max_advance_booking_days' => post('max_advance_booking_days', '30'),
-        'min_advance_booking_hours' => post('min_advance_booking_hours', '24'),
-        'max_trip_duration_hours' => post('max_trip_duration_hours', '72'),
-        'require_return_confirmation' => post('require_return_confirmation', '0'),
+        'max_advance_booking_days' => $clamp(post('max_advance_booking_days', '30'), 1, 365, 30),
+        'min_advance_booking_hours' => $clamp(post('min_advance_booking_hours', '24'), 0, 168, 24),
+        'max_trip_duration_hours' => $clamp(post('max_trip_duration_hours', '72'), 1, 720, 72),
+        'require_return_confirmation' => post('require_return_confirmation', '0') === '1' ? '1' : '0',
     ];
     
     foreach ($settingsToUpdate as $key => $value) {

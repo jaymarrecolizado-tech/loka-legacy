@@ -181,8 +181,8 @@ if ($startDatetime && $endDatetime) {
         }
         
         // Check maximum advance booking time
-        $maxAdvanceSeconds = $maxAdvanceDays * 24 * 3600;
-        if ($hoursUntilStart > $maxAdvanceSeconds) {
+        $maxAdvanceHours = $maxAdvanceDays * 24;
+        if ($hoursUntilStart > $maxAdvanceHours) {
             $errors[] = "Bookings cannot be made more than {$maxAdvanceDays} days in advance. Please select an earlier start time.";
         }
         
@@ -1687,7 +1687,8 @@ ob_start();
         
         // Calculate min and max dates
         const today = new Date();
-        const minDate = today;
+        // Enforce minimum advance booking on the picker, not just server-side
+        const minDate = new Date(today.getTime() + bookingMinAdvanceHours * 3600 * 1000);
         const maxDate = new Date(today);
         maxDate.setDate(maxDate.getDate() + bookingMaxAdvanceDays);
         
@@ -1729,18 +1730,20 @@ ob_start();
         setTimeout(function() {
             if (typeof flatpickr !== 'undefined') {
                 const bookingMaxAdvanceDays = <?= (int) ($bookingSettings['max_advance_booking_days'] ?? 30) ?>;
+                const bookingMinAdvanceHours = <?= (int) ($bookingSettings['min_advance_booking_hours'] ?? 24) ?>;
                 const bookingMaxTripHours = <?= (int) ($bookingSettings['max_trip_duration_hours'] ?? 72) ?>;
-                
+
                 const today = new Date();
+                const minDate = new Date(today.getTime() + bookingMinAdvanceHours * 3600 * 1000);
                 const maxDate = new Date(today);
                 maxDate.setDate(maxDate.getDate() + bookingMaxAdvanceDays);
-                
+
                 flatpickr('#start_datetime', {
                     enableTime: true,
                     dateFormat: "Y-m-d H:i",
                     time_24hr: true,
                     allowInput: true,
-                    minDate: today,
+                    minDate: minDate,
                     maxDate: maxDate,
                     minuteIncrement: 15
                 });
@@ -1749,7 +1752,7 @@ ob_start();
                     dateFormat: "Y-m-d H:i",
                     time_24hr: true,
                     allowInput: true,
-                    minDate: today,
+                    minDate: minDate,
                     maxDate: maxDate,
                     minuteIncrement: 15
                 });

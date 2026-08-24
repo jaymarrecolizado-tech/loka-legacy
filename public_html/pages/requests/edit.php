@@ -122,7 +122,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Validation
     $manilaTz = new DateTimeZone('Asia/Manila');
     $now = new DateTime('now', $manilaTz);
-    
+
+    // Load booking rules settings (same rules as create)
+    $bookingSettings = [];
+    foreach (db()->fetchAll(
+        "SELECT `key`, value FROM settings WHERE `key` IN ('max_advance_booking_days', 'min_advance_booking_hours', 'max_trip_duration_hours')"
+    ) as $s) {
+        $bookingSettings[$s->key] = $s->value;
+    }
+    $maxAdvanceDays = max(1, (int)($bookingSettings['max_advance_booking_days'] ?? 30));
+    $minAdvanceHours = max(0, (int)($bookingSettings['min_advance_booking_hours'] ?? 24));
+    $maxTripHours = max(1, (int)($bookingSettings['max_trip_duration_hours'] ?? 72));
+
     if (empty($startDatetime))
         $errors[] = 'Start date/time is required';
     if (empty($endDatetime))
@@ -132,6 +143,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $endDt = new DateTime($endDatetime, $manilaTz);
         if ($endDt <= $startDt) {
             $errors[] = 'End date/time must be after start date/time';
+        }
+
+        // Booking rules validation (same as create)
+        $hoursUntilStart = ($startDt->getTimestamp() - $now->getTimestamp()) / 3600;
+
+        if ($hoursUntilStart < $minAdvanceHours) {
+            $errors[] = "Bookings must be made at least {$minAdvanceHours} hours in advance. Please select a later start time.";
+        }
+
+        $maxAdvanceHours = $maxAdvanceDays * 24;
+        if ($hoursUntilStart > $maxAdvanceHours) {
+            $errors[] = "Bookings cannot be made more than {$maxAdvanceDays} days in advance. Please select an earlier start time.";
+        }
+
+        $tripDurationHours = ($endDt->getTimestamp() - $startDt->getTimestamp()) / 3600;
+        if ($tripDurationHours > $maxTripHours) {
+            $errors[] = "Trip duration cannot exceed {$maxTripHours} hours. Please shorten your trip or split it into multiple requests.";
         }
     }
     if (empty($purpose))
