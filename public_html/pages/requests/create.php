@@ -101,6 +101,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'delete_workflow
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') !== 'save_workflow' && post('action') !== 'delete_workflow') {
     requireCsrf();
     
+    // Idempotency token: one submission per form render
+    $idempotencyKey = trim(post('submission_token') ?: '');
+    if ($idempotencyKey !== '') {
+        $existing = db()->fetch(
+            "SELECT id FROM requests WHERE idempotency_key = ?",
+            [$idempotencyKey]
+        );
+        if ($existing) {
+            redirectWith(
+                '/?page=requests&action=view&id=' . $existing->id,
+                'warning',
+                'This request was already submitted. Showing the original instead of creating a duplicate.'
+            );
+            exit;
+        }
+    }
+    
     // Get form data
     $startDatetime = postSafe('start_datetime', '', 20);
     $endDatetime = postSafe('end_datetime', '', 20);
@@ -206,13 +223,33 @@ if ($startDatetime && $endDatetime) {
         }
     }
     
+    // Heuristic duplicate backstop: identical request from this user in the last 10 minutes
+    if (empty($errors)) {
+        $dupe = db()->fetch(
+            "SELECT id FROM requests
+             WHERE user_id = ? AND destination = ? AND purpose = ? AND start_datetime = ?
+             AND created_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+             AND deleted_at IS NULL
+             LIMIT 1",
+            [userId(), $destination, $purpose, $startDatetime]
+        );
+        if ($dupe) {
+            redirectWith(
+                '/?page=requests&action=view&id=' . $dupe->id,
+                'warning',
+                'An identical request was submitted a few moments ago. Showing the original instead of creating a duplicate.'
+            );
+            exit;
+        }
+    }
+
     // Create request if no errors
     if (empty($errors)) {
         try {
             db()->beginTransaction();
             
             // Insert request with selected approvers
-            $requestId = db()->insert('requests', [
+            $insertData = [
                 'user_id' => userId(),
                 'department_id' => currentUser()->department_id,
                 'approver_id' => $approverId,
@@ -226,9 +263,30 @@ if ($startDatetime && $endDatetime) {
                 'passenger_count' => $passengerCount,
                 'notes' => $notes,
                 'status' => STATUS_PENDING,
+                'idempotency_key' => $idempotencyKey ?: null,
                 'created_at' => date(DATETIME_FORMAT),
                 'updated_at' => date(DATETIME_FORMAT)
-            ]);
+            ];
+            
+            try {
+                $requestId = db()->insert('requests', $insertData);
+            } catch (PDOException $e) {
+                // Unique index violation = concurrent duplicate submission
+                if ($e->getCode() === '23000' && $idempotencyKey !== '') {
+                    $existing = db()->fetch(
+                        "SELECT id FROM requests WHERE idempotency_key = ?",
+                        [$idempotencyKey]
+                    );
+                    db()->rollback();
+                    redirectWith(
+                        '/?page=requests&action=view&id=' . ($existing->id ?? 0),
+                        'warning',
+                        'This request was already submitted. Showing the original instead of creating a duplicate.'
+                    );
+                    exit;
+                }
+                throw $e;
+            }
             
             // Insert passengers
             foreach ($passengerIds as $p) {
@@ -398,6 +456,8 @@ require_once INCLUDES_PATH . '/header.php';
                     
                     <form method="POST" class="needs-validation" novalidate id="requestForm">
                         <?= csrfField() ?>
+                        <!-- Idempotency token: one submission per form render -->
+                        <input type="hidden" name="submission_token" value="<?= e(bin2hex(random_bytes(16))) ?>">
                         <!-- Hidden input to store selected passengers for form submission -->
                         <input type="hidden" name="passengers_json" id="passengers_json" value="">
                         

@@ -86,10 +86,12 @@ class EmailQueue
         // Build email body
         $body = $this->buildEmailBody($templateKey, $template, $data);
         
-        // SYNC OVERRIDE: Send ALL emails immediately to bypass broken server cron
+        // Optional sync send: only when MAIL_SYNC_SEND is explicitly enabled.
+        // Default is queue-only — the cron (cron/process_queue.php) sends emails
+        // in the background so form submissions return instantly.
         $syncSent = false;
         
-        if (MAIL_ENABLED) {
+        if (MAIL_ENABLED && MAIL_SYNC_SEND) {
             try {
                 $mailer = new Mailer();
                 $syncSent = $mailer->send($toEmail, $subject, $body, $toName);

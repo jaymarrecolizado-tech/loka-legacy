@@ -42,6 +42,12 @@ define('MAIL_FROM_NAME', getEnvVar('SMTP_FROM_NAME', 'LOKA Fleet Management'));
 // Enable/disable mail functionality based on configuration
 define('MAIL_ENABLED', getEnvVar('MAIL_ENABLED', 'true') === 'true');
 
+// Synchronous email sending during page requests (submit, approve, etc.).
+// Default: false — emails are queued only and sent by cron/process_queue.php.
+// Sync sending makes form submissions hang for seconds per recipient, which
+// caused duplicate request submissions (users re-clicking a "hung" submit).
+define('MAIL_SYNC_SEND', getEnvVar('MAIL_SYNC_SEND', 'false') === 'true');
+
 // Configuration validation - check if email is properly configured
 function isEmailConfigured(): bool {
     return MAIL_ENABLED 

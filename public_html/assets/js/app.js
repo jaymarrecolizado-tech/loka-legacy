@@ -533,6 +533,25 @@ function initPreventDoubleSubmit() {
                             btn.innerHTML = 'Processing...';
                         }
                     }, 50);
+
+                    // Full-screen overlay so the wait state is obvious and
+                    // users don't think the app hung and re-submit
+                    if (!document.getElementById('submittingOverlay')) {
+                        const overlay = document.createElement('div');
+                        overlay.id = 'submittingOverlay';
+                        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);z-index:2000;display:flex;align-items:center;justify-content:center;';
+                        overlay.innerHTML =
+                            '<div style="background:#fff;border-radius:12px;padding:1.5rem 2.5rem;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.3)">' +
+                            '<div class="spinner-border text-primary mb-3" role="status" style="width:2.5rem;height:2.5rem"></div>' +
+                            '<div style="font-weight:600;font-size:1.05rem">Submitting&hellip; please wait</div>' +
+                            '<div style="color:#6c757d;font-size:0.85rem;margin-top:0.25rem">Do not close or reload this page</div>' +
+                            '</div>';
+                        document.body.appendChild(overlay);
+
+                        // Safety: never leave the user permanently stuck if the
+                        // request takes abnormally long or fails client-side
+                        setTimeout(() => { const o = document.getElementById('submittingOverlay'); if (o) o.remove(); }, 60000);
+                    }
                 }
             });
         });
