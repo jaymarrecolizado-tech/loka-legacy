@@ -202,11 +202,24 @@
                 </a>
             </li>
 
-            <!-- Request Rollback -->
+            <!-- Settings -->
+            <li class="nav-item">
+                <a class="nav-link <?= activeMenu('settings') ?>" href="<?= APP_URL ?>/?page=settings">
+                    <i class="bi bi-gear"></i>
+                    <span>Settings</span>
+                </a>
+            </li>
+            <?php endif; ?>
+
+            <?php if (isAdmin() || isGuard()): ?>
+            <!-- Request Rollback (admins: full; guards: approved -> motorpool only) -->
             <?php
             $rollbackEligible = db()->fetchColumn(
-                "SELECT COUNT(*) FROM requests
-                 WHERE deleted_at IS NULL AND status IN ('pending_motorpool','approved','completed','revision','rejected')"
+                isAdmin()
+                    ? "SELECT COUNT(*) FROM requests
+                       WHERE deleted_at IS NULL AND status IN ('pending_motorpool','approved','completed','revision','rejected')"
+                    : "SELECT COUNT(*) FROM requests
+                       WHERE deleted_at IS NULL AND status = 'approved'"
             );
             ?>
             <li class="nav-item">
@@ -218,23 +231,7 @@
                     <?php endif; ?>
                 </a>
             </li>
-
-            <!-- Settings -->
-            <li class="nav-item">
-                <a class="nav-link <?= activeMenu('settings') ?>" href="<?= APP_URL ?>/?page=settings">
-                    <i class="bi bi-gear"></i>
-                    <span>Settings</span>
-                </a>
-            </li>
             <?php endif; ?>
-            
-            <!-- Patch Notes - Visible to All Roles -->
-            <li class="nav-item">
-                <a class="nav-link <?= activeMenu('patch-notes') ?>" href="<?= APP_URL ?>/?page=patch-notes">
-                    <i class="bi bi-journal-text"></i>
-                    <span>Patch Notes</span>
-                </a>
-            </li>
         </ul>
     </div>
 </nav>

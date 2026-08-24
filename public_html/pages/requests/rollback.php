@@ -1,13 +1,18 @@
 <?php
 /**
- * LOKA - Admin Request Rollback
+ * LOKA - Request Rollback
  *
- * Allows admins to roll a vehicle request back to an earlier workflow phase.
- * Reverses side effects (vehicle/driver release, trip tickets) and resets the
- * approval_workflow step, with full audit trail and notifications.
+ * Admins: full rollback to any valid earlier workflow phase.
+ * Guards: restricted rollback of approved requests back to Pending Motorpool
+ *         (e.g., mis-dispatch -> send back for vehicle/driver reassignment).
  */
 
-requireRole(ROLE_ADMIN);
+requireAuth();
+if (!isAdmin() && !isGuard()) {
+    redirectWith('/?page=dashboard', 'danger', 'You do not have permission to access this page.');
+}
+
+$isAdminUser = isAdmin();
 
 $requestId = (int) get('id');
 
@@ -15,7 +20,7 @@ if (!$requestId) {
     redirectWith('/?page=rollback', 'danger', 'Request ID required.');
 }
 
-// Valid rollback targets per current status
+// Valid rollback targets per current status (admins)
 $targetsByStatus = [
     STATUS_PENDING_MOTORPOOL => [STATUS_PENDING],
     STATUS_APPROVED          => [STATUS_PENDING_MOTORPOOL, STATUS_PENDING],
@@ -23,6 +28,13 @@ $targetsByStatus = [
     STATUS_REVISION          => [STATUS_PENDING, STATUS_PENDING_MOTORPOOL],
     STATUS_REJECTED          => [STATUS_PENDING, STATUS_PENDING_MOTORPOOL],
 ];
+
+// Guards: only approved -> pending_motorpool
+if (!$isAdminUser) {
+    $targetsByStatus = [
+        STATUS_APPROVED => [STATUS_PENDING_MOTORPOOL],
+    ];
+}
 
 $statusLabels = [
     STATUS_PENDING           => 'Pending Department Approval',
@@ -84,9 +96,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('confirm_rollback') === '1') {
             throw new Exception('Request was modified by someone else. Please review the current state and try again.');
         }
 
-        // Block rollback when the trip is physically in progress
+        // Trip in progress:
+        //  - Guards rolling an approved request back ARE undoing the dispatch,
+        //    so releasing an in-use vehicle is the expected behavior.
+        //  - Admins must let the guard close the trip first (safer default).
         $leavingActive = in_array($oldStatus, [STATUS_APPROVED, STATUS_COMPLETED]);
-        if ($leavingActive && $request->vehicle_id && $request->vehicle_status === 'in_use') {
+        if ($leavingActive && $request->vehicle_id && $request->vehicle_status === 'in_use' && $isAdminUser) {
             throw new Exception('Trip is currently in progress. The guard must receive/close the trip first, or cancel the request instead.');
         }
 
@@ -112,6 +127,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('confirm_rollback') === '1') {
                 if (!$otherActiveDrv) {
                     db()->update('drivers', ['status' => 'available', 'updated_at' => $now], 'id = ?', [$request->driver_id]);
                 }
+            }
+
+            // Guard undo-dispatch: clear the recorded dispatch/arrival so the
+            // request can be cleanly re-dispatched after motorpool reassignment
+            if (!$isAdminUser && $oldStatus === STATUS_APPROVED) {
+                db()->query(
+                    "UPDATE requests
+                     SET actual_dispatch_datetime = NULL, actual_arrival_datetime = NULL,
+                         dispatch_guard_id = NULL, arrival_guard_id = NULL
+                     WHERE id = ?",
+                    [$requestId]
+                );
             }
 
             // Trip tickets: void when going back to an approval phase; cancel-flag when completed -> approved

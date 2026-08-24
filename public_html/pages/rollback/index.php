@@ -1,13 +1,17 @@
 <?php
 /**
- * LOKA - Request Rollback Hub (Admin)
+ * LOKA - Request Rollback Hub (Admin + Guard)
  *
- * Lists all requests eligible for workflow rollback with filters,
- * summary counts, and per-row rollback actions.
+ * Admins: lists all requests eligible for workflow rollback.
+ * Guards: restricted to approved requests (rollback -> pending_motorpool only).
  */
 
-requireRole(ROLE_ADMIN);
+requireAuth();
+if (!isAdmin() && !isGuard()) {
+    redirectWith('/?page=dashboard', 'danger', 'You do not have permission to access this page.');
+}
 
+$isAdminUser = isAdmin();
 $pageTitle = 'Request Rollback';
 
 $startDate = get('start_date', '');
@@ -16,22 +20,25 @@ $filterStatus = get('status', '');
 $filterDept = get('department_id', '');
 $search = trim(get('search', ''));
 
-$rollbackableStatuses = [STATUS_PENDING_MOTORPOOL, STATUS_APPROVED, STATUS_COMPLETED, STATUS_REVISION, STATUS_REJECTED];
+$rollbackableStatuses = $isAdminUser
+    ? [STATUS_PENDING_MOTORPOOL, STATUS_APPROVED, STATUS_COMPLETED, STATUS_REVISION, STATUS_REJECTED]
+    : [STATUS_APPROVED];
 
 $allDepartments = db()->fetchAll("SELECT id, name FROM departments WHERE deleted_at IS NULL ORDER BY name");
 
 // Summary counts per status
 $summary = [];
+$statusListSql = implode("','", $rollbackableStatuses);
 foreach (db()->fetchAll(
     "SELECT status, COUNT(*) AS cnt FROM requests
-     WHERE deleted_at IS NULL AND status IN ('pending_motorpool','approved','completed','revision','rejected')
+     WHERE deleted_at IS NULL AND status IN ('$statusListSql')
      GROUP BY status"
 ) as $row) {
     $summary[$row->status] = (int)$row->cnt;
 }
 
 // Build list query
-$where = ["r.deleted_at IS NULL", "r.status IN ('pending_motorpool','approved','completed','revision','rejected')"];
+$where = ['r.deleted_at IS NULL', "r.status IN ('$statusListSql')"];
 $params = [];
 
 if ($filterStatus && in_array($filterStatus, $rollbackableStatuses)) {
@@ -93,13 +100,14 @@ require_once INCLUDES_PATH . '/header.php';
     <!-- Summary Cards -->
     <div class="row g-3 mb-4">
         <?php
-        $cards = [
+        $allCards = [
             STATUS_PENDING_MOTORPOOL => ['Pending Motorpool', 'info'],
             STATUS_APPROVED          => ['Approved', 'success'],
             STATUS_COMPLETED         => ['Completed', 'primary'],
             STATUS_REVISION          => ['For Revision', 'orange'],
             STATUS_REJECTED          => ['Rejected', 'danger'],
         ];
+        $cards = array_filter($allCards, fn($st) => in_array($st, $rollbackableStatuses), ARRAY_FILTER_USE_KEY);
         foreach ($cards as $st => [$label, $color]):
             $url = '?page=rollback&status=' . $st;
         ?>
