@@ -18,3 +18,7 @@ assets/dist/.vite/
 # OS junk
 Thumbs.db
 .DS_Store
+
+# Production package (generated - rebuild with robocopy, see PRODUCTION_GUIDE.md)
+prod/*
+!prod/PRODUCTION_GUIDE.md
