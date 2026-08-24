@@ -25,7 +25,16 @@ pending ──approve──> pending_motorpool ──approve──> approved ─
 ## Feature Spec
 
 ### Who
-- **Admin only** (`requireRole(ROLE_ADMIN)`)
+- **Admin only** (`requireRole(ROLE_ADMIN)`) — exclusive; guards/approvers have no rollback access
+
+### Scope: guard transaction reversal
+- Rolling back an **approved** request that was already dispatched by a guard **undoes the
+  guard transaction**: `actual_dispatch_datetime`, `actual_arrival_datetime`,
+  `dispatch_guard_id`, `arrival_guard_id` are cleared, and the vehicle/driver are released
+  — so the admin can rectify a guard error (e.g., wrong vehicle dispatched) and the request
+  can be corrected and re-dispatched cleanly.
+- This works even while the vehicle is `in_use` (the admin is explicitly correcting the
+  dispatch). The original dispatch values are preserved in the audit log entry.
 
 ### Where
 - **Dedicated main-menu item** — "Request Rollback" in the sidebar under the

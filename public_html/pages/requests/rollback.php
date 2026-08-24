@@ -1,18 +1,14 @@
 <?php
 /**
- * LOKA - Request Rollback
+ * LOKA - Admin Request Rollback
  *
- * Admins: full rollback to any valid earlier workflow phase.
- * Guards: restricted rollback of approved requests back to Pending Motorpool
- *         (e.g., mis-dispatch -> send back for vehicle/driver reassignment).
+ * Admin-exclusive rollback to an earlier workflow phase. Also reverses guard
+ * transactions: rolling back an approved request clears dispatch/arrival
+ * records (e.g., guard dispatched the wrong vehicle) and releases the
+ * vehicle/driver so the request can be corrected and re-dispatched.
  */
 
-requireAuth();
-if (!isAdmin() && !isGuard()) {
-    redirectWith('/?page=dashboard', 'danger', 'You do not have permission to access this page.');
-}
-
-$isAdminUser = isAdmin();
+requireRole(ROLE_ADMIN);
 
 $requestId = (int) get('id');
 
@@ -20,7 +16,7 @@ if (!$requestId) {
     redirectWith('/?page=rollback', 'danger', 'Request ID required.');
 }
 
-// Valid rollback targets per current status (admins)
+// Valid rollback targets per current status
 $targetsByStatus = [
     STATUS_PENDING_MOTORPOOL => [STATUS_PENDING],
     STATUS_APPROVED          => [STATUS_PENDING_MOTORPOOL, STATUS_PENDING],
@@ -28,13 +24,6 @@ $targetsByStatus = [
     STATUS_REVISION          => [STATUS_PENDING, STATUS_PENDING_MOTORPOOL],
     STATUS_REJECTED          => [STATUS_PENDING, STATUS_PENDING_MOTORPOOL],
 ];
-
-// Guards: only approved -> pending_motorpool
-if (!$isAdminUser) {
-    $targetsByStatus = [
-        STATUS_APPROVED => [STATUS_PENDING_MOTORPOOL],
-    ];
-}
 
 $statusLabels = [
     STATUS_PENDING           => 'Pending Department Approval',
@@ -96,14 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('confirm_rollback') === '1') {
             throw new Exception('Request was modified by someone else. Please review the current state and try again.');
         }
 
-        // Trip in progress:
-        //  - Guards rolling an approved request back ARE undoing the dispatch,
-        //    so releasing an in-use vehicle is the expected behavior.
-        //  - Admins must let the guard close the trip first (safer default).
+        // Admins may undo guard transactions: an approved request that was
+        // already dispatched can be rolled back, clearing dispatch records
+        // below. (No in-use block — the admin is explicitly rectifying the
+        // guard's dispatch error.)
         $leavingActive = in_array($oldStatus, [STATUS_APPROVED, STATUS_COMPLETED]);
-        if ($leavingActive && $request->vehicle_id && $request->vehicle_status === 'in_use' && $isAdminUser) {
-            throw new Exception('Trip is currently in progress. The guard must receive/close the trip first, or cancel the request instead.');
-        }
+        $hadDispatch = !empty($request->actual_dispatch_datetime);
 
         $now = date(DATETIME_FORMAT);
 
@@ -129,9 +116,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('confirm_rollback') === '1') {
                 }
             }
 
-            // Guard undo-dispatch: clear the recorded dispatch/arrival so the
-            // request can be cleanly re-dispatched after motorpool reassignment
-            if (!$isAdminUser && $oldStatus === STATUS_APPROVED) {
+            // Undo guard transaction: clear dispatch/arrival records so the
+            // request can be cleanly corrected and re-dispatched
+            if ($hadDispatch) {
                 db()->query(
                     "UPDATE requests
                      SET actual_dispatch_datetime = NULL, actual_arrival_datetime = NULL,
@@ -192,12 +179,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('confirm_rollback') === '1') {
             'request_rollback',
             'request',
             $requestId,
-            ['status' => $oldStatus],
             [
-                'status'          => $targetStatus,
-                'reason'          => $reason,
-                'rolled_back_by'  => userId(),
-                'rollback_count'  => (int)$request->rollback_count + 1,
+                'status' => $oldStatus,
+                'actual_dispatch_datetime' => $request->actual_dispatch_datetime,
+                'actual_arrival_datetime' => $request->actual_arrival_datetime,
+            ],
+            [
+                'status'                   => $targetStatus,
+                'reason'                   => $reason,
+                'rolled_back_by'           => userId(),
+                'rollback_count'           => (int)$request->rollback_count + 1,
+                'dispatch_records_cleared' => $hadDispatch,
             ]
         );
 
@@ -330,9 +322,12 @@ require_once INCLUDES_PATH . '/header.php';
                             <strong>Rolling back will:</strong>
                             <ul class="mb-0">
                                 <li>Reset the workflow to the selected phase for re-approval</li>
+                                <?php if ($request->status === STATUS_APPROVED && $request->actual_dispatch_datetime): ?>
+                                <li><strong>Undo the guard transaction:</strong> dispatch/arrival times and guard records will be cleared</li>
+                                <?php endif; ?>
                                 <?php if (in_array($request->status, [STATUS_APPROVED, STATUS_COMPLETED])): ?>
                                 <li>Release the assigned vehicle and driver (if not in use by another trip)</li>
-                                <li><?= $targetStatus === STATUS_APPROVED || in_array(STATUS_APPROVED, $validTargets) ? 'Flag linked trip tickets as cancelled / remove them from the active queue' : 'Remove linked trip tickets from the active queue' ?></li>
+                                <li>Remove linked trip tickets from the active queue</li>
                                 <?php endif; ?>
                                 <li>Notify the requester and the target approver</li>
                             </ul>

@@ -327,11 +327,6 @@ require_once INCLUDES_PATH . '/header.php';
                                                         data-bs-target="#arrivalModal<?= $trip->id ?>">
                                                     <i class="bi bi-box-arrow-in-left me-1"></i>Arrival
                                                 </button>
-                                                <a href="<?= APP_URL ?>/?page=rollback&action=process&id=<?= $trip->id ?>"
-                                                   class="btn btn-sm btn-outline-warning" target="_blank"
-                                                   title="Mis-dispatch? Send back to motorpool for reassignment">
-                                                    <i class="bi bi-arrow-counterclockwise"></i>
-                                                </a>
                                             <?php else: ?>
                                                 <button type="button" class="btn btn-sm btn-outline-secondary" disabled>
                                                     <i class="bi bi-check-all me-1"></i>Done

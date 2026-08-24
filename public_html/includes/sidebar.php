@@ -202,24 +202,11 @@
                 </a>
             </li>
 
-            <!-- Settings -->
-            <li class="nav-item">
-                <a class="nav-link <?= activeMenu('settings') ?>" href="<?= APP_URL ?>/?page=settings">
-                    <i class="bi bi-gear"></i>
-                    <span>Settings</span>
-                </a>
-            </li>
-            <?php endif; ?>
-
-            <?php if (isAdmin() || isGuard()): ?>
-            <!-- Request Rollback (admins: full; guards: approved -> motorpool only) -->
+            <!-- Request Rollback (admin only) -->
             <?php
             $rollbackEligible = db()->fetchColumn(
-                isAdmin()
-                    ? "SELECT COUNT(*) FROM requests
-                       WHERE deleted_at IS NULL AND status IN ('pending_motorpool','approved','completed','revision','rejected')"
-                    : "SELECT COUNT(*) FROM requests
-                       WHERE deleted_at IS NULL AND status = 'approved'"
+                "SELECT COUNT(*) FROM requests
+                 WHERE deleted_at IS NULL AND status IN ('pending_motorpool','approved','completed','revision','rejected')"
             );
             ?>
             <li class="nav-item">
@@ -229,6 +216,14 @@
                     <?php if ($rollbackEligible > 0): ?>
                     <span class="badge bg-secondary ms-auto"><?= $rollbackEligible > 99 ? '99+' : $rollbackEligible ?></span>
                     <?php endif; ?>
+                </a>
+            </li>
+
+            <!-- Settings -->
+            <li class="nav-item">
+                <a class="nav-link <?= activeMenu('settings') ?>" href="<?= APP_URL ?>/?page=settings">
+                    <i class="bi bi-gear"></i>
+                    <span>Settings</span>
                 </a>
             </li>
             <?php endif; ?>

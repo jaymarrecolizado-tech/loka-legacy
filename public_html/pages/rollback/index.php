@@ -1,17 +1,14 @@
 <?php
 /**
- * LOKA - Request Rollback Hub (Admin + Guard)
+ * LOKA - Request Rollback Hub (Admin)
  *
- * Admins: lists all requests eligible for workflow rollback.
- * Guards: restricted to approved requests (rollback -> pending_motorpool only).
+ * Lists all requests eligible for workflow rollback with filters,
+ * summary counts, and per-row rollback actions. Rolling back an approved
+ * request also reverses guard transactions (clears dispatch/arrival records).
  */
 
-requireAuth();
-if (!isAdmin() && !isGuard()) {
-    redirectWith('/?page=dashboard', 'danger', 'You do not have permission to access this page.');
-}
+requireRole(ROLE_ADMIN);
 
-$isAdminUser = isAdmin();
 $pageTitle = 'Request Rollback';
 
 $startDate = get('start_date', '');
@@ -20,9 +17,7 @@ $filterStatus = get('status', '');
 $filterDept = get('department_id', '');
 $search = trim(get('search', ''));
 
-$rollbackableStatuses = $isAdminUser
-    ? [STATUS_PENDING_MOTORPOOL, STATUS_APPROVED, STATUS_COMPLETED, STATUS_REVISION, STATUS_REJECTED]
-    : [STATUS_APPROVED];
+$rollbackableStatuses = [STATUS_PENDING_MOTORPOOL, STATUS_APPROVED, STATUS_COMPLETED, STATUS_REVISION, STATUS_REJECTED];
 
 $allDepartments = db()->fetchAll("SELECT id, name FROM departments WHERE deleted_at IS NULL ORDER BY name");
 
