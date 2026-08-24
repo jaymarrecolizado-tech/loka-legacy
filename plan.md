@@ -1,3 +1,73 @@
+# LOKA Plan #3: Booking Rules Cleanup & Return-Confirmation Enforcement — ✅ IMPLEMENTED (pending manual QA)
+
+## Goal
+
+1. Remove the dead SPA API layer (`public_html/assets/js/api/`) — unused, unbundlable
+   scaffold (imports axios, uses `import.meta.env`; no package.json/bundler exists and
+   nothing imports these files).
+2. Consolidate the duplicated booking-rules loading/validation (create.php + edit.php)
+   into shared helpers so the rules can't drift apart.
+3. Make the `require_return_confirmation` setting actually do something: when **Yes**,
+   a trip may only be completed after a guard records the vehicle's return
+   (`actual_arrival_datetime`); motorpool's direct-complete path is gated. When **No**,
+   current behavior is unchanged.
+
+## Findings (audit 2026-08-24)
+
+- Settings save works: CSRF-checked, clamped to sane bounds, upserts correctly
+  (`pages/settings/index.php`).
+- Server-side enforcement works in create.php (~148–193) and edit.php (~126–163), plus
+  Flatpickr min/max client-side in create.php.
+- Issues:
+  - `require_return_confirmation` saved/rendered but never read anywhere → no-op.
+  - `settingsApi.updateBookingRules` points at nonexistent `/api/settings/booking-rules`
+    route; whole JS API module is dead code.
+  - Clamped values reset silently with only "saved successfully".
+  - edit.php clamps with `max(1,...)`, create.php doesn't — drift risk.
+  - Edit of a previously valid request can fail min-notice validation if trip start is
+    now near/past (accepted behavior for now; noted).
+
+## Phase 1 — Remove dead API layer
+
+1. Sweep layouts/includes for any references to `assets/js/api`.
+2. Delete `public_html/assets/js/api/` (client.js + index.js).
+3. Patch-notes entry.
+
+## Phase 2 — Shared booking-rules helpers
+
+1. New helpers (in `includes/functions.php` or new `includes/booking-rules.php`):
+   - `getBookingRules(): array{max_advance_days,min_advance_hours,max_trip_hours}`
+     — DB load with defaults + clamp.
+   - `validateBookingRules(DateTime $startDt, DateTime $endDt): array` — error strings.
+2. Refactor `create.php` and `edit.php` to use the helpers (removes ~60 duplicated lines).
+3. Settings page: report clamped/reset values back to admin instead of silently defaulting.
+4. Optional: skip min-notice check on edit when start time unchanged (deferred unless trivial).
+
+## Phase 3 — Enforce require_return_confirmation
+
+Semantics (per decision): guard confirmation of vehicle return = trip ended.
+
+1. `pages/requests/complete.php`: when setting = Yes AND `$request->actual_arrival_datetime`
+   is NULL → block with clear message ("Return must be confirmed by the guard...").
+   Audit-log blocked attempts.
+2. Guard arrival path (`pages/guard/actions.php`) stays unchanged — it already sets
+   STATUS_COMPLETED on arrival.
+3. `pages/requests/view.php`: when setting = Yes and request approved without arrival,
+   hide/disable the Complete Trip button with an explanatory hint.
+4. Patch-notes entry.
+
+## QA Checklist
+
+- [ ] Toggle = Yes: completing an approved, un-returned trip from requests view is blocked with clear error
+- [ ] Toggle = Yes: guard records arrival → trip completes normally, vehicle/driver released
+- [ ] Toggle = No: old direct-complete path works as before
+- [ ] Create/edit still enforce min notice / max advance / max duration per settings
+- [ ] Changing settings reflects immediately in pickers and validation
+- [ ] Out-of-range settings input shows which fields were corrected
+- [ ] No remaining references to assets/js/api anywhere
+
+---
+
 # LOKA Feature Plan: Admin Workflow Rollback — ✅ IMPLEMENTED (commits 63c71ff, a2729f5)
 
 ## Goal

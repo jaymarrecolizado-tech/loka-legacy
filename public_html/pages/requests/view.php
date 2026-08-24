@@ -152,9 +152,17 @@ require_once INCLUDES_PATH . '/header.php';
                 <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#overrideModal">
                     <i class="bi bi-pencil-square me-1"></i>Override Vehicle/Driver
                 </button>
+                <?php $guardReturnRequired = !$request->actual_arrival_datetime && requireReturnConfirmation(); ?>
+                <?php if ($guardReturnRequired): ?>
+                <button type="button" class="btn btn-secondary" disabled
+                        title="The guard must record the vehicle's return before this trip can be completed">
+                    <i class="bi bi-check-circle me-1"></i>Complete Trip
+                </button>
+                <?php else: ?>
                 <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#completeModal">
                     <i class="bi bi-check-circle me-1"></i>Complete Trip
                 </button>
+                <?php endif; ?>
             <?php endif; ?>
 
             <?php if (isAdmin() && in_array($request->status, [STATUS_PENDING_MOTORPOOL, STATUS_APPROVED, STATUS_COMPLETED, STATUS_REVISION, STATUS_REJECTED])): ?>

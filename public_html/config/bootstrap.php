@@ -47,6 +47,7 @@ require_once __DIR__ . '/session.php';
 
 // Load helpers
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/booking-rules.php';
 
 // Initialize Security
 $security = Security::getInstance();

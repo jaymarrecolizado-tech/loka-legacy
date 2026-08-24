@@ -37,6 +37,15 @@ if ($request->status !== STATUS_APPROVED) {
     redirectWith('/?page=requests&action=view&id=' . $requestId, 'danger', 'Only approved requests can be marked as completed.');
 }
 
+// Booking rule: guard must confirm the vehicle return before completion
+if (!$request->actual_arrival_datetime && requireReturnConfirmation()) {
+    auditLog('complete_blocked_no_return', 'request', $requestId,
+        ['status' => STATUS_APPROVED],
+        ['reason' => 'require_return_confirmation enabled but no guard arrival recorded']
+    );
+    redirectWith('/?page=requests&action=view&id=' . $requestId, 'danger', 'Return confirmation is required. The guard must record the vehicle\'s return before this trip can be marked as completed.');
+}
+
 // Authorization check: Verify motorpool head has authority over this request
 $canComplete = false;
 if (isAdmin()) {

@@ -10,6 +10,17 @@ $pageTitle = 'Patch Notes';
 // Patch notes data - organized by version (from git history)
 $patchNotes = [
     [
+        'version' => '2.6.0',
+        'date' => '2026-08-24',
+        'title' => 'Booking Rules & Return Confirmation',
+        'changes' => [
+            ['type' => 'feature', 'text' => '"Require Return Confirmation" setting is now enforced: when enabled, the guard must record the vehicle\'s return before a trip can be completed'],
+            ['type' => 'improvement', 'text' => 'Booking rules validation consolidated into shared helpers used by both create and edit forms'],
+            ['type' => 'improvement', 'text' => 'Settings page now shows which out-of-range values were corrected on save'],
+            ['type' => 'fix', 'text' => 'Removed unused frontend API scaffold (dead code)'],
+        ]
+    ],
+    [
         'version' => '1.0.0',
         'date' => '2026-02-22',
         'title' => 'Initial Release',

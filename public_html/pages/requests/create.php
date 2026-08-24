@@ -145,19 +145,14 @@ $vehicleId = postInt('vehicle_id') ?: null;
     $motorpoolHeadId = postInt('motorpool_head_id');
     $requestedDriverId = postInt('requested_driver_id') ?: null;
     
-    // Load booking rules settings
-    $bookingSettings = [];
-    $settingsData = db()->fetchAll("SELECT `key`, value FROM settings WHERE `key` IN ('max_advance_booking_days', 'min_advance_booking_hours', 'max_trip_duration_hours')");
-    foreach ($settingsData as $s) {
-        $bookingSettings[$s->key] = $s->value;
-    }
-    $maxAdvanceDays = (int) ($bookingSettings['max_advance_booking_days'] ?? 30);
-    $minAdvanceHours = (int) ($bookingSettings['min_advance_booking_hours'] ?? 24);
-    $maxTripHours = (int) ($bookingSettings['max_trip_duration_hours'] ?? 72);
+    // Load booking rules settings (shared helper)
+    $bookingSettings = getBookingRules();
+    $maxAdvanceDays = $bookingSettings['max_advance_booking_days'];
+    $minAdvanceHours = $bookingSettings['min_advance_booking_hours'];
+    $maxTripHours = $bookingSettings['max_trip_duration_hours'];
     
     // Validation
     $manilaTz = new DateTimeZone('Asia/Manila');
-    $now = new DateTime('now', $manilaTz);
     
     if (empty($startDatetime)) {
         $errors[] = 'Start date/time is required';
@@ -165,31 +160,14 @@ $vehicleId = postInt('vehicle_id') ?: null;
     if (empty($endDatetime)) {
         $errors[] = 'End date/time is required';
     }
-if ($startDatetime && $endDatetime) {
+    if ($startDatetime && $endDatetime) {
         $startDt = new DateTime($startDatetime, $manilaTz);
         $endDt = new DateTime($endDatetime, $manilaTz);
         if ($endDt <= $startDt) {
             $errors[] = 'End date/time must be after start date/time';
-        }
-        
-        // Booking rules validation
-        $hoursUntilStart = ($startDt->getTimestamp() - $now->getTimestamp()) / 3600;
-        
-        // Check minimum advance booking time
-        if ($hoursUntilStart < $minAdvanceHours) {
-            $errors[] = "Bookings must be made at least {$minAdvanceHours} hours in advance. Please select a later start time.";
-        }
-        
-        // Check maximum advance booking time
-        $maxAdvanceHours = $maxAdvanceDays * 24;
-        if ($hoursUntilStart > $maxAdvanceHours) {
-            $errors[] = "Bookings cannot be made more than {$maxAdvanceDays} days in advance. Please select an earlier start time.";
-        }
-        
-        // Check maximum trip duration
-        $tripDurationHours = ($endDt->getTimestamp() - $startDt->getTimestamp()) / 3600;
-        if ($tripDurationHours > $maxTripHours) {
-            $errors[] = "Trip duration cannot exceed {$maxTripHours} hours. Please shorten your trip or split it into multiple requests.";
+        } else {
+            // Booking rules validation (shared helper)
+            $errors = array_merge($errors, validateBookingRules($startDt, $endDt));
         }
     }
     if (empty($purpose)) {

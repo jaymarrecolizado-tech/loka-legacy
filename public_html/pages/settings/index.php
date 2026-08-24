@@ -24,12 +24,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($val < $min || $val > $max) return (string)$default;
         return (string)$val;
     };
+    
+    // Track out-of-range values that were corrected so the admin isn't surprised
+    $corrected = [];
+    $trackClamp = function ($label, $val, $min, $max, $default) use ($clamp, &$corrected) {
+        $raw = (int) trim((string)$val);
+        $result = $clamp($val, $min, $max, $default);
+        if ($raw !== (int) $result && ($raw < $min || $raw > $max)) {
+            $corrected[] = "{$label} was reset to {$result} (allowed range: {$min}–{$max}).";
+        }
+        return $result;
+    };
 
     $settingsToUpdate = [
         'system_name' => post('system_name', APP_NAME),
-        'max_advance_booking_days' => $clamp(post('max_advance_booking_days', '30'), 1, 365, 30),
-        'min_advance_booking_hours' => $clamp(post('min_advance_booking_hours', '24'), 0, 168, 24),
-        'max_trip_duration_hours' => $clamp(post('max_trip_duration_hours', '72'), 1, 720, 72),
+        'max_advance_booking_days' => $trackClamp('Maximum advance booking', post('max_advance_booking_days', '30'), 1, 365, 30),
+        'min_advance_booking_hours' => $trackClamp('Minimum notice', post('min_advance_booking_hours', '24'), 0, 168, 24),
+        'max_trip_duration_hours' => $trackClamp('Maximum trip duration', post('max_trip_duration_hours', '72'), 1, 720, 72),
         'require_return_confirmation' => post('require_return_confirmation', '0') === '1' ? '1' : '0',
     ];
     
@@ -62,6 +73,14 @@ require_once INCLUDES_PATH . '/header.php';
     <?php if ($success): ?>
     <div class="alert alert-success alert-dismissible fade show">
         Settings saved successfully.
+        <?php if (!empty($corrected)): ?>
+        <hr>
+        <ul class="mb-0 ps-3">
+            <?php foreach ($corrected as $notice): ?>
+            <li><?= e($notice) ?></li>
+            <?php endforeach; ?>
+        </ul>
+        <?php endif; ?>
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
     <?php endif; ?>
