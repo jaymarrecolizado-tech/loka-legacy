@@ -1,10 +1,79 @@
-# LOKA Feature Plan: Admin Workflow Rollback
+# LOKA Feature Plan: Admin Workflow Rollback — ✅ IMPLEMENTED (commits 63c71ff, a2729f5)
 
 ## Goal
 
 Allow **admins** to roll back a vehicle request to an earlier phase in the approval
 workflow (e.g., send an approved request back to motorpool review, or back to the
 department approver), with full audit trail and automatic reversal of side effects.
+Admin rollback also **reverses guard transactions** (clears dispatch/arrival records).
+
+---
+
+# LOKA Plan #2: Prevent Duplicate Request Submissions
+
+## Problem
+
+Users submit the same request multiple times. Root cause (confirmed in code):
+
+1. `pages/requests/create.php` (lines ~215–350) inserts the request, then **synchronously**
+   calls `notify()` for the approver + every passenger + the driver — all **before** the
+   redirect. `EmailQueue.php:95` performs a **live SMTP send inline** (`[SYNC-EMAIL]`),
+   one-by-one per recipient.
+2. Each SMTP send takes seconds → total submit hangs 10–30s+ → the page "looks hung"
+   while it's actually sending emails → the user clicks Submit again / refreshes →
+   **duplicate requests**.
+3. Existing protections are insufficient:
+   - `initPreventDoubleSubmit()` (app.js) disables buttons client-side — bypassed by
+     reload, back button, or slow JS; useless once the first POST is in flight.
+   - `notify()` has notification-level dedupe/rate-limit — protects notifications only,
+     not `requests`.
+
+## Fix Strategy (defense in depth)
+
+### Layer 1 — Make submission fast (root cause)
+- **Stop sending emails synchronously during submit.** `notify()` should only:
+  insert the notification row + queue the email (`email_queue.status='pending'`).
+- The existing cron (`cron/process_queue.php`, already scheduled every 2 min) sends them
+  in the background. Add config flag `MAIL_SYNC_SEND` (default **false**); when false,
+  `EmailQueue` skips the inline `$mailer->send()` and only queues.
+- Result: submit drops from ~10–30s to <1s. Notifications still arrive within ~2 min.
+
+### Layer 2 — Server-side idempotency (hard guarantee)
+- **Migration 018**: `ALTER TABLE requests ADD COLUMN idempotency_key VARCHAR(64) DEFAULT NULL, ADD UNIQUE INDEX uq_requests_idempotency (idempotency_key)`
+- `create.php` form embeds a hidden UUID generated per page load (`$_SESSION` or hidden field).
+- On POST: atomically claim the key — `INSERT ...` fails with duplicate-key error if already
+  used → catch, look up the existing request, and **redirect to it** with
+  "This request was already submitted" instead of inserting again.
+- **Heuristic backstop** (covers re-typed duplicates too): before insert, reject/warn if an
+  identical request exists from the same user in the last 10 minutes
+  (`user_id + destination + start_datetime + purpose` match).
+
+### Layer 3 — UX feedback (client)
+- Upgrade `initPreventDoubleSubmit()`: on submit, disable buttons **and** show a
+  full-screen "Submitting… please wait" overlay so the wait state is obvious.
+- Keep the existing guard as-is otherwise.
+
+### Layer 4 — Cleanup of existing duplicates (one-time)
+- SQL report for admins: group identical requests (user + destination + start + purpose,
+  created within 5 min) → review list; soft-delete the duplicates keeping the earliest.
+
+## Implementation Steps
+1. Migration 018 (idempotency_key + unique index).
+2. `EmailQueue`: honor `MAIL_SYNC_SEND` flag; default queue-only.
+3. `create.php`: idempotency token (generate, embed, verify, claim), heuristic duplicate
+   check, and move `notify()` calls to queue-only (they already go through `notify()`).
+4. `app.js`: submitting overlay.
+5. One-time duplicate-detection SQL + admin review.
+6. QA: submit normally; double-click submit; reload-and-resubmit; kill the tab mid-submit
+   and re-submit — all must yield exactly ONE request.
+
+## QA Checklist
+- [ ] Submit takes < 1s and redirects immediately; emails arrive via cron within ~2 min
+- [ ] Double-click / reload / back-button resubmit does NOT create a second request
+- [ ] Identical re-submission within 10 min is blocked with a clear message linking to the original
+- [ ] Legitimate similar requests (different date/destination) still go through
+- [ ] No `[SYNC-EMAIL]` entries in logs during submission; queue processes via cron
+
 
 ## Current Workflow (as implemented)
 
