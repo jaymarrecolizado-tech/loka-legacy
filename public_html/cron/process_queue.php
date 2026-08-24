@@ -2,16 +2,26 @@
 /**
  * LOKA - Email Queue Processor
  *
- * Run this script via cron/task scheduler to process queued emails
+ * Sends all queued emails (notifications, approvals, dispatch alerts, etc.).
+ * The app ONLY queues emails during form submissions — this cron does the
+ * actual sending, keeping submissions fast and duplicate-free.
  *
- * Recommended schedule: Every 1-2 minutes
+ * Recommended schedule: every 2 minutes
  *
- * HOSTINGER (cPanel Cron Jobs):
- *   Frequency: Every 2 minutes (use: every 2 minutes in cPanel)
+ * Hostinger KVM 2 / VPS (SSH crontab):
+ *   1. SSH in, then: crontab -e
+ *   2. Add (adjust paths + php binary):
+ *      */2 * * * * /usr/bin/php /home/dictr2-lokafleet/htdocs/lokafleet.dictr2.cloud/public_html/cron/process_queue.php >> /home/dictr2-lokafleet/htdocs/lokafleet.dictr2.cloud/public_html/logs/cron.log 2>&1
+ *   3. Verify it runs: tail -f .../logs/cron.log
+ *
+ * Or run setup.sh on the VPS — it installs this cron + log rotation for you.
+ *
+ * Verify queue-only mode in .env: MAIL_SYNC_SEND=false (default).
+ * Set MAIL_SYNC_SEND=true ONLY as a fallback if the cron cannot run.
+ *
+ * cPanel Cron Jobs (shared hosting alternative):
+ *   Frequency: every 2 minutes
  *   Command: /usr/bin/php /home/dictr2-lokafleet/htdocs/lokafleet.dictr2.cloud/public_html/cron/process_queue.php
- *
- * Linux Cron:
- *   Run every 2 minutes: /usr/bin/php /path/to/cron/process_queue.php >> /path/to/logs/email_queue.log 2>&1
  */
 
 // Prevent web access

@@ -28,8 +28,12 @@ NC='\033[0m' # No Color
 APP_NAME="LOKA Fleet Management"
 DB_NAME="fleet_management"
 DB_USER="loka_db_user"
-WEB_ROOT="/var/www/html"
+# Auto-detect web root from this script's location (works for Hostinger
+# CloudPanel layouts like /home/<user>/htdocs/<domain> and plain /var/www/html)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WEB_ROOT="$SCRIPT_DIR"
 LOG_DIR="$WEB_ROOT/logs"
+PHP_BIN="$(command -v php || echo /usr/bin/php)"
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  LOKA Fleet - Server Setup Script${NC}"
@@ -150,30 +154,40 @@ fi
 echo ""
 
 # Step 5: Create Admin User
-echo -e "${GREEN}[5/7] Creating admin user...${NC}"
+echo -e "${GREEN}[5/7] Admin user...${NC}"
 
-if [ -f "$WEB_ROOT/reset_admin_password.php" ]; then
-    read -p "Do you want to create/reset admin password? (y/n): " create_admin
-
-    if [ "$create_admin" = "y" ] || [ "$create_admin" = "Y" ]; then
-        php "$WEB_ROOT/reset_admin_password.php"
-    fi
-else
-    echo -e "${YELLOW}No admin reset script found${NC}"
-    echo -e "${YELLOW}You can create admin manually in the database${NC}"
-fi
+echo -e "${YELLOW}Admin accounts are managed in the database (users table, role='admin').${NC}"
+echo -e "${YELLOW}If you need to reset an admin password, update users.password with a${NC}"
+echo -e "${YELLOW}password_hash() value or use the app's 'Forgot Password' flow.${NC}"
 echo ""
 
-# Step 6: Setup Cron Job
+# Step 6: Setup Cron Job (email queue processor)
 echo -e "${GREEN}[6/7] Setting up cron job for email queue...${NC}"
 
-CRON_JOB="*/2 * * * * php $WEB_ROOT/cron/process_queue.php >> $WEB_ROOT/logs/cron.log 2>&1"
+# Absolute PHP path: cron runs with a minimal PATH where bare 'php' may fail.
+# Every 2 minutes; output to the app's log dir. flock-style overlap protection
+# is handled inside process_queue.php (atomic lock file).
+CRON_JOB="*/2 * * * * $PHP_BIN $WEB_ROOT/cron/process_queue.php >> $LOG_DIR/cron.log 2>&1"
 
 if crontab -l 2>/dev/null | grep -q "process_queue.php"; then
     echo -e "${YELLOW}✓ Cron job already exists${NC}"
 else
     (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
-    echo -e "${GREEN}✓ Cron job added${NC}"
+    echo -e "${GREEN}✓ Cron job added: $CRON_JOB${NC}"
+fi
+
+# Keep cron.log from growing unbounded (keep 14 days, compress old)
+if [ ! -f /etc/logrotate.d/loka-cron ] && [ -w /etc/logrotate.d ] 2>/dev/null; then
+    cat > /etc/logrotate.d/loka-cron <<EOF
+$LOG_DIR/cron.log {
+    daily
+    rotate 14
+    compress
+    missingok
+    notifempty
+}
+EOF
+    echo -e "${GREEN}✓ Log rotation configured (/etc/logrotate.d/loka-cron)${NC}"
 fi
 echo ""
 
