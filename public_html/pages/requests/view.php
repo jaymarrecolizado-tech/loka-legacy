@@ -156,6 +156,13 @@ require_once INCLUDES_PATH . '/header.php';
                     <i class="bi bi-check-circle me-1"></i>Complete Trip
                 </button>
             <?php endif; ?>
+
+            <?php if (isAdmin() && in_array($request->status, [STATUS_PENDING_MOTORPOOL, STATUS_APPROVED, STATUS_COMPLETED, STATUS_REVISION, STATUS_REJECTED])): ?>
+                <a href="<?= APP_URL ?>/?page=rollback&action=process&id=<?= $requestId ?>"
+                   class="btn btn-outline-warning" title="Roll this request back to an earlier workflow phase">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Rollback
+                </a>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -567,6 +574,8 @@ require_once INCLUDES_PATH . '/header.php';
                                     <div class="me-3">
                                         <?php if ($approval->status === 'approved'): ?>
                                             <span class="badge bg-success rounded-circle p-2"><i class="bi bi-check-lg"></i></span>
+                                        <?php elseif ($approval->status === 'rollback'): ?>
+                                            <span class="badge bg-warning text-dark rounded-circle p-2"><i class="bi bi-arrow-counterclockwise"></i></span>
                                         <?php else: ?>
                                             <span class="badge bg-danger rounded-circle p-2"><i class="bi bi-x-lg"></i></span>
                                         <?php endif; ?>
@@ -574,10 +583,15 @@ require_once INCLUDES_PATH . '/header.php';
                                     <div>
                                         <div class="fw-medium">
                                             <?= e($approval->approver_name) ?>
-                                            <span class="text-<?= $approval->status === 'approved' ? 'success' : 'danger' ?>">
-                                                <?= ucfirst($approval->status) ?>
-                                            </span>
-                                            (<?= ucfirst($approval->approval_type) ?> Level)
+                                            <?php if ($approval->status === 'rollback'): ?>
+                                                <span class="text-warning">Rolled Back</span>
+                                                <small class="text-muted">(to <?= ucfirst($approval->approval_type) ?> phase)</small>
+                                            <?php else: ?>
+                                                <span class="text-<?= $approval->status === 'approved' ? 'success' : 'danger' ?>">
+                                                    <?= ucfirst($approval->status) ?>
+                                                </span>
+                                                (<?= ucfirst($approval->approval_type) ?> Level)
+                                            <?php endif; ?>
                                         </div>
                                         <small class="text-muted"><?= formatDateTime($approval->created_at) ?></small>
                                         <?php if ($approval->comments): ?>

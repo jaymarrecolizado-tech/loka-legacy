@@ -174,6 +174,8 @@ switch ($page) {
             require_once PAGES_PATH . '/requests/complete.php';
         } elseif ($action === 'override') {
             require_once PAGES_PATH . '/requests/override.php';
+        } elseif ($action === 'rollback') {
+            require_once PAGES_PATH . '/requests/rollback.php';
         } elseif ($action === 'print') {
             require_once PAGES_PATH . '/requests/print.php';
         } else {
@@ -348,6 +350,15 @@ switch ($page) {
     case 'audit':
         requireRole(ROLE_ADMIN);
         require_once PAGES_PATH . '/audit/index.php';
+        break;
+
+    case 'rollback':
+        requireRole(ROLE_ADMIN);
+        if ($action === 'process') {
+            require_once PAGES_PATH . '/requests/rollback.php';
+        } else {
+            require_once PAGES_PATH . '/rollback/index.php';
+        }
         break;
 
     case 'admin-reports':

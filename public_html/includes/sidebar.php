@@ -201,7 +201,24 @@
                     <span>Audit Logs</span>
                 </a>
             </li>
-            
+
+            <!-- Request Rollback -->
+            <?php
+            $rollbackEligible = db()->fetchColumn(
+                "SELECT COUNT(*) FROM requests
+                 WHERE deleted_at IS NULL AND status IN ('pending_motorpool','approved','completed','revision','rejected')"
+            );
+            ?>
+            <li class="nav-item">
+                <a class="nav-link <?= activeMenu('rollback') ?>" href="<?= APP_URL ?>/?page=rollback">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                    <span>Request Rollback</span>
+                    <?php if ($rollbackEligible > 0): ?>
+                    <span class="badge bg-secondary ms-auto"><?= $rollbackEligible > 99 ? '99+' : $rollbackEligible ?></span>
+                    <?php endif; ?>
+                </a>
+            </li>
+
             <!-- Settings -->
             <li class="nav-item">
                 <a class="nav-link <?= activeMenu('settings') ?>" href="<?= APP_URL ?>/?page=settings">
