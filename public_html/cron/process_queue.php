@@ -11,7 +11,7 @@
  * Hostinger KVM 2 / VPS (SSH crontab):
  *   1. SSH in, then: crontab -e
  *   2. Add (adjust paths + php binary):
- *      */2 * * * * /usr/bin/php /home/dictr2-lokafleet/htdocs/lokafleet.dictr2.cloud/public_html/cron/process_queue.php >> /home/dictr2-lokafleet/htdocs/lokafleet.dictr2.cloud/public_html/logs/cron.log 2>&1
+ *      0-59/2 * * * * /usr/bin/php /home/dictr2-lokafleet/htdocs/lokafleet.dictr2.cloud/public_html/cron/process_queue.php >> /home/dictr2-lokafleet/htdocs/lokafleet.dictr2.cloud/public_html/logs/cron.log 2>&1
  *   3. Verify it runs: tail -f .../logs/cron.log
  *
  * Or run setup.sh on the VPS — it installs this cron + log rotation for you.
