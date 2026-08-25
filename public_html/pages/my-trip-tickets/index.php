@@ -288,7 +288,7 @@ require_once INCLUDES_PATH . '/header.php';
                                     </td>
                                     <td>
                                         <div class="fw-medium"><?= e($tt->trip_destination) ?></div>
-                                        <small class="text-muted"><?= truncate($tt->trip_purpose, 40) ?></small>
+                                        <small class="text-muted"><?= truncate($tt->trip_purpose, 60) ?></small>
                                     </td>
                                     <td>
                                         <div class="small">

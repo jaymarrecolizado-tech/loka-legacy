@@ -25,7 +25,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
     <!-- Custom CSS -->
-    <link href="<?= ASSETS_PATH ?>/css/style.css" rel="stylesheet">
+    <link href="<?= ASSETS_PATH ?>/css/style.css?v=<?= e(APP_VERSION) ?>" rel="stylesheet">
 </head>
 <body>
     <!-- Top Navigation -->

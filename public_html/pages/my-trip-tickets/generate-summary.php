@@ -49,6 +49,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $isPrint) {
         // Fetch drivers for dropdown
         $drivers = db()->fetchAll("SELECT u.id, u.name FROM drivers d JOIN users u ON d.user_id = u.id ORDER BY u.name");
 
+        // Fetch motorpool heads (Reviewers) and Chief Admin & Finance / Admin (Approvers) for signatory dropdowns
+        $reviewers = db()->fetchAll(
+            "SELECT name FROM users WHERE role IN (?, ?) AND status = 'active' AND deleted_at IS NULL ORDER BY name",
+            [ROLE_MOTORPOOL, ROLE_ADMIN]
+        );
+        $approvers = db()->fetchAll(
+            "SELECT name, role FROM users WHERE role IN (?, ?, ?) AND status = 'active' AND deleted_at IS NULL ORDER BY name",
+            [ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE, ROLE_ADMIN]
+        );
+
         // Fetch all completed trips (requests) for this vehicle within date range
         $sql = "SELECT r.id as req_id, r.destination, r.purpose,
                        du.name as trip_driver_name, r.passenger_count as passengers,
@@ -154,8 +164,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $isPrint) {
         }
 
         if ($isPrint) {
-            // Include html layout directly
-            require_once __DIR__ . '/summary-print.php';
+            // Include html layout directly (variant: summary or travel order)
+            $variant = get('variant', 'summary') === 'travel_order'
+                ? 'summary-print-travelorder.php'
+                : 'summary-print.php';
+            require_once __DIR__ . '/' . $variant;
             exit;
         }
     }
@@ -205,6 +218,15 @@ require_once INCLUDES_PATH . '/header.php';
                         <input type="hidden" name="page" value="my-trip-tickets">
                         <input type="hidden" name="action" value="generate-summary">
                         <input type="hidden" name="print" value="1">
+
+                        <div class="mb-3">
+                            <label class="form-label">Ticket Template <span class="text-danger">*</span></label>
+                            <select class="form-select" name="variant">
+                                <option value="summary" selected>Vehicle Trip Ticket (Weekly Summary)</option>
+                                <option value="travel_order">Travel Order</option>
+                            </select>
+                            <small class="text-muted">Both templates let you edit every field and add rows before printing.</small>
+                        </div>
 
                         <div class="mb-3">
                             <label class="form-label">Vehicle <span class="text-danger">*</span></label>

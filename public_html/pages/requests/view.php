@@ -341,6 +341,8 @@ require_once INCLUDES_PATH . '/header.php';
                 </div>
             <?php endif; ?>
 
+            <?php require __DIR__ . '/partials/vehicle_observations.php'; ?>
+
             <!-- Travel Documents -->
             <?php if ($request->has_travel_order || $request->has_official_business_slip): ?>
                 <div class="card mb-4">

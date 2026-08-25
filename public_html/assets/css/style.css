@@ -219,6 +219,32 @@ body {
     font-size: 0.875rem;
 }
 
+/* Clickable stat cards */
+a.stat-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+a.stat-card-link:hover .stat-label {
+    color: #495057;
+}
+
+.stat-card .stat-hint {
+    margin-top: 0.35rem;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #adb5bd;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+a.stat-card-link:hover .stat-hint,
+a.stat-card-link:focus .stat-hint {
+    opacity: 1;
+}
+
 /* ===== TABLES ===== */
 .table-card {
     border: none;
@@ -845,3 +871,348 @@ body {
         margin-left: 0 !important;
     }
 }
+
+/* ===== Availability planning calendar (ported from prod-loka) ===== */
+/* ===== Availability planning calendar ===== */
+.avail-layout {
+    display: grid;
+    grid-template-columns: minmax(280px, 340px) 1fr;
+    gap: 1.25rem;
+    align-items: start;
+}
+@media (max-width: 991.98px) {
+    .avail-layout { grid-template-columns: 1fr; }
+}
+.avail-mini { padding: 1rem; }
+.avail-mini-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+.avail-mini-title { font-size: 1.1rem; font-weight: 700; line-height: 1.2; }
+.avail-mini-sub { font-size: 0.75rem; opacity: 0.65; }
+.avail-mini-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.avail-range-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    user-select: none;
+}
+.avail-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0;
+    border: 1px solid #94a3b8;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #94a3b8;
+}
+[data-theme="loka"] .avail-cal-grid {
+    border-color: #475569;
+    background: #475569;
+}
+.avail-cal-dow {
+    background: #1e3a5f;
+    color: #f8fafc;
+    text-align: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.45rem 0.15rem;
+    border-right: 1px solid #334155;
+}
+.avail-cal-dow:last-child { border-right: none; }
+.avail-cal-day {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: 4.25rem;
+    padding: 0.35rem 0.4rem;
+    background: #ffffff;
+    color: inherit;
+    text-decoration: none;
+    border-right: 1px solid #94a3b8;
+    border-bottom: 1px solid #94a3b8;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+[data-theme="loka"] .avail-cal-day {
+    background: #0f172a;
+    border-right-color: #475569;
+    border-bottom-color: #475569;
+    color: #e2e8f0;
+}
+.avail-cal-day:nth-child(7n) { border-right: none; }
+.avail-cal-day:hover { background: #f1f5f9; }
+[data-theme="loka"] .avail-cal-day:hover { background: #1e293b; }
+.avail-cal-day.is-other {
+    background: #f8fafc;
+    color: #94a3b8;
+    pointer-events: none;
+}
+[data-theme="loka"] .avail-cal-day.is-other {
+    background: #0b1220;
+    color: #475569;
+}
+.avail-cal-day.is-free { background: #ecfdf5; }
+.avail-cal-day.is-partial { background: #fffbeb; }
+.avail-cal-day.is-full { background: #fef2f2; }
+[data-theme="loka"] .avail-cal-day.is-free { background: #052e1f; }
+[data-theme="loka"] .avail-cal-day.is-partial { background: #3b2f0b; }
+[data-theme="loka"] .avail-cal-day.is-full { background: #3f1212; }
+.avail-cal-day.is-today .avail-day-num {
+    background: #1e3a5f;
+    color: #fff;
+}
+.avail-cal-day.is-selected {
+    box-shadow: inset 0 0 0 2px #2563eb;
+    z-index: 1;
+    position: relative;
+}
+.avail-cal-day.is-sel-start,
+.avail-cal-day.is-sel-end {
+    box-shadow: inset 0 0 0 2px #1d4ed8;
+}
+.avail-day-num {
+    display: inline-flex;
+    width: 1.5rem;
+    height: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.avail-day-free {
+    font-size: 0.65rem;
+    font-weight: 600;
+    opacity: 0.75;
+    margin-top: 0.15rem;
+}
+.avail-day-dots {
+    display: flex;
+    gap: 3px;
+    margin-top: auto;
+    padding-top: 0.2rem;
+}
+.avail-day-dots i {
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    background: #2563eb;
+    display: block;
+}
+.avail-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+}
+.avail-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.avail-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+}
+.avail-dot.free { background: #10b981; }
+.avail-dot.partial { background: #f59e0b; }
+.avail-dot.full { background: #ef4444; }
+.avail-hint {
+    margin: 0.5rem 0 0;
+    font-size: 0.7rem;
+    opacity: 0.65;
+    line-height: 1.35;
+}
+.avail-panel {
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    padding: 1rem 1.15rem 1.25rem;
+}
+[data-theme="loka"] .avail-panel {
+    background: #0f172a;
+    border-color: #334155;
+}
+.avail-panel-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+[data-theme="loka"] .avail-panel-head { border-bottom-color: #334155; }
+.avail-panel-title { font-size: 1.05rem; font-weight: 700; }
+.avail-panel-sub { font-size: 0.8rem; opacity: 0.65; margin-top: 0.2rem; }
+.avail-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.avail-filter-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    min-width: 160px;
+}
+.avail-tabs {
+    display: none;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+.avail-tab {
+    flex: 1;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.avail-tab.is-active {
+    background: #1e3a5f;
+    border-color: #1e3a5f;
+    color: #fff;
+}
+[data-theme="loka"] .avail-tab {
+    background: #1e293b;
+    border-color: #475569;
+    color: #e2e8f0;
+}
+[data-theme="loka"] .avail-tab.is-active {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+@media (max-width: 767.98px) {
+    .avail-tabs { display: flex; }
+    .avail-sections .avail-section { display: none; }
+    .avail-sections .avail-section.is-active { display: block; }
+}
+@media (min-width: 768px) {
+    .avail-sections {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr 1fr;
+        gap: 1rem;
+    }
+    .avail-sections .avail-section { display: block !important; }
+}
+.avail-section {
+    border: 1px solid #94a3b8;
+    border-radius: 0.65rem;
+    padding: 0.85rem 0.9rem 1rem;
+    background: #f8fafc;
+    min-height: 0;
+}
+[data-theme="loka"] .avail-section {
+    border-color: #64748b;
+    background: #1e293b;
+}
+.avail-section-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 0.65rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #cbd5e1;
+}
+[data-theme="loka"] .avail-section-title {
+    border-bottom-color: #475569;
+}
+.avail-count {
+    margin-left: auto;
+    font-size: 0.75rem;
+    font-weight: 600;
+    opacity: 0.65;
+}
+.avail-empty {
+    text-align: center;
+    padding: 1.25rem 0.75rem;
+    opacity: 0.7;
+    font-size: 0.85rem;
+}
+.avail-empty i { font-size: 1.5rem; display: block; margin-bottom: 0.35rem; }
+.avail-trip-list,
+.avail-asset-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 28rem;
+    overflow: auto;
+}
+.avail-trip-item,
+.avail-asset-list li {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.55rem 0.65rem;
+    background: #f8fafc;
+}
+[data-theme="loka"] .avail-trip-item,
+[data-theme="loka"] .avail-asset-list li {
+    border-color: #334155;
+    background: #111827;
+}
+.avail-trip-time { font-size: 0.72rem; opacity: 0.7; margin-bottom: 0.2rem; }
+.avail-trip-dest {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: inherit;
+    text-decoration: none;
+}
+.avail-trip-dest:hover { text-decoration: underline; }
+.avail-trip-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    margin-top: 0.35rem;
+}
+.avail-asset-list li {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.15rem 0.5rem;
+    align-items: center;
+}
+.avail-asset-name { font-weight: 700; font-size: 0.85rem; }
+.avail-asset-meta {
+    grid-column: 1 / -1;
+    font-size: 0.72rem;
+    opacity: 0.7;
+}
+.avail-month-table { padding: 0; overflow: hidden; }
+.avail-month-summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.9rem 1.15rem;
+    font-weight: 600;
+}
+.avail-month-summary::-webkit-details-marker { display: none; }
+
+
+/* Gas voucher filter utility */
+.min-w-140 { min-width: 140px; }

@@ -41,6 +41,9 @@ require_once __DIR__ . '/../classes/Cache.php';
 require_once __DIR__ . '/../classes/Auth.php';
 require_once __DIR__ . '/../classes/Mailer.php';
 require_once __DIR__ . '/../classes/EmailQueue.php';
+require_once __DIR__ . '/sms.php';
+require_once __DIR__ . '/../classes/SmsGateway.php';
+require_once __DIR__ . '/../classes/SmsQueue.php';
 
 // Load session (needs Security class)
 require_once __DIR__ . '/session.php';
@@ -48,6 +51,11 @@ require_once __DIR__ . '/session.php';
 // Load helpers
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/booking-rules.php';
+require_once __DIR__ . '/../includes/view_as.php';
+require_once __DIR__ . '/../includes/sms.php';
+require_once __DIR__ . '/../includes/mail_delivery.php';
+require_once __DIR__ . '/../includes/badge_counts.php';
+require_once __DIR__ . '/../includes/vehicle_care.php';
 
 // Initialize Security
 $security = Security::getInstance();

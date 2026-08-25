@@ -379,7 +379,7 @@ require_once INCLUDES_PATH . '/header.php';
                         <dd class="col-sm-8"><?= e($request->destination) ?></dd>
                         
                         <dt class="col-sm-4">Original Purpose:</dt>
-                        <dd class="col-sm-8"><?= truncate($request->purpose, 50) ?></dd>
+                        <dd class="col-sm-8"><?= truncate($request->purpose, 80) ?></dd>
                     </dl>
                 </div>
             </div>
@@ -475,7 +475,7 @@ require_once INCLUDES_PATH . '/header.php';
                     <div class="col-md-6">
                         <label class="form-label">Purpose</label>
                         <textarea class="form-control" name="purpose" rows="2" placeholder="Detailed purpose of the trip..."><?= e($purposeValue) ?></textarea>
-                        <small class="text-muted">Original: <?= truncate($tripPurpose, 40) ?></small>
+                        <small class="text-muted">Original: <?= truncate($tripPurpose, 60) ?></small>
                     </div>
                 </div>
 

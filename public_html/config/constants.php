@@ -41,13 +41,19 @@ define('ROLE_APPROVER', 'approver');
 define('ROLE_MOTORPOOL', 'motorpool_head');
 define('ROLE_GUARD', 'guard');
 define('ROLE_ADMIN', 'admin');
+define('ROLE_CHIEF_ADMIN_FINANCE', 'chief_admin_finance');
+define('ROLE_OIC_CHIEF_ADMIN_FINANCE', 'oic_chief_admin_finance');
+define('ROLE_ALL_FATHER', 'all_father');
 
 define('ROLE_LEVELS', [
     ROLE_REQUESTER => 1,
     ROLE_GUARD => 1,
     ROLE_APPROVER => 3,
     ROLE_MOTORPOOL => 4,
-    ROLE_ADMIN => 5
+    ROLE_ADMIN => 5,
+    ROLE_CHIEF_ADMIN_FINANCE => 2,
+    ROLE_OIC_CHIEF_ADMIN_FINANCE => 2,
+    ROLE_ALL_FATHER => 99
 ]);
 
 // Request Status
@@ -128,7 +134,10 @@ define('ROLE_LABELS', [
     ROLE_APPROVER => ['label' => 'Approver', 'color' => 'info'],
     ROLE_MOTORPOOL => ['label' => 'Motorpool Head', 'color' => 'primary'],
     ROLE_GUARD => ['label' => 'Guard', 'color' => 'warning'],
-    ROLE_ADMIN => ['label' => 'Administrator', 'color' => 'danger']
+    ROLE_CHIEF_ADMIN_FINANCE => ['label' => 'Chief Admin & Finance', 'color' => 'dark'],
+    ROLE_OIC_CHIEF_ADMIN_FINANCE => ['label' => 'OIC Chief Admin & Finance', 'color' => 'dark'],
+    ROLE_ADMIN => ['label' => 'Administrator', 'color' => 'danger'],
+    ROLE_ALL_FATHER => ['label' => 'All Father', 'color' => 'danger']
 ]);
 
 // Maintenance Types
@@ -230,4 +239,53 @@ define('MAINTENANCE_STATUSES', [
     MAINTENANCE_STATUS_IN_PROGRESS => ['label' => 'In Progress', 'color' => 'primary'],
     MAINTENANCE_STATUS_COMPLETED => ['label' => 'Completed', 'color' => 'success'],
     MAINTENANCE_STATUS_CANCELLED => ['label' => 'Cancelled', 'color' => 'secondary']
+]);
+
+// Vehicle care calendar (additive — separate from repair maintenance_requests)
+define('CARE_TYPE_PMS', 'pms');
+define('CARE_TYPE_REGISTRATION', 'registration');
+define('CARE_TYPE_CLEANING', 'cleaning');
+define('CARE_TYPE_OTHER', 'other');
+
+define('CARE_STATUS_PENDING', 'pending');
+define('CARE_STATUS_SCHEDULED', 'scheduled');
+define('CARE_STATUS_COMPLETED', 'completed');
+define('CARE_STATUS_CANCELLED', 'cancelled');
+
+define('CARE_TYPES', [
+    CARE_TYPE_PMS => [
+        'label' => 'PMS',
+        'icon' => 'bi-tools',
+        'interval_days' => 90,
+        'interval_km' => 5000,
+        'recurring' => true,
+    ],
+    CARE_TYPE_REGISTRATION => [
+        'label' => 'Registration renewal',
+        'icon' => 'bi-card-checklist',
+        'interval_days' => null,
+        'interval_km' => null,
+        'recurring' => false,
+    ],
+    CARE_TYPE_CLEANING => [
+        'label' => 'Cleaning',
+        'icon' => 'bi-droplet-half',
+        'interval_days' => 7,
+        'interval_km' => null,
+        'recurring' => true,
+    ],
+    CARE_TYPE_OTHER => [
+        'label' => 'Other',
+        'icon' => 'bi-journal-text',
+        'interval_days' => null,
+        'interval_km' => null,
+        'recurring' => false,
+    ],
+]);
+
+define('CARE_STATUSES', [
+    CARE_STATUS_PENDING => ['label' => 'Pending approval', 'color' => 'warning'],
+    CARE_STATUS_SCHEDULED => ['label' => 'Scheduled', 'color' => 'info'],
+    CARE_STATUS_COMPLETED => ['label' => 'Completed', 'color' => 'success'],
+    CARE_STATUS_CANCELLED => ['label' => 'Cancelled', 'color' => 'secondary'],
 ]);

@@ -17,6 +17,7 @@ $ticket = db()->fetch(
             r.id as request_id, r.destination as trip_destination, r.purpose as trip_purpose,
             r.actual_dispatch_datetime, r.actual_arrival_datetime,
             d.license_number as driver_license, du.name as driver_name, du.phone as driver_phone,
+            v.plate_number, v.make as vehicle_make, v.model as vehicle_model, v.color as vehicle_color,
             u_req.name as requester_name, u_req.email as requester_email, u_req.phone as requester_phone,
             dg.name as dispatch_guard, dg.phone as dispatch_guard_phone,
             ag.name as arrival_guard, ag.phone as arrival_guard_phone,
@@ -25,6 +26,7 @@ $ticket = db()->fetch(
      JOIN requests r ON tt.request_id = r.id
      LEFT JOIN drivers d ON tt.driver_id = d.id
      LEFT JOIN users du ON d.user_id = du.id
+     LEFT JOIN vehicles v ON tt.vehicle_id = v.id AND v.deleted_at IS NULL
      LEFT JOIN users u_req ON r.user_id = u_req.id
      LEFT JOIN users dg ON tt.dispatch_guard_id = dg.id
      LEFT JOIN users ag ON tt.arrival_guard_id = ag.id
@@ -115,6 +117,28 @@ require_once INCLUDES_PATH . '/header.php';
                                 <i class="bi bi-card-text me-1"></i>
                                 License: <?= e($ticket->driver_license) ?>
                             </small>
+                        </div>
+                    </div>
+
+                    <!-- Vehicle Information -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-2">
+                            <i class="bi bi-truck me-1"></i> Vehicle Information
+                        </h6>
+                        <div class="p-3 bg-light rounded">
+            <?php if (!empty($ticket->plate_number)): ?>
+                            <strong><?= e($ticket->plate_number) ?></strong>
+                            <br>
+                            <small class="text-muted">
+                                <i class="bi bi-car-front me-1"></i>
+                                <?= e(trim(($ticket->vehicle_make ?? '') . ' ' . ($ticket->vehicle_model ?? '')) ?: 'Make/model not set') ?>
+                <?php if (!empty($ticket->vehicle_color)): ?>
+                                &middot; <?= e($ticket->vehicle_color) ?>
+                <?php endif; ?>
+                            </small>
+            <?php else: ?>
+                            <span class="text-muted">No vehicle assigned</span>
+            <?php endif; ?>
                         </div>
                     </div>
 

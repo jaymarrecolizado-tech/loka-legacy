@@ -17,6 +17,8 @@ $sql = "SELECT r.*,
             u.name as requester_name, u.phone as requester_phone,
             d.name as department_name,
             v.plate_number, v.make, v.model as vehicle_model,
+            COALESCE(v.odometer_broken, 0) as odometer_broken,
+            v.mileage as vehicle_mileage,
             dr.license_number as driver_license,
             driver_user.name as driver_name, driver_user.phone as driver_phone,
             mph.name as motorpool_head_name,
@@ -355,7 +357,7 @@ require_once INCLUDES_PATH . '/header.php';
         <div class="modal fade" id="dispatchModal<?= $trip->id ?>" tabindex="-1">
             <div class="modal-dialog">
                 <div class="modal-content">
-                    <form method="POST" action="<?= APP_URL ?>/?page=guard&action=record_dispatch">
+                    <form method="POST" action="<?= APP_URL ?>/?page=guard&action=record_dispatch" enctype="multipart/form-data">
                         <?= csrfField() ?>
                         <input type="hidden" name="request_id" value="<?= $trip->id ?>">
                         
@@ -415,6 +417,16 @@ require_once INCLUDES_PATH . '/header.php';
                                 </div>
                             </div>
 
+                            <!-- Odometer + Vehicle Observation -->
+                            <?php
+                            $odoPhase = 'dispatch';
+                            require __DIR__ . '/partials/odometer_fields.php';
+                            ?>
+                            <?php
+                            $obsPhase = 'dispatch';
+                            require __DIR__ . '/partials/observation_fields.php';
+                            ?>
+
                             <div class="mb-3">
                                 <label for="guard_notes<?= $trip->id ?>" class="form-label">Notes (Optional)</label>
                                 <textarea class="form-control"
@@ -441,7 +453,7 @@ require_once INCLUDES_PATH . '/header.php';
         <div class="modal fade" id="arrivalModal<?= $trip->id ?>" tabindex="-1">
             <div class="modal-dialog">
                 <div class="modal-content">
-                    <form method="POST" action="<?= APP_URL ?>/?page=guard&action=record_arrival">
+                    <form method="POST" action="<?= APP_URL ?>/?page=guard&action=record_arrival" enctype="multipart/form-data">
                         <?= csrfField() ?>
                         <input type="hidden" name="request_id" value="<?= $trip->id ?>">
                         
@@ -487,19 +499,15 @@ require_once INCLUDES_PATH . '/header.php';
                                 <small class="text-muted">Current time is pre-filled. Adjust if needed.</small>
                             </div>
 
-                            <!-- Ending Mileage (Optional) -->
-                            <?php if ($trip->mileage_start): ?>
-                            <div class="mb-3">
-                                <label for="mileage_end<?= $trip->id ?>" class="form-label">Ending Mileage (Optional)</label>
-                                <input type="number" class="form-control" id="mileage_end<?= $trip->id ?>" name="mileage_end"
-                                       min="<?= $trip->mileage_start ?>" placeholder="Current odometer reading">
-                                <small class="text-muted">
-                                    <i class="bi bi-info-circle me-1"></i>
-                                    Starting mileage was <strong><?= $trip->mileage_start ?> km</strong>.
-                                    If entered, system will calculate actual trip distance.
-                                </small>
-                            </div>
-                            <?php endif; ?>
+                            <!-- Odometer + Vehicle Observation -->
+                            <?php
+                            $odoPhase = 'arrival';
+                            require __DIR__ . '/partials/odometer_fields.php';
+                            ?>
+                            <?php
+                            $obsPhase = 'arrival';
+                            require __DIR__ . '/partials/observation_fields.php';
+                            ?>
 
                             <div class="mb-3">
                                 <label for="guard_notes<?= $trip->id ?>" class="form-label">Notes (Optional)</label>

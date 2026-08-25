@@ -36,6 +36,20 @@
                 </a>
             </li>
 
+            <?php if (function_exists('canAccessGasVouchers') && canAccessGasVouchers()): ?>
+            <!-- Gas Vouchers -->
+            <li class="nav-item">
+                <a class="nav-link <?= activeMenu('gas-vouchers') ?>" href="<?= APP_URL ?>/?page=gas-vouchers">
+                    <i class="bi bi-fuel-pump"></i>
+                    <span>Gas Vouchers</span>
+                    <?php $pendingVouchers = badgeCountPendingGasVouchers(); ?>
+                    <?php if ($pendingVouchers > 0): ?>
+                    <?= sidebarBadgeHtml($pendingVouchers) ?>
+                    <?php endif; ?>
+                </a>
+            </li>
+            <?php endif; ?>
+
             <!-- Schedule Calendar (All Users) -->
             <li class="nav-item">
                 <a class="nav-link <?= activeMenu('schedule') ?>" href="<?= APP_URL ?>/?page=schedule&action=calendar">
@@ -159,6 +173,26 @@
                     <span>Schedule</span>
                 </a>
             </li>
+            <?php if (function_exists('canManageCareAssignments') && canManageCareAssignments()): ?>
+            <!-- Care Assignments -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'maintenance' && in_array(get('action'), ['care-assign', 'care-create', 'care-edit'])) ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=maintenance&action=care-assign">
+                    <i class="bi bi-heart-pulse"></i>
+                    <span>Care Assignments</span>
+                </a>
+            </li>
+            <?php endif; ?>
+            <?php if (canAccessSystemControl()): ?>
+            <!-- Odometers -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'security' && get('action') === 'odometer') ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=security&action=odometer">
+                    <i class="bi bi-speedometer"></i>
+                    <span>Odometers</span>
+                </a>
+            </li>
+            <?php endif; ?>
             <?php endif; ?>
             
             <?php if (canAccessReports()): ?>
@@ -224,6 +258,50 @@
                 <a class="nav-link <?= activeMenu('settings') ?>" href="<?= APP_URL ?>/?page=settings">
                     <i class="bi bi-gear"></i>
                     <span>Settings</span>
+                </a>
+            </li>
+            <?php endif; ?>
+
+            <?php if (canAccessSystemControl()): ?>
+            <li class="nav-header">System Control</li>
+
+            <!-- Lockouts -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'security' && in_array(get('action'), ['rate-limits', 'index'])) ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=security&action=rate-limits">
+                    <i class="bi bi-unlock"></i>
+                    <span>Lockouts</span>
+                    <?php $lockouts = badgeCountSecurityLockouts(); ?>
+                    <?php if ($lockouts > 0): ?>
+                    <?= sidebarBadgeHtml($lockouts, true) ?>
+                    <?php endif; ?>
+                </a>
+            </li>
+
+            <!-- Summary -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'security' && get('action') === 'summary') ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=security&action=summary">
+                    <i class="bi bi-bar-chart-line"></i>
+                    <span>Summary</span>
+                </a>
+            </li>
+
+            <!-- SMS -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'security' && get('action') === 'sms') ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=security&action=sms">
+                    <i class="bi bi-phone"></i>
+                    <span>SMS</span>
+                </a>
+            </li>
+
+            <!-- Email -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'security' && get('action') === 'email') ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=security&action=email">
+                    <i class="bi bi-envelope"></i>
+                    <span>Email</span>
                 </a>
             </li>
             <?php endif; ?>

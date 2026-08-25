@@ -3,6 +3,18 @@
  * LOKA - Helper Functions
  */
 
+require_once __DIR__ . '/table_sort.php';
+require_once __DIR__ . '/list_pagination.php';
+require_once __DIR__ . '/list_table.php';
+require_once __DIR__ . '/view_as.php';
+require_once __DIR__ . '/badge_counts.php';
+require_once __DIR__ . '/dashboard_stats.php';
+require_once __DIR__ . '/availability.php';
+require_once __DIR__ . '/image_optimize.php';
+require_once __DIR__ . '/vehicle_observations.php';
+require_once __DIR__ . '/vehicle_care.php';
+require_once __DIR__ . '/report_helpers.php';
+
 /**
  * Get database instance
  */
@@ -123,11 +135,22 @@ function hasRole(string $minRole): bool
 }
 
 /**
- * Check if user is admin
+ * Check if user is admin (All Father only when not View-as another role)
  */
 function isAdmin(): bool
 {
-    return userRole() === ROLE_ADMIN;
+    if (isViewingAs()) {
+        return userRole() === ROLE_ADMIN;
+    }
+    return userRole() === ROLE_ADMIN || isRealAllFather();
+}
+
+/**
+ * Check if user is All Father (real account — not cleared by View-as)
+ */
+function isAllFather(): bool
+{
+    return isRealAllFather();
 }
 
 /**
@@ -153,6 +176,11 @@ function currentDriverId(): ?int
 {
     if (!isLoggedIn()) {
         return null;
+    }
+
+    // View-as Driver uses a test driver profile
+    if (getViewAsRole() === 'driver') {
+        return viewAsTestDriverId();
     }
 
     static $loaded = false;
@@ -570,6 +598,15 @@ function notify(int $userId, string $type, string $title, string $message, ?stri
     } catch (Exception $e) {
         error_log("NOTIFY ERROR: Email queue failed for user #{$userId}: " . $e->getMessage());
     }
+
+    // Soft-fail SMS enqueue (does not affect in-app/email)
+    try {
+        if (function_exists('smsNotifyUser')) {
+            smsNotifyUser($userId, $type, $title, $message, $link, $requestId);
+        }
+    } catch (Throwable $e) {
+        error_log("NOTIFY ERROR: SMS queue failed for user #{$userId}: " . $e->getMessage());
+    }
 }
 
 /**
@@ -773,21 +810,6 @@ function notifyAllParties(int $requestId, string $type, string $title, string $m
     if ($driverId) {
         notifyDriver($driverId, $type, $title, $message, $link);
     }
-}
-
-/**
- * Process email queue asynchronously (non-blocking)
- * NOTE: This function is kept for backward compatibility but does nothing.
- * Emails are processed by the cron job (process_queue.php) to prevent app lag.
- * 
- * To process emails, run: php LOKA/cron/process_queue.php
- * Or set up a Windows Task Scheduler job to run it every 1-2 minutes.
- */
-function processEmailQueueAsync(): void
-{
-    // Do nothing - emails are processed by cron job only
-    // This prevents any lag during requests
-    return;
 }
 
 /**
@@ -1294,4 +1316,328 @@ function fileIcon(string $filePath): string
     $iconClass = $icons[$extension] ?? 'bi-file-earmark text-secondary';
 
     return '<i class="bi ' . $iconClass . '"></i>';
+}
+
+// =============================================================================
+// PORTED FROM PROD-LOKA (Plan #4 Phase 0): roles / access layer / gas vouchers
+// =============================================================================
+
+/**
+ * Only All Father may clear rate limits / unlock accounts in-app.
+ */
+function canClearRateLimits(): bool
+{
+    return isRealAllFather();
+}
+
+/**
+ * Roles assignable in user create/edit. All Father is hidden unless actor is All Father.
+ *
+ * @return array<string, array{label: string, color: string}>
+ */
+function assignableRoles(): array
+{
+    $roles = ROLE_LABELS;
+    if (!isRealAllFather()) {
+        unset($roles[ROLE_ALL_FATHER]);
+    }
+    return $roles;
+}
+
+/**
+ * Require All Father role or redirect (real role, not View-as).
+ */
+function requireAllFather(): void
+{
+    if (!isRealAllFather() || isViewingAs()) {
+        redirectWith('/?page=dashboard', 'danger', 'All Father access required.');
+    }
+}
+
+/**
+ * System Control: All Father only (unavailable while View-as is active).
+ */
+function canAccessSystemControl(): bool
+{
+    return isRealAllFather() && !isViewingAs();
+}
+
+/**
+ * Require System Control access (All Father only).
+ */
+function requireSystemControl(): void
+{
+    requireAuth();
+    if (!canAccessSystemControl()) {
+        redirectWith('/?page=dashboard', 'danger', 'All Father access required.');
+    }
+}
+
+/**
+ * Check if user is Chief Admin & Finance (or OIC — same powers)
+ */
+function isChiefAdminFinance(): bool
+{
+    return userRole() === ROLE_CHIEF_ADMIN_FINANCE
+        || userRole() === ROLE_OIC_CHIEF_ADMIN_FINANCE;
+}
+
+/**
+ * Drivers may use gas vouchers (own) and my trips.
+ */
+function canAccessGasVouchers(): bool
+{
+    if (isGuard() && !isDriver()) {
+        return false;
+    }
+    return isDriver()
+        || hasRole(ROLE_REQUESTER)
+        || isApprover()
+        || isMotorpool()
+        || isAdmin()
+        || isChiefAdminFinance();
+}
+
+/**
+ * Full ops reports — Administrator or All Father only.
+ */
+function canAccessOpsReports(): bool
+{
+    if (isGuard()) {
+        return false;
+    }
+    return isAdmin();
+}
+
+/**
+ * Reports menu/pages — Administrator or All Father only.
+ */
+function canAccessDriverReports(): bool
+{
+    return canAccessOpsReports();
+}
+
+/**
+ * Notify active users holding any of the given roles (in-app + email via notify()).
+ *
+ * @param array<string> $roles
+ */
+function notifyRoleUsers(
+    array $roles,
+    string $type,
+    string $title,
+    string $message,
+    ?string $link = null,
+    ?int $excludeUserId = null,
+    ?int $requestId = null
+): void {
+    $roles = array_values(array_unique(array_filter($roles)));
+    if ($roles === []) {
+        return;
+    }
+
+    $placeholders = implode(',', array_fill(0, count($roles), '?'));
+    $params = $roles;
+    $sql = "SELECT id FROM users
+            WHERE role IN ({$placeholders})
+              AND status = 'active'
+              AND deleted_at IS NULL";
+    if ($excludeUserId !== null && $excludeUserId > 0) {
+        $sql .= ' AND id != ?';
+        $params[] = $excludeUserId;
+    }
+
+    $users = db()->fetchAll($sql, $params);
+    foreach ($users as $user) {
+        notify((int) $user->id, $type, $title, $message, $link, $requestId);
+    }
+}
+
+/**
+ * Require the user to have at least ONE of the given roles.
+ * Accepts either a single role string or an array of role strings.
+ *
+ * @param string|array $roles
+ */
+function requireAnyRole($roles): void
+{
+    requireAuth();
+    $roles = (array) $roles;
+    foreach ($roles as $role) {
+        if (hasRole($role)) {
+            return; // Passes — at least one role matches
+        }
+    }
+    redirectWith('/?page=dashboard', 'danger', 'You do not have permission to access this page.');
+}
+
+/**
+ * Block guard accounts from non-ops modules (requests, vouchers, tickets, etc.).
+ */
+function denyGuardAccess(): void
+{
+    if (isGuard()) {
+        redirectWith('/?page=guard', 'danger', 'You do not have permission to access this page.');
+    }
+}
+
+/**
+ * Guards may view trip details for approved/completed fleet trips
+ * (pending dispatch, on trip, or already arrived).
+ */
+function canGuardViewActiveTrip(object $request): bool
+{
+    if (!isGuard()) {
+        return false;
+    }
+
+    return in_array($request->status, [STATUS_APPROVED, STATUS_COMPLETED], true);
+}
+
+/**
+ * Total passengers for a request = companions in request_passengers + requester.
+ */
+function countRequestPassengers(int $requestId): int
+{
+    $companions = (int) db()->fetchColumn(
+        "SELECT COUNT(*) FROM request_passengers WHERE request_id = ?",
+        [$requestId]
+    );
+    return $companions + 1;
+}
+
+/**
+ * Normalize passenger POST payload (passengers[] and/or passengers_json backup).
+ *
+ * @return list<string>
+ */
+function normalizeRequestPassengerIdsFromPost(): array
+{
+    $passengerIds = $_POST['passengers'] ?? [];
+    if (!is_array($passengerIds)) {
+        $passengerIds = [];
+    }
+
+    if ($passengerIds === [] && !empty($_POST['passengers_json'])) {
+        $decoded = json_decode((string) $_POST['passengers_json'], true);
+        if (is_array($decoded)) {
+            $passengerIds = $decoded;
+        }
+    }
+
+    $passengerIds = array_values(array_filter($passengerIds, static function ($p) {
+        return trim((string) $p) !== '';
+    }));
+
+    return array_map(static fn($p) => trim((string) $p), $passengerIds);
+}
+
+/**
+ * Prefix passenger-facing copy so recipients know they are on the trip.
+ */
+function passengerInvolvementMessage(int $requestId, string $detail): string
+{
+    $detail = trim($detail);
+    return "You are listed as a passenger on this trip (Request #{$requestId})."
+        . ($detail !== '' ? "\n\n" . $detail : '');
+}
+
+// =============================================================================
+// GAS VOUCHER HELPERS
+// =============================================================================
+
+define('GAS_VOUCHER_STATUSES', [
+    'draft'            => ['label' => 'Draft',              'color' => 'secondary'],
+    'pending_review'   => ['label' => 'Pending Review',     'color' => 'warning'],
+    'pending_approval' => ['label' => 'Pending Approval',   'color' => 'info'],
+    'approved'         => ['label' => 'Approved',           'color' => 'success'],
+    'rejected'         => ['label' => 'Rejected',           'color' => 'danger'],
+    'cancelled'        => ['label' => 'Cancelled',          'color' => 'dark'],
+]);
+
+/**
+ * Return a badge for a gas voucher status.
+ */
+function gasVoucherStatusBadge(string $status): string
+{
+    return statusBadge($status, GAS_VOUCHER_STATUSES);
+}
+
+/**
+ * Return the color key for a gas voucher status (used for alert classes).
+ */
+function gasVoucherStatusColor(string $status): string
+{
+    return GAS_VOUCHER_STATUSES[$status]['color'] ?? 'secondary';
+}
+
+/**
+ * Return the human-readable label for a gas voucher status.
+ */
+function gasVoucherStatusLabel(string $status): string
+{
+    return GAS_VOUCHER_STATUSES[$status]['label'] ?? ucfirst($status);
+}
+
+/**
+ * HMAC secret used to sign gas voucher verification links.
+ */
+function gasVoucherVerifySecret(): string
+{
+    $key = getenv('APP_KEY') ?: ($_ENV['APP_KEY'] ?? '');
+    $key = is_string($key) ? trim($key) : '';
+    return $key !== '' ? $key : 'LOKA_SECRET';
+}
+
+/**
+ * Truncated HMAC for voucher QR links (keeps QR modules sparse enough to scan).
+ */
+function gasVoucherVerifyHash(object $voucher): string
+{
+    return substr(hash_hmac(
+        'sha256',
+        $voucher->id . '-' . $voucher->voucher_no,
+        gasVoucherVerifySecret()
+    ), 0, 16);
+}
+
+/**
+ * Build a signed public verification URL for a gas voucher (encoded in QR).
+ */
+function gasVoucherVerifyUrl(object $voucher): string
+{
+    $hash = gasVoucherVerifyHash($voucher);
+
+    $base = rtrim((string) SITE_URL, '/');
+    if ($base === '') {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $base = $scheme . '://' . $host . rtrim((string) APP_URL, '/');
+    }
+
+    return $base . '/?page=verify-voucher&id=' . (int) $voucher->id . '&hash=' . urlencode($hash);
+}
+
+/**
+ * Validate a gas voucher verification hash from a scanned QR link.
+ * Accepts the current 16-char token or a legacy full SHA-256 hex digest.
+ */
+function gasVoucherVerifyHashValid(object $voucher, string $hash): bool
+{
+    if ($hash === '') {
+        return false;
+    }
+
+    $full = hash_hmac(
+        'sha256',
+        $voucher->id . '-' . $voucher->voucher_no,
+        gasVoucherVerifySecret()
+    );
+    $short = substr($full, 0, 16);
+
+    if (hash_equals($short, $hash)) {
+        return true;
+    }
+
+    return hash_equals($full, $hash);
 }

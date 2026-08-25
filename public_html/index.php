@@ -32,6 +32,7 @@ require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/config/constants.php';
 require_once __DIR__ . '/config/security.php';
 require_once __DIR__ . '/config/mail.php';
+require_once __DIR__ . '/config/sms.php';
 
 // Environment-based error reporting
 // Auto-detect production: check if not localhost and HTTPS is enabled
@@ -61,6 +62,8 @@ require_once __DIR__ . '/classes/Cache.php';
 require_once __DIR__ . '/classes/Auth.php';
 require_once __DIR__ . '/classes/Mailer.php';
 require_once __DIR__ . '/classes/EmailQueue.php';
+require_once __DIR__ . '/classes/SmsGateway.php';
+require_once __DIR__ . '/classes/SmsQueue.php';
 require_once __DIR__ . '/classes/NotificationService.php';
 
 // Load notification templates
@@ -71,6 +74,11 @@ require_once __DIR__ . '/config/session.php';
 
 // Load helpers
 require_once __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/includes/booking-rules.php';
+require_once __DIR__ . '/includes/view_as.php';
+require_once __DIR__ . '/includes/sms.php';
+require_once __DIR__ . '/includes/mail_delivery.php';
+require_once __DIR__ . '/includes/badge_counts.php';
 
 // Initialize Security and send headers
 $security = Security::getInstance();
@@ -127,7 +135,7 @@ $page = get('page', 'dashboard');
 $action = get('action', 'index');
 
 // Public pages (no auth required)
-$publicPages = ['login', 'logout', 'forgot-password', 'reset-password'];
+$publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'cron'];
 
 // Route handling
 if (!in_array($page, $publicPages)) {
@@ -155,6 +163,23 @@ switch ($page) {
 
     case 'reset-password':
         require_once PAGES_PATH . '/auth/reset-password.php';
+        break;
+
+    case 'view-as':
+        require_once PAGES_PATH . '/view-as/set.php';
+        break;
+
+    case 'qr':
+        require_once PAGES_PATH . '/public/qr.php';
+        break;
+
+    case 'verify-voucher':
+        require_once PAGES_PATH . '/public/verify-voucher.php';
+        break;
+
+    case 'cron':
+        // Secret-key auth handled inside the page
+        require_once PAGES_PATH . '/cron/index.php';
         break;
 
     case 'dashboard':
@@ -299,12 +324,33 @@ switch ($page) {
             require_once PAGES_PATH . '/reports/export-driver.php';
         } elseif ($action === 'export-driver-csv') {
             require_once PAGES_PATH . '/reports/export-driver-csv.php';
+        } elseif ($action === 'gas-vouchers') {
+            require_once PAGES_PATH . '/reports/gas-vouchers.php';
+        } elseif ($action === 'export-gas-vouchers-csv') {
+            require_once PAGES_PATH . '/reports/export-gas-vouchers-csv.php';
+        } elseif ($action === 'export-gas-vouchers-pdf') {
+            require_once PAGES_PATH . '/reports/export-gas-vouchers-pdf.php';
         } else {
             require_once PAGES_PATH . '/reports/index.php';
         }
         break;
 
     case 'maintenance':
+        // Care actions have their own access gates (drivers with assignments may propose/complete)
+        $careActions = ['schedule', 'care-assign', 'care-create', 'care-edit'];
+        if (in_array($action, $careActions, true)) {
+            require_once INCLUDES_PATH . '/vehicle_care.php';
+            if ($action === 'care-assign') {
+                require_once PAGES_PATH . '/maintenance/care-assign.php';
+            } elseif ($action === 'care-create') {
+                require_once PAGES_PATH . '/maintenance/care-create.php';
+            } elseif ($action === 'care-edit') {
+                require_once PAGES_PATH . '/maintenance/care-edit.php';
+            } else {
+                require_once PAGES_PATH . '/maintenance/schedule.php';
+            }
+            break;
+        }
         requireRole(ROLE_APPROVER);
         if ($action === 'create') {
             require_once PAGES_PATH . '/maintenance/create.php';
@@ -375,6 +421,41 @@ switch ($page) {
         }
         break;
 
+    case 'security':
+        requireSystemControl();
+        if ($action === 'summary') {
+            require_once PAGES_PATH . '/security/summary.php';
+        } elseif ($action === 'sms') {
+            require_once PAGES_PATH . '/security/sms.php';
+        } elseif ($action === 'email') {
+            require_once PAGES_PATH . '/security/email.php';
+        } elseif ($action === 'odometer') {
+            require_once INCLUDES_PATH . '/odometer.php';
+            require_once PAGES_PATH . '/security/odometer.php';
+        } else {
+            require_once PAGES_PATH . '/security/rate-limits.php';
+        }
+        break;
+
+    case 'gas-vouchers':
+        denyGuardAccess();
+        if ($action === 'create') {
+            require_once PAGES_PATH . '/gas-vouchers/create.php';
+        } elseif ($action === 'view') {
+            require_once PAGES_PATH . '/gas-vouchers/view.php';
+        } elseif ($action === 'approve') {
+            require_once PAGES_PATH . '/gas-vouchers/approve.php';
+        } elseif ($action === 'print') {
+            require_once PAGES_PATH . '/gas-vouchers/print.php';
+        } elseif ($action === 'cancel') {
+            require_once PAGES_PATH . '/gas-vouchers/cancel.php';
+        } elseif ($action === 'update-payment') {
+            require_once PAGES_PATH . '/gas-vouchers/update-payment.php';
+        } else {
+            require_once PAGES_PATH . '/gas-vouchers/index.php';
+        }
+        break;
+
     case 'profile':
         require_once PAGES_PATH . '/profile/index.php';
         break;
@@ -390,6 +471,10 @@ switch ($page) {
     case 'my-trip-tickets':
         if ($action === 'generate-summary') {
             require_once PAGES_PATH . '/my-trip-tickets/generate-summary.php';
+        } elseif ($action === 'summary-print') {
+            require_once PAGES_PATH . '/my-trip-tickets/summary-print.php';
+        } elseif ($action === 'summary-print-travelorder') {
+            require_once PAGES_PATH . '/my-trip-tickets/summary-print-travelorder.php';
         } else {
             require_once PAGES_PATH . '/my-trip-tickets/index.php';
         }

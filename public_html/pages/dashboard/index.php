@@ -232,75 +232,49 @@ if ($showCharts) {
     
     <!-- Statistics Cards -->
     <div class="row g-4 mb-4 stats-row">
-        <!-- My Requests -->
+        <?php
+        $canSeeFleet = hasRole(ROLE_APPROVER);
+        $statCards = [
+            [
+                'label' => 'My Requests', 'value' => $myRequestsCount,
+                'icon' => 'bi-file-earmark-text', 'color' => 'primary',
+                'href' => '?page=requests', 'link' => !isGuard(),
+            ],
+            [
+                'label' => 'Pending Approvals', 'value' => $pendingApprovalsCount,
+                'icon' => 'bi-hourglass-split', 'color' => 'warning',
+                'href' => '?page=approvals', 'link' => isApprover(),
+            ],
+            [
+                'label' => 'Available Vehicles', 'value' => $availableVehiclesCount,
+                'icon' => 'bi-car-front', 'color' => 'success',
+                'href' => '?page=vehicles', 'link' => $canSeeFleet,
+            ],
+            [
+                'label' => 'Available Drivers', 'value' => $activeDriversCount,
+                'icon' => 'bi-person-badge', 'color' => 'info',
+                'href' => '?page=drivers', 'link' => $canSeeFleet,
+            ],
+        ];
+        ?>
+        <?php foreach ($statCards as $card): extract($card); ?>
         <div class="col-12 col-md-6 col-xl-3">
-            <div class="card stat-card h-100">
+            <<?= $link ? 'a href="' . APP_URL . '/' . e($href) . '"' : 'div' ?> class="card stat-card h-100<?= $link ? ' stat-card-link' : '' ?>">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <div class="stat-value text-primary"><?= $myRequestsCount ?></div>
-                            <div class="stat-label">My Requests</div>
+                            <div class="stat-value text-<?= $color ?>"><?= $value ?></div>
+                            <div class="stat-label"><?= $label ?></div>
+                            <?php if ($link): ?><div class="stat-hint"><i class="bi bi-box-arrow-up-right me-1"></i>View all</div><?php endif; ?>
                         </div>
-                        <div class="stat-icon bg-primary bg-opacity-10 text-primary">
-                            <i class="bi bi-file-earmark-text"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <?php if (isApprover()): ?>
-        <!-- Pending Approvals -->
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="stat-value text-warning"><?= $pendingApprovalsCount ?></div>
-                            <div class="stat-label">Pending Approvals</div>
-                        </div>
-                        <div class="stat-icon bg-warning bg-opacity-10 text-warning">
-                            <i class="bi bi-hourglass-split"></i>
+                        <div class="stat-icon bg-<?= $color ?> bg-opacity-10 text-<?= $color ?>">
+                            <i class="bi <?= $icon ?>"></i>
                         </div>
                     </div>
                 </div>
-            </div>
+            </<?= $link ? 'a' : 'div' ?>>
         </div>
-        <?php endif; ?>
-        
-        <!-- Available Vehicles -->
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="stat-value text-success"><?= $availableVehiclesCount ?></div>
-                            <div class="stat-label">Available Vehicles</div>
-                        </div>
-                        <div class="stat-icon bg-success bg-opacity-10 text-success">
-                            <i class="bi bi-car-front"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Active Drivers -->
-        <div class="col-xl-3 col-md-6">
-            <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="stat-value text-info"><?= $activeDriversCount ?></div>
-                            <div class="stat-label">Available Drivers</div>
-                        </div>
-                        <div class="stat-icon bg-info bg-opacity-10 text-info">
-                            <i class="bi bi-person-badge"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <?php endforeach; ?>
     </div>
 
     <?php if ($showCharts && $analyticsData): ?>

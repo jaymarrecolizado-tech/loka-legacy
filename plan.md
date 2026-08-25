@@ -1,3 +1,145 @@
+# LOKA Plan #4: Port Advanced Features from prod-loka — ✅ IMPLEMENTED (Phases 0–5; Phase 6 skipped by design)
+
+Source of truth for the advanced app: `C:\xampp\htdocs\Projects\prod-loka` (v2.5.1).
+Target: this repo (`pred-loka-old-boots`, v2.6.0). Feature-gap analysis performed
+2026-08-24 via full codebase comparison.
+
+## Gap Summary
+
+Modules in prod-loka but missing here:
+
+| Module | Scope | Size |
+|---|---|---|
+| **Gas Vouchers** | Full lifecycle (draft → pending_review → pending_approval → approved/rejected/cancelled), payment tracking, signatories, gas stations (Petromar/Queensforth), printable DICT RO2 format, QR public verification, reports + CSV/PDF exports | XL |
+| **System Control / Security** | All-Father panel: lockouts/rate-limits, security summary, SMS config, email delivery config, broken-odometer management, View-as role impersonation | L |
+| **Vehicle Care subsystem** | Preventive care calendar separate from repair tickets (PMS/registration/cleaning) with recurring intervals, staff assignments, cron reminders | M |
+| **Trip Tickets Type 2 / Travel Orders** | Weekly per-vehicle summary tickets, fuel-refill data, ticket numbering YEAR-PLATE-MONTH+WEEK, dual approval, travel-order print variant | M |
+| **Messaging** | Email delivery modes (immediate/queued/hybrid) + HTTP cron; SMS gateway (android-sms-gateway) + sms_logs queue | M |
+| **Badge framework** | Sidebar badge counts with per-user ack (`user_badge_acks`), helper API (`badge_counts.php`) | S |
+| **Dashboard partials** | Monolith split into 8 partials + dedicated stats include | S |
+| **Odometer integrity** | Vehicle observations + photos at dispatch/request time, odometer_broken flag | S |
+
+New roles: `chief_admin_finance` (level 2, final gas-voucher approver),
+`all_father` (level 99, superuser/System Control).
+
+## Critical Conflicts to Reconcile First
+
+This fork has features prod-loka does NOT have — they must be preserved and any
+port must not clobber them:
+
+1. **Request Rollback** (`pages/requests/rollback.php`, `pages/rollback/`, migration 017)
+   — removed upstream; keep ours.
+2. **Booking rules** (`includes/booking-rules.php`, return-confirmation gate) — keep ours;
+   guard partials from prod-loka must be merged around it.
+3. **Idempotency keys** (migration 018) — keep ours.
+4. **Migration numbering collision**: prod-loka's migrations 019–029 collide with our
+   017–018 numbering space. Ported migrations get renumbered 030+ in dependency order.
+
+## Implementation Phases (dependency order)
+
+### Phase 0 — Foundation
+1. Constants: add `ROLE_CHIEF_ADMIN_FINANCE`, `ROLE_ALL_FATHER`, role levels/labels,
+   CARE_* constant block.
+2. Helpers: port access layer (`isAllFather()`, `isChiefAdminFinance()`,
+   `requireAnyRole()`, `requireAllFather()`, `requireSystemControl()`,
+   `canAccessSystemControl()`, `canClearRateLimits()`, `canGuardViewActiveTrip()`,
+   `denyGuardAccess()`, `notifyRoleUsers()`) while KEEPING our
+   `canAccessReports()`/`requireReportsAccess()` until consumers migrate.
+3. Migrations (renumbered 030+): chief_admin_finance role, all_father +
+   vehicle_observations(+photos), user_badge_acks, sms_logs, email delivery mode,
+   gas_vouchers (+signatories +gas_station), password_reset_tokens fix,
+   vehicles.odometer_broken, vehicle_care_* tables.
+4. Badge framework (`includes/badge_counts.php` + sidebar rework) early, since every
+   later module adds badges.
+
+### Phase 1 — Gas Voucher module (XL)
+- Port pages: `gas-vouchers/` (index/create/view/approve/cancel/update-payment/print),
+  `public/qr.php` + `public/verify-voucher.php`, reports + exports,
+  `includes/gas_voucher_report.php`.
+- Helpers incl. HMAC tamper-proof verify hash; QR printed on voucher, verified publicly
+  against approved status.
+- Sidebar item gated by `canAccessGasVouchers()` with pending badge;
+  chief_admin_finance is the final approval step.
+- QA: full lifecycle, payment states, both gas stations, QR verification, exports.
+
+### Phase 2 — System Control / Security panel (L)
+- Port `security/` pages (summary, rate-limits, sms, email, odometer) + subnav,
+  rate_limits/security_logs backing tables, view-as impersonation.
+- Decide SMS scope: port queue classes now or defer Phase 5.
+
+### Phase 3 — Vehicle Care subsystem (M)
+- Port care-create/edit/assign pages, `includes/vehicle_care.php`, recurring-interval
+  logic, cron reminder action (needs Phase 5 cron endpoint or wire into existing cron).
+
+### Phase 4 — Trip Tickets Type 2 / Travel Orders (M)
+- Extend trip_tickets schema (ticket_type/ticket_number/week_start/week_end/
+  fuel_refill_data/dual approval columns), weekly summary generation,
+  travel-order print variant.
+- Merge guard flow changes carefully around OUR return-confirmation booking rule.
+
+### Phase 5 — Messaging & Cron (M)
+- Email delivery-mode setting + HTTP cron endpoint (`?page=cron&action=...&key=SECRET`).
+- SMS gateway classes + queue + System Control config (optional; flag-gated).
+
+### Phase 6 — UX polish (S, optional)
+- Dashboard partialization, schedule page decomposition, passenger helper wrappers,
+  report-access refactor to canAccessOpsReports/canAccessDriverReports.
+- SKIP prod-loka's Vite asset pipeline (we serve static assets directly) and its
+  Tailwind consolidation (out of scope).
+
+## Porting Rules
+
+1. Copy file-by-file from prod-loka, then adapt: APP_URL routing, our constants names,
+   our booking-rules integration points.
+2. Every phase ends with php -l on all touched files + manual module QA before
+   starting the next.
+3. Never copy prod-loka's root-level one-off diagnostic scripts; only public_html
+   modules, includes, classes, and migrations (renumbered).
+4. Secrets audit: prod-loka's email-blaster contains hard-coded credentials — do not
+   port it as-is.
+
+## QA Checklist (per-phase checklists to be filled at implementation time)
+
+### Implementation status (2026-08-24)
+- Phase 0 DONE — constants (chief_admin_finance/all_father/CARE_*), access helpers +
+  gas-voucher helpers + passenger helpers in functions.php, view_as.php ported,
+  migrations renumbered 030–040, badge_counts.php (Bootstrap badges).
+  isAdmin()/currentDriverId() now View-as aware. Bootstrap loads sms/mail_delivery/
+  badge_counts/vehicle_care.
+- Phase 1 DONE — pages/gas-vouchers/*, pages/public/{qr,verify-voucher}.php,
+  reports gas-vouchers (+csv/pdf), includes/gas_voucher_report.php, table_sort.php,
+  vendor TCPDF copied. All Tailwind/DaisyUI converted to Bootstrap 5.
+- Phase 2 DONE — pages/security/* (summary/rate-limits/sms/email/odometer + subnav),
+  view-as routing, includes/odometer.php, list_pagination/list_table Bootstrapized.
+  Observation partials COPIED but NOT wired into guard flow (deferred — changes UX;
+  see agent notes: guard/actions.php + requests/view.php wiring steps documented).
+- Phase 3 DONE — maintenance care-create/edit/assign, includes/vehicle_care.php,
+  schedule page merges care calendar; routing exempts care actions from approver gate.
+- Phase 4 DONE (scoped) — TARGET already had trip_type travel_order schema (migration
+  018); prod-loka's Type-2 weekly system existed mostly as docs. Ported the two real
+  artifacts: summary-print-travelorder.php + test-travelorder.php + routing.
+- Phase 5 DONE — pages/cron/index.php HTTP endpoint (?page=cron&action=email|sms|care&key=),
+  cron/process_sms_queue.php, cron/process_care_reminders.php (include-safe w/
+  fallback), classes/SmsGateway+SmsQueue, EmailQueue delivery-mode aware
+  (immediate/queued/hybrid), notify() gains soft-fail SMS hook.
+- Phase 6 SKIPPED per decision: keep Bootstrap UI, no Vite/Tailwind consolidation,
+  no dashboard partialization.
+- Migrations 030–040 executed against old_loka_db; all tables/settings verified.
+- All PHP files lint clean; public routes smoke-tested (302 auth redirects correct,
+  verify-voucher public 200, QR PNG renders).
+
+### Deferred / known gaps
+- [x] Guard observation + odometer field wiring into dispatch/arrival flow (DONE 2026-08-24:
+      actions.php resolves odometer readings w/ broken-odometer skip, saves observations,
+      notifies damage; modals embed odometer_fields/observation_fields partials with
+      multipart forms; requests/view.php shows observation card)
+- [ ] Assign a user role='all_father' to actually use System Control
+- [ ] SMS gateway needs android-sms-gateway server config in System Control → SMS
+- [ ] Schedule cron via Windows Task Scheduler or hit ?page=cron URLs periodically
+- [ ] Manual QA of each module lifecycle (vouchers approve chain, care schedules, lockout unlock)
+
+---
+
 # LOKA Plan #3: Booking Rules Cleanup & Return-Confirmation Enforcement — ✅ IMPLEMENTED (pending manual QA)
 
 ## Goal

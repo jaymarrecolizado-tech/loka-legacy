@@ -8,6 +8,8 @@
 
 requireRole(ROLE_APPROVER);
 
+require_once INCLUDES_PATH . '/vehicle_care.php';
+
 $pageTitle = 'Maintenance Schedule';
 
 $view = get('view', 'calendar'); // calendar, list, upcoming
@@ -166,6 +168,16 @@ require_once INCLUDES_PATH . '/header.php';
             <p class="text-muted mb-0">Plan and track vehicle maintenance</p>
         </div>
         <div class="d-flex gap-2">
+            <?php if (canProposeCareSchedule()): ?>
+            <a href="<?= APP_URL ?>/?page=maintenance&action=care-create" class="btn btn-outline-primary">
+                <i class="bi bi-calendar-plus me-1"></i>New Care Schedule
+            </a>
+            <?php endif; ?>
+            <?php if (canManageCareAssignments()): ?>
+            <a href="<?= APP_URL ?>/?page=maintenance&action=care-assign" class="btn btn-outline-secondary">
+                <i class="bi bi-clipboard-check me-1"></i>Care Assignments
+            </a>
+            <?php endif; ?>
             <a href="<?= APP_URL ?>/?page=maintenance&action=create" class="btn btn-primary">
                 <i class="bi bi-plus-lg me-1"></i>New Request
             </a>
@@ -328,6 +340,16 @@ require_once INCLUDES_PATH . '/header.php';
                 }
                 $calendarEvents[$day][] = $m;
             }
+
+            // Merge preventive care events (separate from repair tickets)
+            $careEvents = careCalendarEvents($monthStart, $monthEnd, $vehicleId ?: null);
+            foreach ($careEvents as $c) {
+                $day = date('j', strtotime($c->due_date));
+                if (!isset($calendarEvents[$day])) {
+                    $calendarEvents[$day] = [];
+                }
+                $calendarEvents[$day][] = $c;
+            }
             ?>
             <div class="table-responsive">
                 <table class="table table-bordered calendar-table">
@@ -376,16 +398,29 @@ require_once INCLUDES_PATH . '/header.php';
                                             <div class="mt-1">
                                                 <?php foreach ($calendarEvents[$cellDay] as $event): ?>
                                                     <?php
-                                                    $statusColors = [
-                                                        'pending' => 'warning',
-                                                        'scheduled' => 'info',
-                                                        'in_progress' => 'primary',
-                                                        'completed' => 'success',
-                                                        'cancelled' => 'secondary'
-                                                    ];
+                                                    $isCare = !empty($event->_source) && $event->_source === 'care';
+                                                    $eventUrl = $isCare
+                                                        ? APP_URL . '/?page=maintenance&action=care-edit&id=' . (int) $event->id
+                                                        : APP_URL . '/?page=maintenance&action=view&id=' . (int) $event->id;
+                                                    if ($isCare) {
+                                                        $statusColors = [
+                                                            'pending' => 'warning',
+                                                            'scheduled' => 'info',
+                                                            'completed' => 'success',
+                                                            'cancelled' => 'secondary'
+                                                        ];
+                                                    } else {
+                                                        $statusColors = [
+                                                            'pending' => 'warning',
+                                                            'scheduled' => 'info',
+                                                            'in_progress' => 'primary',
+                                                            'completed' => 'success',
+                                                            'cancelled' => 'secondary'
+                                                        ];
+                                                    }
                                                     $color = $statusColors[$event->status] ?? 'secondary';
                                                     ?>
-                                                    <a href="<?= APP_URL ?>/?page=maintenance&action=view&id=<?= $event->id ?>"
+                                                    <a href="<?= $eventUrl ?>"
                                                        class="d-block mb-1 p-1 rounded bg-<?= $color ?> bg-opacity-10 text-decoration-none">
                                                         <small>
                                                             <strong>#<?= $event->id ?></strong>

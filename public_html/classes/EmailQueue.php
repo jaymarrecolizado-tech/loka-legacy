@@ -86,12 +86,40 @@ class EmailQueue
         // Build email body
         $body = $this->buildEmailBody($templateKey, $template, $data);
         
-        // Optional sync send: only when MAIL_SYNC_SEND is explicitly enabled.
-        // Default is queue-only — the cron (cron/process_queue.php) sends emails
-        // in the background so form submissions return instantly.
+        // Optional sync send, controlled by delivery mode (immediate|queued|hybrid).
+        // immediate → sync send always; queued → never (cron sends); hybrid → only
+        // critical templates sync. Falls back to legacy MAIL_SYNC_SEND flag when
+        // the mail_delivery helpers are not loaded.
+        $mode = function_exists('emailDeliveryMode') ? emailDeliveryMode() : null;
+        $criticalTemplates = function_exists('emailHybridCriticalTemplates')
+            ? emailHybridCriticalTemplates()
+            : [
+                'request_confirmation',
+                'request_approved',
+                'request_rejected',
+                'request_revision',
+                'request_cancelled',
+                'department_approved',
+                'request_fully_approved',
+                'driver_assigned',
+            ];
+
+        $shouldSync = false;
+        if ($mode !== null) {
+            if ($mode === 'immediate') {
+                $shouldSync = true;
+            } elseif ($mode === 'hybrid' && in_array($templateKey, $criticalTemplates, true)) {
+                $shouldSync = true;
+            }
+            // queued → never sync here
+        } elseif (MAIL_ENABLED && MAIL_SYNC_SEND) {
+            // Legacy behavior: queue-only unless MAIL_SYNC_SEND is explicitly enabled
+            $shouldSync = true;
+        }
+
         $syncSent = false;
-        
-        if (MAIL_ENABLED && MAIL_SYNC_SEND) {
+
+        if ($shouldSync && MAIL_ENABLED) {
             try {
                 $mailer = new Mailer();
                 $syncSent = $mailer->send($toEmail, $subject, $body, $toName);

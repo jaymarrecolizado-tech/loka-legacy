@@ -8,6 +8,9 @@
 requireRole(ROLE_GUARD);
 requireCsrf();
 
+require_once INCLUDES_PATH . '/odometer.php';
+require_once INCLUDES_PATH . '/vehicle_observations.php';
+
 $action = get('action');
 $requestId = postInt('request_id');
 
@@ -17,9 +20,12 @@ if (!$requestId) {
 
 // Verify the request exists and is approved
 $request = db()->fetch(
-    "SELECT r.*, u.name as requester_name, u.email as requester_email
+    "SELECT r.*, u.name as requester_name, u.email as requester_email,
+            v.plate_number, v.mileage as vehicle_mileage,
+            COALESCE(v.odometer_broken, 0) as odometer_broken
      FROM requests r
      JOIN users u ON r.user_id = u.id
+     LEFT JOIN vehicles v ON r.vehicle_id = v.id AND v.deleted_at IS NULL
      WHERE r.id = ? AND r.status = 'approved' AND r.deleted_at IS NULL",
     [$requestId]
 );
@@ -67,17 +73,66 @@ switch ($action) {
         // Format the datetime
         $formattedDispatchTime = date('Y-m-d H:i:s', strtotime($dispatchTime));
 
+        // Odometer reading (skip gracefully when broken/unreadable)
+        $vehicleBroken = vehicleOdometerIsBroken(
+            (object) [
+                'plate_number' => $request->plate_number ?? '',
+                'odometer_broken' => $request->odometer_broken ?? 0,
+            ],
+            $request->plate_number ?? null
+        );
+        $odo = guardResolveOdometerReading(
+            'dispatch',
+            guardPostedMileage('mileage_start'),
+            (bool) post('odometer_broken'),
+            $vehicleBroken,
+            $request->vehicle_mileage !== null ? (int) $request->vehicle_mileage : null
+        );
+        if (!$odo['ok']) {
+            redirectWith('/?page=guard', 'danger', $odo['error']);
+        }
+
+        // Vehicle condition observation (photos + condition required)
+        $obsResult = observationSaveForPhase(
+            $requestId,
+            $request->vehicle_id ? (int) $request->vehicle_id : null,
+            'dispatch',
+            (int) userId(),
+            (string) post('overall_condition', ''),
+            observationParseFlagsFromPost(),
+            (string) postSafe('condition_notes', '', 1000),
+            $odo['mileage'],
+            $_FILES['observation_photos'] ?? []
+        );
+        if (!$obsResult['ok']) {
+            redirectWith('/?page=guard', 'danger', $obsResult['error'] ?? 'Could not save vehicle observation.');
+        }
+
+        $notes = guardAppendNotes($guardNotes ?: null, $odo['note']);
+
         // Update request
-        db()->update('requests', [
+        $updateData = [
             'actual_dispatch_datetime' => $formattedDispatchTime,
             'dispatch_guard_id' => userId(),
-            'guard_notes' => $guardNotes ?: null,
+            'guard_notes' => $notes,
             'has_travel_order' => $hasTravelOrder,
             'has_official_business_slip' => $hasObSlip,
             'travel_order_number' => $travelOrderNumber,
             'ob_slip_number' => $obSlipNumber,
             'updated_at' => $now
-        ], 'id = ?', [$requestId]);
+        ];
+        if ($odo['mileage'] !== null) {
+            $updateData['mileage_start'] = $odo['mileage'];
+        }
+        db()->update('requests', $updateData, 'id = ?', [$requestId]);
+
+        // Keep vehicle odometer in sync
+        if ($request->vehicle_id && $odo['mileage'] !== null) {
+            db()->update('vehicles', [
+                'mileage' => $odo['mileage'],
+                'updated_at' => $now,
+            ], 'id = ?', [$request->vehicle_id]);
+        }
         
         // Audit log
         auditLog(
@@ -88,7 +143,10 @@ switch ($action) {
             [
                 'dispatch_time' => $formattedDispatchTime,
                 'guard_id' => userId(),
-                'guard_notes' => $guardNotes
+                'guard_notes' => $notes,
+                'mileage_start' => $odo['mileage'],
+                'odometer_broken' => $odo['broken'],
+                'observation_id' => $obsResult['observation_id'] ?? null
             ]
         );
         
@@ -113,7 +171,13 @@ switch ($action) {
             );
         }
         
-        redirectWith('/?page=guard', 'success', "Dispatch recorded for request #{$requestId}.");
+        redirectWith(
+            '/?page=guard',
+            'success',
+            $odo['broken']
+                ? "Dispatch recorded for request #{$requestId} (odometer reading skipped — broken/unreadable)."
+                : "Dispatch recorded for request #{$requestId}."
+        );
         break;
         
     case 'record_arrival':
@@ -128,7 +192,6 @@ switch ($action) {
         }
 
         $arrivalTime = post('arrival_time');
-        $mileageEnd = postInt('mileage_end') ?: null; // Optional ending mileage
         $guardNotes = postSafe('guard_notes', '', 500);
 
         if (!$arrivalTime) {
@@ -143,23 +206,62 @@ switch ($action) {
             redirectWith('/?page=guard', 'danger', 'Arrival time must be after dispatch time.');
         }
 
-        // Validate mileage_end if provided (must be >= mileage_start if set)
-        if ($mileageEnd !== null && $request->mileage_start !== null && $mileageEnd < $request->mileage_start) {
-            redirectWith('/?page=guard', 'danger', 'Ending mileage cannot be less than starting mileage.');
+        // Odometer reading (skip gracefully when broken/unreadable)
+        $vehicleBroken = vehicleOdometerIsBroken(
+            (object) [
+                'plate_number' => $request->plate_number ?? '',
+                'odometer_broken' => $request->odometer_broken ?? 0,
+            ],
+            $request->plate_number ?? null
+        );
+        $baseline = $request->mileage_start !== null ? (int) $request->mileage_start : null;
+        $odo = guardResolveOdometerReading(
+            'arrival',
+            guardPostedMileage('mileage_end'),
+            (bool) post('odometer_broken'),
+            $vehicleBroken,
+            $baseline
+        );
+        if (!$odo['ok']) {
+            redirectWith('/?page=guard', 'danger', $odo['error']);
         }
 
-        // Calculate actual mileage if both values exist
+        $mileageEnd = $odo['mileage'];
         $mileageActual = null;
-        if ($mileageEnd !== null && $request->mileage_start !== null) {
-            $mileageActual = $mileageEnd - $request->mileage_start;
+        if ($mileageEnd !== null && $baseline !== null) {
+            $mileageActual = $mileageEnd - $baseline;
         }
+
+        // Vehicle condition observation (photos + condition required)
+        $overallCondition = (string) post('overall_condition', '');
+        $conditionNotes = (string) postSafe('condition_notes', '', 1000);
+        $obsResult = observationSaveForPhase(
+            $requestId,
+            $request->vehicle_id ? (int) $request->vehicle_id : null,
+            'arrival',
+            (int) userId(),
+            $overallCondition,
+            observationParseFlagsFromPost(),
+            $conditionNotes,
+            $mileageEnd,
+            $_FILES['observation_photos'] ?? []
+        );
+        if (!$obsResult['ok']) {
+            redirectWith('/?page=guard', 'danger', $obsResult['error'] ?? 'Could not save vehicle observation.');
+        }
+        observationNotifyDamage($request, $overallCondition, $conditionNotes);
+
+        // Combined notes: existing + [Arrival] + odometer note
+        $arrivalNote = $guardNotes ? ('[Arrival] ' . $guardNotes) : null;
+        $combinedNotes = guardAppendNotes($request->guard_notes, $arrivalNote);
+        $combinedNotes = guardAppendNotes($combinedNotes, $odo['note']);
 
         // Update request - mark as completed
         $updateData = [
             'actual_arrival_datetime' => $formattedArrivalTime,
             'arrival_guard_id' => userId(),
             'status' => STATUS_COMPLETED,
-            'guard_notes' => $guardNotes ? ($request->guard_notes . "\n\n[Arrival] " . $guardNotes) : $request->guard_notes,
+            'guard_notes' => $combinedNotes,
             'updated_at' => $now
         ];
 
@@ -199,6 +301,10 @@ switch ($action) {
                 'arrival_time' => $formattedArrivalTime,
                 'guard_id' => userId(),
                 'guard_notes' => $guardNotes,
+                'mileage_end' => $mileageEnd,
+                'mileage_actual' => $mileageActual,
+                'odometer_broken' => $odo['broken'],
+                'observation_id' => $obsResult['observation_id'] ?? null,
                 'new_status' => STATUS_COMPLETED
             ]
         );

@@ -301,12 +301,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'list') {
 $sql = "SELECT tt.*,
             r.id as request_id, r.destination as trip_destination,
             d.license_number as driver_license, du.name as driver_name,
+            v.plate_number, v.make, v.model as vehicle_model,
             dg.name as dispatch_guard, ag.name as arrival_guard,
             u.name as reviewed_by_name
      FROM trip_tickets tt
      JOIN requests r ON tt.request_id = r.id
      LEFT JOIN drivers d ON tt.driver_id = d.id
      LEFT JOIN users du ON d.user_id = du.id
+     LEFT JOIN vehicles v ON tt.vehicle_id = v.id AND v.deleted_at IS NULL
      LEFT JOIN users dg ON tt.dispatch_guard_id = dg.id
      LEFT JOIN users ag ON tt.arrival_guard_id = ag.id
      LEFT JOIN users u ON tt.reviewed_by = u.id
@@ -506,6 +508,7 @@ require_once INCLUDES_PATH . '/header.php';
                                 <th>Request</th>
                                 <th>Trip Type</th>
                                 <th>Driver</th>
+                                <th>Vehicle</th>
                                 <th>Destination</th>
                                 <th>Date Range</th>
                                 <th>Status</th>
@@ -559,8 +562,16 @@ require_once INCLUDES_PATH . '/header.php';
                                         <?php endif; ?>
                                     </td>
                                     <td>
+                                        <?php if ($ticket->plate_number): ?>
+                                            <span class="badge bg-primary"><?= e($ticket->plate_number) ?></span><br>
+                                            <small class="text-muted"><?= e(trim($ticket->make . ' ' . $ticket->vehicle_model)) ?></small>
+                                        <?php else: ?>
+                                            <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
                                         <?= e($ticket->destination) ?><br>
-                                        <small class="text-muted"><?= truncate($ticket->purpose, 30) ?></small>
+                                        <small class="text-muted" title="<?= e($ticket->purpose) ?>"><?= truncate($ticket->purpose, 60) ?></small>
                                     </td>
                                     <td>
                                         <small>
