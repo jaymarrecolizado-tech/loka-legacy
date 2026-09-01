@@ -338,6 +338,15 @@ switch ($action) {
                 '/?page=requests&action=view&id=' . $requestId
             );
         }
+
+        // Create anonymous driver evaluation invitations for passengers (best-effort, post-commit)
+        try {
+            if (function_exists('createDriverEvaluations')) {
+                createDriverEvaluations((int) $requestId);
+            }
+        } catch (Throwable $e) {
+            error_log('guard arrival createDriverEvaluations #' . $requestId . ': ' . $e->getMessage());
+        }
         
         redirectWith(
             '/?page=trip-tickets&action=create_form&request_id=' . $requestId,

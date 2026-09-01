@@ -166,6 +166,15 @@ try {
             $driverNotificationData['link']
         );
     }
+
+    // Create anonymous driver evaluation invitations for passengers (best-effort, post-commit)
+    try {
+        if (function_exists('createDriverEvaluations')) {
+            createDriverEvaluations((int) $requestId);
+        }
+    } catch (Throwable $e) {
+        error_log('complete trip createDriverEvaluations #' . $requestId . ': ' . $e->getMessage());
+    }
     
     redirectWith('/?page=requests&action=view&id=' . $requestId, 'success', 'Trip marked as completed. Vehicle and driver released.');
     
