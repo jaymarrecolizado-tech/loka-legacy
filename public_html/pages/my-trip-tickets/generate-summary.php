@@ -50,6 +50,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $isPrint) {
         // Fetch drivers for dropdown
         $drivers = db()->fetchAll("SELECT u.id, u.name FROM drivers d JOIN users u ON d.user_id = u.id ORDER BY u.name");
 
+        // Fetch motorpool heads (Reviewers) and Chief/OIC/Admin (Approvers) for signatory dropdowns
+        $reviewers = db()->fetchAll(
+            "SELECT name FROM users WHERE role IN (?, ?) AND status = 'active' AND deleted_at IS NULL ORDER BY name",
+            [ROLE_MOTORPOOL, ROLE_ADMIN]
+        );
+        $approvers = db()->fetchAll(
+            "SELECT name, role FROM users WHERE role IN (?, ?, ?) AND status = 'active' AND deleted_at IS NULL ORDER BY name",
+            [ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE, ROLE_ADMIN]
+        );
+
         // Fetch all completed trips (requests) for this vehicle within date range
         $sql = "SELECT r.id as req_id, r.destination, r.purpose,
                        du.name as trip_driver_name, r.passenger_count as passengers,

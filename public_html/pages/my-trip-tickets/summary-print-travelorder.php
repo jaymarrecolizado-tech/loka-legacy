@@ -862,10 +862,14 @@ if ($__verifyUrl) {
                 <div class="sig-role">Verified by</div>
                 <div style="height: 22px;"></div>
                 <div class="sig-line"></div>
-                <select class="sig-input" style="background: transparent; text-transform: uppercase;">
+                <select class="sig-input" id="sigReviewer2" style="background: transparent; text-transform: uppercase;">
                     <option value="">Select Motorpool...</option>
-                    <?php foreach ($drivers as $d): ?>
-                        <option value="<?= e($d->name) ?>"><?= strtoupper(e($d->name)) ?></option>
+                    <?php
+                    $defaultReviewer2 = 'ENGR. RONALD S. BARIUAN';
+                    $reviewerNames2 = array_column($reviewers ?? [], 'name');
+                    if (!in_array($defaultReviewer2, $reviewerNames2)) $reviewerNames2[] = $defaultReviewer2;
+                    foreach ($reviewerNames2 as $rname): ?>
+                        <option value="<?= e($rname) ?>" <?= $rname === $defaultReviewer2 ? 'selected' : '' ?>><?= strtoupper(e($rname)) ?></option>
                     <?php endforeach; ?>
                 </select>
                 <div class="sig-title">Motorpool Unit Representative</div>
@@ -874,8 +878,19 @@ if ($__verifyUrl) {
                 <div class="sig-role">Approved by</div>
                 <div style="height: 22px;"></div>
                 <div class="sig-line"></div>
-                <div class="sig-name">MINA FLOR T. VILLAFUERTE</div>
-                <div class="sig-title">Admin and Finance Division Chief</div>
+                <select class="sig-input" id="sigApprover2" style="background: transparent; text-transform: uppercase;" onchange="updateApproverTitle2()">
+                    <option value="">Select Approver...</option>
+                    <?php
+                    $defaultApprover2 = 'MINA FLOR T. VILLAFUERTE';
+                    $approverRows2 = $approvers ?? [];
+                    $hasDef2 = false;
+                    foreach ($approverRows2 as $ar) { if (strcasecmp($ar->name, $defaultApprover2)===0) {$hasDef2=true; break;}}
+                    if (!$hasDef2) $approverRows2[] = (object)['name'=>$defaultApprover2,'role'=>ROLE_CHIEF_ADMIN_FINANCE];
+                    foreach ($approverRows2 as $ar): ?>
+                        <option value="<?= e($ar->name) ?>" data-role="<?= e($ar->role) ?>" <?= strcasecmp($ar->name,$defaultApprover2)===0?'selected':'' ?>><?= strtoupper(e($ar->name)) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="sig-title" id="sigApproverTitle2">Admin and Finance Division Chief</div>
             </div>
         </div>
 
@@ -898,6 +913,14 @@ if ($__verifyUrl) {
     </div><!-- /ticket -->
 
     <script>
+        function updateApproverTitle2(){
+            const sel=document.getElementById('sigApprover2');
+            const el=document.getElementById('sigApproverTitle2');
+            if(!sel||!el) return;
+            const opt=sel.options[sel.selectedIndex];
+            const role=opt?opt.dataset.role:''; el.textContent=(role==='chief_admin_finance')?'Admin and Finance Division Chief':'OIC, Admin and Finance Division Chief';
+        }
+        window.addEventListener('load',updateApproverTitle2);
         function resetForm() {
             if (!confirm('Reset all form entries?')) return;
             const keepIds = ['driverName', 'plateDisplay', 'odoStart', 'odoEnd', 'distTraveled', 'fuelConsumed', 'fuelCost', 'sigDriver'];

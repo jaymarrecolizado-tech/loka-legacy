@@ -1079,15 +1079,41 @@ if ($__verifyUrl) {
                 <div class="sig-role">Reviewed by</div>
                 <div style="height:20px;"></div>
                 <div class="sig-line"></div>
-                <div class="sig-name">ENGR. RONALD S. BARIUAN</div>
+                <select class="sig-select" id="sigReviewer">
+                    <option value="">Select Reviewer...</option>
+                    <?php
+                    $defaultReviewer = 'ENGR. RONALD S. BARIUAN';
+                    $reviewerNames = array_column($reviewers ?? [], 'name');
+                    if (!in_array($defaultReviewer, $reviewerNames)) {
+                        $reviewerNames[] = $defaultReviewer;
+                    }
+                    foreach ($reviewerNames as $rname): ?>
+                        <option value="<?= e($rname) ?>" <?= $rname === $defaultReviewer ? 'selected' : '' ?>><?= strtoupper(e($rname)) ?></option>
+                    <?php endforeach; ?>
+                </select>
                 <div class="sig-title">Motorpool Unit</div>
             </div>
             <div class="sig">
                 <div class="sig-role">Approved</div>
                 <div style="height:20px;"></div>
                 <div class="sig-line"></div>
-                <div class="sig-name">MINA FLOR T. VILLAFUERTE</div>
-                <div class="sig-title">Admin and Finance Division</div>
+                <select class="sig-select" id="sigApprover" onchange="updateApproverTitle()">
+                    <option value="">Select Approver...</option>
+                    <?php
+                    $defaultApprover = 'MINA FLOR T. VILLAFUERTE';
+                    $approverRows = $approvers ?? [];
+                    $hasDefault = false;
+                    foreach ($approverRows as $arow) {
+                        if (strcasecmp($arow->name, $defaultApprover) === 0) { $hasDefault = true; break; }
+                    }
+                    if (!$hasDefault) {
+                        $approverRows[] = (object) ['name' => $defaultApprover, 'role' => ROLE_CHIEF_ADMIN_FINANCE];
+                    }
+                    foreach ($approverRows as $arow): ?>
+                        <option value="<?= e($arow->name) ?>" data-role="<?= e($arow->role) ?>" <?= strcasecmp($arow->name, $defaultApprover) === 0 ? 'selected' : '' ?>><?= strtoupper(e($arow->name)) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="sig-title" id="sigApproverTitle">Admin and Finance Division</div>
             </div>
         </div>
 
@@ -1128,6 +1154,16 @@ if ($__verifyUrl) {
             document.getElementById('tripnoBadge').textContent = val;
             document.getElementById('footerTno').textContent = 'Trip No: ' + val;
         }
+
+        function updateApproverTitle() {
+            const sel = document.getElementById('sigApprover');
+            const titleEl = document.getElementById('sigApproverTitle');
+            if (!sel || !titleEl) return;
+            const opt = sel.options[sel.selectedIndex];
+            const role = opt ? (opt.dataset.role || '') : '';
+            titleEl.textContent = (role === 'chief_admin_finance') ? 'Admin and Finance Division' : 'OIC, Admin and Finance Division';
+        }
+        window.addEventListener('load', updateApproverTitle);
 
         function resetForm() {
             if (!confirm('Clear all entered data?')) return;
