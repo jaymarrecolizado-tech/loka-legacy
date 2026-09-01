@@ -535,7 +535,9 @@ switch ($page) {
 
     case 'api':
         $action = get('action');
-        if ($action === 'check_conflict') {
+        if ($action === 'global_search') {
+            require_once PAGES_PATH . '/api/global_search.php';
+        } elseif ($action === 'check_conflict') {
             require_once PAGES_PATH . '/api/check_conflict.php';
         } elseif ($action === 'list' || $action === 'get' || $action === 'create' || $action === 'update' || $action === 'delete') {
             // Determine API type from query parameter or referer

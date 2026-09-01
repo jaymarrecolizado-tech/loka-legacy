@@ -1,6 +1,7 @@
 /**
  * LOKA - Navigation Search++ (top bar + Ctrl+K palette)
- * Best-in-class: fuzzy + highlight + pin/favorite + badges + quick-jump + recent queries
+ * Best-in-class: fuzzy + highlight + pin/favorite + badges + quick-jump + recent queries + LIVE actual items
+ * LIVE: fetches /?page=api&action=global_search&q=XXX to point to actual Request/Vehicle/Driver/User view pages, not just nav labels.
  */
 (function() {
     const userId = window.LOKA_USER_ID || '0';
@@ -63,7 +64,7 @@
             if(tok.length>=2 && label.split(/\s+/).some(w=>w.startsWith(tok))) s+=3;
         });
         if(label.startsWith(q)) s+=8;
-        if(isPinned(item.href)) s+=3; // pinned boost
+        if(isPinned(item.href)) s+=3;
         return s;
     }
     function filterItems(items, query){
@@ -74,13 +75,11 @@
         const q=(query||'').trim();
         if(!q) return [];
         const out=[];
-        // #123 or 123 -> request
         const mNum = q.match(/^#?(\d{1,6})$/);
         if(mNum){
             const id=mNum[1];
             out.push({ label:`Go to Request #${id}`, href:`/?page=requests&action=view&id=${id}`, icon:'bi-hash', section:'Quick Jump', keywords:`request ${id}`, quick:true });
         }
-        // plate-like: 3-10 chars alphanumeric with optional dash/space, not pure digits
         if(/^[A-Z0-9\- ]{3,10}$/i.test(q) && !/^\d+$/.test(q) && q.length>=3){
             const plate=q.toUpperCase().replace(/\s+/g,' ').trim();
             out.push({ label:`Search Vehicle: ${plate}`, href:`/?page=vehicles&search=${encodeURIComponent(plate)}`, icon:'bi-car-front', section:'Quick Jump', keywords:`vehicle plate ${plate}`, quick:true });
@@ -96,24 +95,41 @@
     }
     function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
+    // Live actual items via API (debounced)
+    let liveAbort = null, liveSeq = 0;
+    async function fetchLive(q){
+        if(!q || q.trim().length<2) return [];
+        const seq = ++liveSeq;
+        if(liveAbort) liveAbort.abort();
+        liveAbort = new AbortController();
+        try {
+            const url = window.location.pathname + '?page=api&action=global_search&q=' + encodeURIComponent(q);
+            const res = await fetch(url, { signal: liveAbort.signal, headers: { 'X-Requested-With':'XMLHttpRequest' } });
+            const data = await res.json();
+            if(seq !== liveSeq) return [];
+            if(data && data.success && Array.isArray(data.items)) return data.items.slice(0, 6);
+            return [];
+        } catch(e){ return []; }
+    }
+
     function renderItem(a, item, query, showPinBtn){
         const pinned=isPinned(item.href);
         const hlLabel=highlight(item.label, query);
         const hlSection=highlight(item.section, query);
         const badge=item.badge && item.badge>0 ? `<span class="badge bg-warning text-dark ms-1">${item.badge}</span>` : '';
         const quickBadge=item.quick ? `<span class="badge bg-info ms-1">Jump</span>` : '';
-        const pinBtn=showPinBtn ? `<button type="button" class="btn btn-sm btn-link p-0 ms-1 pin-btn ${pinned?'text-warning':'text-muted'}" title="${pinned?'Unpin':'Pin to top'}" data-href="${escapeHtml(item.href)}"><i class="bi ${pinned?'bi-star-fill':'bi-star'}"></i></button>` : '';
+        const liveBadge=item.section && ['Request','Vehicle','Driver','User'].includes(item.section) && !item.quick ? `<span class="badge bg-success bg-opacity-10 text-success border ms-1">Actual</span>` : '';
+        const pinBtn=showPinBtn && !item.quick && item.section!=='Request' && item.section!=='Vehicle' && item.section!=='Driver' && item.section!=='User' ? `<button type="button" class="btn btn-sm btn-link p-0 ms-1 pin-btn ${pinned?'text-warning':'text-muted'}" title="${pinned?'Unpin':'Pin to top'}" data-href="${escapeHtml(item.href)}"><i class="bi ${pinned?'bi-star-fill':'bi-star'}"></i></button>` : (showPinBtn && isPinned(item.href) ? `<button type="button" class="btn btn-sm btn-link p-0 ms-1 pin-btn text-warning" title="Unpin" data-href="${escapeHtml(item.href)}"><i class="bi bi-star-fill"></i></button>` : '');
         a.className='nav-search-item d-flex align-items-center gap-2 px-3 py-2 text-decoration-none';
         a.href=item.href;
         a.innerHTML=`<i class="bi ${item.icon} ${item.quick?'text-info':'text-primary'}"></i>
-            <div class="flex-grow-1"><div class="fw-medium small">${hlLabel}${badge}${quickBadge}</div><small class="text-muted">${hlSection}${item.count?` • ${item.count}×`:''}</small></div>
+            <div class="flex-grow-1"><div class="fw-medium small">${hlLabel}${badge}${quickBadge}${liveBadge}</div><small class="text-muted">${hlSection}${item.count?` • ${item.count}×`:''}</small></div>
             ${pinBtn}`;
-        // pin click
         const btn=a.querySelector('.pin-btn');
         if(btn){ btn.addEventListener('click', e=>{ e.preventDefault(); e.stopPropagation(); togglePin(item.href); refreshAll(); }); }
         a.addEventListener('click', ()=>{ pushRecent(item); bumpFrequent(item); if(query) pushQuery(query); });
     }
-    function refreshAll(){ // re-render current open dropdown/palette
+    function refreshAll(){
         const topInput=document.getElementById('navSearchInput');
         if(topInput && document.activeElement===topInput) showTopDropdown(topInput.value);
         const pal=document.getElementById('navSearchPalette');
@@ -123,7 +139,7 @@
         }
     }
 
-    let currentResults=[], activeIdx=-1;
+    let activeIdx=-1;
     function updateActive(listEl){
         const els=listEl.querySelectorAll('.nav-search-item');
         els.forEach((el,i)=> el.classList.toggle('active', i===activeIdx));
@@ -131,7 +147,10 @@
     }
     function navigateActive(listEl){ const els=listEl.querySelectorAll('.nav-search-item'); if(activeIdx>=0 && els[activeIdx]) els[activeIdx].click(); }
 
-    function showTopDropdown(query){
+    // Debounce helper
+    function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+
+    async function showTopDropdown(query){
         const topList=document.getElementById('navSearchList');
         const topDropdown=document.getElementById('navSearchDropdown');
         if(!topList||!topDropdown) return;
@@ -172,17 +191,41 @@
         }
         const quick=quickJumpItems(query);
         const filtered=filterItems(items, query);
-        currentResults=[...quick, ...filtered].slice(0,8);
-        if(!currentResults.length){
-            topList.innerHTML='<div class="text-muted small px-3 py-3 text-center">No matches. Try #123 for request or a plate like ABC1234.</div>';
+        // Render immediately with nav results, then enrich with live actual items
+        let combined=[...quick, ...filtered].slice(0,8);
+        topList.innerHTML='';
+        if(!combined.length){
+            topList.innerHTML='<div class="text-muted small px-3 py-2">Searching…</div>';
         } else {
-            topList.innerHTML='';
-            currentResults.forEach(it=>{ const a=document.createElement('a'); renderItem(a,it,query,true); topList.appendChild(a); });
+            combined.forEach(it=>{ const a=document.createElement('a'); renderItem(a,it,query,true); topList.appendChild(a); });
         }
         topDropdown.classList.remove('d-none'); activeIdx=-1; updateActive(topList);
-    }
 
-    function refreshPalette(q){
+        // Fetch live actual items and merge on top
+        const live = await fetchLive(query);
+        if(live.length){
+            // Deduplicate by href
+            const seen=new Set(combined.map(c=>c.href));
+            const newLive = live.filter(l=> !seen.has(l.href));
+            if(newLive.length){
+                // Insert live section at top
+                topList.innerHTML='';
+                if(newLive.length){
+                    const h=document.createElement('div'); h.className='px-3 py-1 text-uppercase small fw-bold text-success'; h.textContent='Matching items';
+                    topList.appendChild(h);
+                    newLive.forEach(it=>{ const a=document.createElement('a'); renderItem(a,it,query,false); topList.appendChild(a); });
+                    const sep=document.createElement('hr'); sep.className='my-1'; topList.appendChild(sep);
+                }
+                combined.forEach(it=>{ const a=document.createElement('a'); renderItem(a,it,query,true); topList.appendChild(a); });
+                updateActive(topList);
+            }
+        } else if(!combined.length){
+            topList.innerHTML='<div class="text-muted small px-3 py-3 text-center">No matches. Try #123 for request or a plate like ABC1234.</div>';
+        }
+    }
+    const debouncedTop = debounce(showTopDropdown, 220);
+
+    async function refreshPalette(q){
         const items=window.LOKA_NAV_ITEMS||[];
         const paletteList=document.getElementById('paletteList');
         const paletteRecent=document.getElementById('paletteRecent');
@@ -216,19 +259,37 @@
                     paletteRecent.appendChild(a);
                 });
             }
-            paletteList.innerHTML='<div class="text-muted small px-3 py-2">Type to search features… Try <code>#123</code> for a request or a plate like <code>ABC1234</code>.</div>';
+            paletteList.innerHTML='<div class="text-muted small px-3 py-2">Type to search features… Try <code>#123</code> for a request or a plate like <code>ABC1234</code> — actual items appear first.</div>';
             return;
         }
         paletteRecent.classList.add('d-none'); paletteFrequent.classList.add('d-none');
         const quick=quickJumpItems(q);
         const res=filterItems(items, q);
-        const combined=[...quick, ...res].slice(0,10);
-        if(!combined.length) paletteList.innerHTML='<div class="text-muted small px-3 py-3 text-center">No matches.</div>';
-        else {
-            paletteList.innerHTML='';
-            combined.forEach(it=>{ const a=document.createElement('a'); renderItem(a,it,q,true); paletteList.appendChild(a); });
+        let combined=[...quick, ...res].slice(0,6);
+        paletteList.innerHTML = combined.length ? '' : '<div class="text-muted small px-3 py-2">Searching actual items…</div>';
+        combined.forEach(it=>{ const a=document.createElement('a'); renderItem(a,it,q,true); paletteList.appendChild(a); });
+
+        const live = await fetchLive(q);
+        if(live.length){
+            const seen=new Set(combined.map(c=>c.href));
+            const newLive=live.filter(l=>!seen.has(l.href));
+            if(newLive.length){
+                paletteList.innerHTML='';
+                const h=document.createElement('div'); h.className='small fw-bold text-success text-uppercase px-3 py-1'; h.textContent='Matching items';
+                paletteList.appendChild(h);
+                newLive.forEach(it=>{ const a=document.createElement('a'); renderItem(a,it,q,false); paletteList.appendChild(a); });
+                if(combined.length){
+                    const sep=document.createElement('hr'); sep.className='my-1'; paletteList.appendChild(sep);
+                    const h2=document.createElement('div'); h2.className='small fw-bold text-muted text-uppercase px-3 py-1'; h2.textContent='Features';
+                    paletteList.appendChild(h2);
+                    combined.forEach(it=>{ const a=document.createElement('a'); renderItem(a,it,q,true); paletteList.appendChild(a); });
+                }
+            }
+        } else if(!combined.length){
+            paletteList.innerHTML='<div class="text-muted small px-3 py-3 text-center">No matches.</div>';
         }
     }
+    const debouncedPalette = debounce(refreshPalette, 220);
 
     function init(){
         const topInput=document.getElementById('navSearchInput');
@@ -240,7 +301,7 @@
         const backdrop=document.getElementById('paletteBackdrop');
         if(!topInput||!topDropdown||!palette) return;
 
-        topInput.addEventListener('input', e=> showTopDropdown(e.target.value));
+        topInput.addEventListener('input', e=> debouncedTop(e.target.value));
         topInput.addEventListener('focus', ()=> showTopDropdown(topInput.value));
         topInput.addEventListener('keydown', e=>{
             const els=topList.querySelectorAll('.nav-search-item');
@@ -256,7 +317,6 @@
         document.addEventListener('keydown', e=>{
             if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); openPalette(); }
             if(e.key==='Escape' && !palette.classList.contains('d-none')) closePalette();
-            // palette keyboard nav
             if(!palette.classList.contains('d-none') && paletteList){
                 const els=paletteList.querySelectorAll('.nav-search-item');
                 if(e.key==='ArrowDown'){ e.preventDefault(); activeIdx=Math.min(activeIdx+1, els.length-1); updateActive(paletteList); }
@@ -265,9 +325,8 @@
             }
         });
         backdrop.addEventListener('click', closePalette);
-        if(paletteInput) paletteInput.addEventListener('input', e=> { activeIdx=-1; refreshPalette(e.target.value); });
+        if(paletteInput) paletteInput.addEventListener('input', e=> { activeIdx=-1; debouncedPalette(e.target.value); });
 
-        // Track sidebar + palette clicks for frequent
         document.querySelectorAll('.sidebar .nav-link').forEach(a=>{
             a.addEventListener('click', ()=>{
                 const href=a.getAttribute('href'); const label=a.querySelector('span')?.textContent?.trim()||href;

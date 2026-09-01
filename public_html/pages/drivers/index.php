@@ -7,6 +7,7 @@ requireRole(ROLE_APPROVER);
 
 $pageTitle = 'Drivers';
 $statusFilter = get('status', '');
+$searchFilter = trim(get('search', ''));
 
 $params = [];
 $whereClause = 'd.deleted_at IS NULL';
@@ -14,6 +15,14 @@ $whereClause = 'd.deleted_at IS NULL';
 if ($statusFilter) {
     $whereClause .= ' AND d.status = ?';
     $params[] = $statusFilter;
+}
+
+if ($searchFilter !== '') {
+    $whereClause .= ' AND (u.name LIKE ? OR u.email LIKE ? OR d.license_number LIKE ?)';
+    $like = '%' . $searchFilter . '%';
+    $params[] = $like;
+    $params[] = $like;
+    $params[] = $like;
 }
 
 $drivers = db()->fetchAll(
@@ -51,6 +60,10 @@ require_once INCLUDES_PATH . '/header.php';
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 <input type="hidden" name="page" value="drivers">
+                <div class="col-md-3">
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control" placeholder="Name, email, license..." value="<?= e($searchFilter) ?>">
+                </div>
                 <div class="col-md-3">
                     <label class="form-label">Status</label>
                     <select name="status" class="form-select">

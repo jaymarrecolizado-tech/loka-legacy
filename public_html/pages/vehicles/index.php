@@ -10,6 +10,7 @@ $pageTitle = 'Vehicles';
 // Get filters
 $statusFilter = get('status', '');
 $typeFilter = get('type', '');
+$searchFilter = trim(get('search', ''));
 
 // Build query
 $params = [];
@@ -23,6 +24,15 @@ if ($statusFilter) {
 if ($typeFilter) {
     $whereClause .= ' AND v.vehicle_type_id = ?';
     $params[] = $typeFilter;
+}
+
+if ($searchFilter !== '') {
+    $whereClause .= ' AND (v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ? OR vt.name LIKE ?)';
+    $like = '%' . $searchFilter . '%';
+    $params[] = $like;
+    $params[] = $like;
+    $params[] = $like;
+    $params[] = $like;
 }
 
 $vehicles = db()->fetchAll(
@@ -64,6 +74,11 @@ require_once INCLUDES_PATH . '/header.php';
                 <input type="hidden" name="page" value="vehicles">
 
                 <div class="col-md-3">
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control" placeholder="Plate, make, model, type..." value="<?= e($searchFilter) ?>">
+                </div>
+
+                <div class="col-md-2">
                     <label class="form-label">Status</label>
                     <select name="status" class="form-select">
                         <option value="">All Statuses</option>
