@@ -31,6 +31,9 @@
         #navSearchPalette .nav-search-item:hover, #navSearchPalette .nav-search-item.active { background: #f1f5f9; }
         .nav-search-item { color: #1f2937; }
         .nav-search-item small { font-size: 0.75rem; }
+        .nav-search-item mark { font-weight: 600; color: inherit; }
+        .nav-search-item .pin-btn { opacity: 0.6; }
+        .nav-search-item:hover .pin-btn { opacity: 1; }
         #navSearchPalette { position: fixed; top: 12%; left: 50%; transform: translateX(-50%); width: 90%; max-width: 560px; z-index: 1060; max-height: 70vh; overflow: auto; }
         #paletteBackdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1055; }
     </style>

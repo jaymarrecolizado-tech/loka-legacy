@@ -10,14 +10,35 @@ function getNavSearchItems(): array
 {
     $items = [];
 
+    // Live badge counts (cheap, cached where possible) to surface in search
+    $badgeMap = [];
+    try {
+        if (isApprover()) {
+            if (isMotorpool()) {
+                $badgeMap['/?page=approvals'] = (int) db()->count('requests', "status = 'pending_motorpool'");
+            } else {
+                $uid = currentUser()->department_id ?? null;
+                if ($uid) $badgeMap['/?page=approvals'] = (int) db()->count('requests', "status = 'pending' AND department_id = ?", [$uid]);
+            }
+        }
+        if (function_exists('canAccessGasVouchers') && canAccessGasVouchers()) {
+            if (function_exists('badgeCountPendingGasVouchers')) $badgeMap['/?page=gas-vouchers'] = (int) badgeCountPendingGasVouchers();
+        }
+        if (isApprover()) {
+            $badgeMap['/?page=maintenance'] = (int) db()->count('maintenance_requests', "status IN (?, ?) AND deleted_at IS NULL", [MAINTENANCE_STATUS_PENDING, MAINTENANCE_STATUS_SCHEDULED]);
+        }
+    } catch (Throwable $e) { /* badges are best-effort */ }
+
     // Helper to push item
-    $add = function (string $label, string $href, string $icon, string $section, string $keywords = '') use (&$items) {
+    $add = function (string $label, string $href, string $icon, string $section, string $keywords = '', ?int $badge = null) use (&$items, $badgeMap) {
+        $resolvedBadge = $badge ?? ($badgeMap[$href] ?? null);
         $items[] = [
             'label' => $label,
             'href' => $href,
             'icon' => $icon,
             'section' => $section,
             'keywords' => strtolower($keywords ?: $label),
+            'badge' => $resolvedBadge,
         ];
     };
 
@@ -100,6 +121,10 @@ function getNavSearchItems(): array
     $add('Profile', '/?page=profile', 'bi-person', 'User', 'profile account');
     $add('Notifications', '/?page=notifications', 'bi-bell', 'User', 'notifications inbox unread');
     $add('Patch Notes', '/?page=patch-notes', 'bi-journal-text', 'User', 'patch notes changelog version');
+
+    // Quick jumps (not in sidebar but useful for power users)
+    $add('View Request by ID', '/?page=requests', 'bi-hash', 'Quick Jump', 'request id goto view #', null);
+    $add('View Vehicle by Plate', '/?page=vehicles', 'bi-car-front', 'Quick Jump', 'vehicle plate goto view', null);
 
     return $items;
 }
