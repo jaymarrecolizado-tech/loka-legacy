@@ -149,6 +149,9 @@ require_once INCLUDES_PATH . '/header.php';
                                     <td>
                                         <?php if ($req->status === 'approved'): ?>
                                             <span class="badge bg-success">Approved</span>
+                                            <?php if (empty($req->actual_arrival_datetime) && strtotime($req->end_datetime) < time()): ?>
+                                                <span class="badge bg-danger ms-1" title="Exceeded end: <?= e($req->end_datetime) ?>"><i class="bi bi-exclamation-triangle me-1"></i>Overdue</span>
+                                            <?php endif; ?>
                                         <?php else: ?>
                                             <span class="badge bg-warning">Pending Motorpool</span>
                                         <?php endif; ?>

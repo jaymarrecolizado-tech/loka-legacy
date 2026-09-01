@@ -101,6 +101,38 @@ require_once INCLUDES_PATH . '/header.php';
             </a>
         </div>
         <?php endif; ?>
+
+        <!-- Driver Rankings (anonymous) -->
+        <div class="col-lg-4 col-md-6">
+            <a href="<?= APP_URL ?>/?page=reports&action=driver-rankings" class="text-decoration-none">
+                <div class="card h-100 report-card">
+                    <div class="card-body text-center py-5">
+                        <div class="mb-3">
+                            <i class="bi bi-trophy text-warning" style="font-size: 3.5rem;"></i>
+                        </div>
+                        <h5>Driver Rankings</h5>
+                        <p class="text-muted mb-3">Anonymous passenger evaluations — per-driver averages, GRAB-like rankings</p>
+                        <span class="badge bg-warning text-dark"><i class="bi bi-shield-lock me-1"></i>Anonymous</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Evaluations -->
+        <div class="col-lg-4 col-md-6">
+            <a href="<?= APP_URL ?>/?page=evaluations" class="text-decoration-none">
+                <div class="card h-100 report-card">
+                    <div class="card-body text-center py-5">
+                        <div class="mb-3">
+                            <i class="bi bi-star-half text-primary" style="font-size: 3.5rem;"></i>
+                        </div>
+                        <h5>Evaluations</h5>
+                        <p class="text-muted mb-3">Response rates per trip and anonymous remarks dashboard</p>
+                        <span class="badge bg-primary">Anonymous</span>
+                    </div>
+                </div>
+            </a>
+        </div>
     </div>
 </div>
 

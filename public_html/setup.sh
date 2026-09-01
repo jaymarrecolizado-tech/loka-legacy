@@ -176,6 +176,16 @@ else
     echo -e "${GREEN}✓ Cron job added: $CRON_JOB${NC}"
 fi
 
+# Trip confirmations + overdue + evaluation reminders (every 5 minutes)
+CRON_TRIP="*/5 * * * * $PHP_BIN $WEB_ROOT/cron/process_trip_confirmations.php >> $LOG_DIR/cron.log 2>&1"
+if crontab -l 2>/dev/null | grep -q "process_trip_confirmations.php"; then
+    echo -e "${YELLOW}✓ Trip cron job already exists${NC}"
+else
+    (crontab -l 2>/dev/null; echo "$CRON_TRIP") | crontab -
+    echo -e "${GREEN}✓ Trip cron job added: $CRON_TRIP${NC}"
+    echo -e "${YELLOW}  Also available as HTTP fallback: /?page=cron&action=trips&key=SECRET (secured by cron_secret)${NC}"
+fi
+
 # Keep cron.log from growing unbounded (keep 14 days, compress old)
 if [ ! -f /etc/logrotate.d/loka-cron ] && [ -w /etc/logrotate.d ] 2>/dev/null; then
     cat > /etc/logrotate.d/loka-cron <<EOF

@@ -10,6 +10,20 @@ $pageTitle = 'Patch Notes';
 // Patch notes data - organized by version (from git history)
 $patchNotes = [
     [
+        'version' => '2.7.0',
+        'date' => '2026-09-01',
+        'title' => 'Trip Confirmations, Overdue Alerts & Anonymous Driver Evaluations',
+        'changes' => [
+            ['type' => 'feature', 'text' => 'Motorpool head can add/remove passengers (system users + guests) on approved and on-routing requests before dispatch — capacity and duplicate checks, audit + notifications'],
+            ['type' => 'feature', 'text' => 'Admin / All Father toggle to enforce Travel Order / Official Business Slip upload during application (Settings → Travel Documents)'],
+            ['type' => 'feature', 'text' => 'Pre-trip confirmatory email for approved requests: 1 day before trip (or configurable minutes if same-day) with Proceed / Don\'t Proceed token links; default is proceed if no response; Don\'t Proceed offers Cancel or Request Reschedule (re-approval by motorpool)'],
+            ['type' => 'feature', 'text' => 'Overdue-trip alerts: motorpool head notified when an approved trip exceeds its designated end time; periodic renotify + Overdue badge in Requests and Availability'],
+            ['type' => 'feature', 'text' => 'Post-trip anonymous driver evaluations (GRAB-like): passengers rate punctuality/safety/courtesy/driving/vehicle + remarks; reports show Driver Rankings computed averages and anonymous remarks only'],
+            ['type' => 'feature', 'text' => 'New pages: Manage Passengers, Evaluations (public token submit + dashboard), Driver Rankings with Chart.js and CSV export; new cron job process_trip_confirmations.php every 5 minutes'],
+            ['type' => 'improvement', 'text' => 'Settings page now exposes Trip Confirmation lead/window, Overdue renotify, and Evaluation reminder/expiry settings with clamping'],
+        ]
+    ],
+    [
         'version' => '2.6.0',
         'date' => '2026-08-24',
         'title' => 'Booking Rules & Return Confirmation',

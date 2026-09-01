@@ -229,6 +229,12 @@ require_once INCLUDES_PATH . '/header.php';
                             </td>
                             <td>
                                 <?= requestStatusBadge($request->status) ?>
+                                <?php
+                                $isOverdue = $request->status === STATUS_APPROVED && empty($request->actual_arrival_datetime) && !empty($request->end_datetime) && strtotime($request->end_datetime) < time();
+                                ?>
+                                <?php if ($isOverdue): ?>
+                                <span class="badge bg-danger ms-1" title="Exceeded designated end: <?= e($request->end_datetime) ?>"><i class="bi bi-exclamation-triangle me-1"></i>Overdue</span>
+                                <?php endif; ?>
                                 <?php if ($request->status === STATUS_REVISION): ?>
                                 <span class="badge bg-warning text-dark ms-1"><i class="bi bi-pencil-square me-1"></i>Needs Revision</span>
                                 <?php elseif (in_array($request->status, [STATUS_PENDING, STATUS_PENDING_MOTORPOOL]) && $request->unread_notifications > 0): ?>

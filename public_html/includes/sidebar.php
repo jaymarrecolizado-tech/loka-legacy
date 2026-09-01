@@ -205,6 +205,20 @@
                     <span>Reports</span>
                 </a>
             </li>
+            <!-- Driver Rankings (anonymous evaluations) -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page')==='reports' && get('action')==='driver-rankings') ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=reports&action=driver-rankings">
+                    <i class="bi bi-trophy"></i>
+                    <span>Driver Rankings</span>
+                </a>
+            </li>
+            <!-- Evaluations -->
+            <li class="nav-item">
+                <a class="nav-link <?= activeMenu('evaluations') ?>" href="<?= APP_URL ?>/?page=evaluations">
+                    <i class="bi bi-star-half"></i>
+                    <span>Evaluations</span>
+                </a>
+            </li>
             <?php endif; ?>
             
             <?php if (isMotorpool()): ?>

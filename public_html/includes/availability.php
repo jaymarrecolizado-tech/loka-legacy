@@ -46,6 +46,7 @@ function availabilityTripsForMonth(int $year, int $month): array
     return db()->fetchAll(
         "SELECT r.id, r.start_datetime, r.end_datetime, r.destination, r.purpose,
                 r.vehicle_id, r.driver_id, r.requested_driver_id, r.status,
+                r.actual_arrival_datetime, r.end_datetime AS trip_end,
                 u.name AS requester_name, v.plate_number
          FROM requests r
          JOIN users u ON r.user_id = u.id
