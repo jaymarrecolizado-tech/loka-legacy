@@ -29,9 +29,12 @@ function getNavSearchItems(): array
         }
     } catch (Throwable $e) { /* badges are best-effort */ }
 
-    // Helper to push item
-    $add = function (string $label, string $href, string $icon, string $section, string $keywords = '', ?int $badge = null) use (&$items, $badgeMap) {
-        $resolvedBadge = $badge ?? ($badgeMap[$href] ?? null);
+    // Helper to push item - href must be absolute (APP_URL + query) so it works from subfolder install
+    $add = function (string $label, string $path, string $icon, string $section, string $keywords = '', ?int $badge = null) use (&$items, $badgeMap) {
+        // $path is like '/?page=drivers' - prefix with APP_URL
+        $href = rtrim(APP_URL, '/') . $path;
+        // badgeMap is keyed by path, also try href
+        $resolvedBadge = $badge ?? ($badgeMap[$path] ?? ($badgeMap[$href] ?? null));
         $items[] = [
             'label' => $label,
             'href' => $href,

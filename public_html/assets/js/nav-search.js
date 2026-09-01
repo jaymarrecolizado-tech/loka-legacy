@@ -23,7 +23,8 @@
     function saveQueries(a){ save(LS_QUERIES, a.slice(0, MAX_QUERIES)); }
 
     function pushRecent(item){
-        const r = loadRecent().filter(x=>x.href!==item.href);
+        item.href = normalizeHref(item.href);
+        const r = loadRecent().filter(x=>normalizeHref(x.href)!==item.href);
         r.unshift({ label:item.label, href:item.href, icon:item.icon, section:item.section });
         saveRecent(r);
     }
@@ -33,19 +34,32 @@
         qs.unshift(q); saveQueries(qs);
     }
     function bumpFrequent(item){
+        item.href = normalizeHref(item.href);
         const m = loadFrequent(); m[item.href]=(m[item.href]||0)+1; saveFrequent(m);
+    }
+    const APP_BASE = (window.LOKA_APP_URL || '').replace(/\/$/, '');
+    function normalizeHref(href){
+        if(!href) return href;
+        if(href.startsWith('http')) return href;
+        if(href.startsWith('/?page=')) return APP_BASE + href;
+        return href;
     }
     function getFrequentItems(all){
         const m = loadFrequent();
-        return Object.entries(m).map(([href,cnt])=>{ const f=all.find(a=>a.href===href); return f?{...f,count:cnt}:null; }).filter(Boolean).sort((a,b)=>b.count-a.count).slice(0,MAX_FREQUENT);
+        return Object.entries(m).map(([href,cnt])=>{
+            const norm = normalizeHref(href);
+            const f=all.find(a=>a.href===href || a.href===norm || normalizeHref(a.href)===href);
+            return f?{...f,count:cnt, href: f.href}:null;
+        }).filter(Boolean).sort((a,b)=>b.count-a.count).slice(0,MAX_FREQUENT);
     }
     function getPinnedItems(all){
-        const pins = loadPinned();
-        return pins.map(href=> all.find(a=>a.href===href)).filter(Boolean).map(it=> ({...it, pinned:true }));
+        const pins = loadPinned().map(normalizeHref);
+        return pins.map(href=> all.find(a=>a.href===href || normalizeHref(a.href)===href)).filter(Boolean).map(it=> ({...it, pinned:true }));
     }
-    function isPinned(href){ return loadPinned().includes(href); }
+    function isPinned(href){ return loadPinned().map(normalizeHref).includes(normalizeHref(href)); }
     function togglePin(href){
-        let pins = loadPinned();
+        href = normalizeHref(href);
+        let pins = loadPinned().map(normalizeHref);
         if(pins.includes(href)) pins = pins.filter(h=>h!==href);
         else { if(pins.length>=MAX_PINNED) pins.pop(); pins.unshift(href); }
         savePinned(pins);
@@ -78,11 +92,11 @@
         const mNum = q.match(/^#?(\d{1,6})$/);
         if(mNum){
             const id=mNum[1];
-            out.push({ label:`Go to Request #${id}`, href:`/?page=requests&action=view&id=${id}`, icon:'bi-hash', section:'Quick Jump', keywords:`request ${id}`, quick:true });
+            out.push({ label:`Go to Request #${id}`, href:APP_BASE + `/?page=requests&action=view&id=${id}`, icon:'bi-hash', section:'Quick Jump', keywords:`request ${id}`, quick:true });
         }
         if(/^[A-Z0-9\- ]{3,10}$/i.test(q) && !/^\d+$/.test(q) && q.length>=3){
             const plate=q.toUpperCase().replace(/\s+/g,' ').trim();
-            out.push({ label:`Search Vehicle: ${plate}`, href:`/?page=vehicles&search=${encodeURIComponent(plate)}`, icon:'bi-car-front', section:'Quick Jump', keywords:`vehicle plate ${plate}`, quick:true });
+            out.push({ label:`Search Vehicle: ${plate}`, href:APP_BASE + `/?page=vehicles&search=${encodeURIComponent(plate)}`, icon:'bi-car-front', section:'Quick Jump', keywords:`vehicle plate ${plate}`, quick:true });
         }
         return out;
     }
@@ -291,7 +305,31 @@
     }
     const debouncedPalette = debounce(refreshPalette, 220);
 
+    function migrateLegacy(){
+        [LS_RECENT, LS_PINNED].forEach(k=>{
+            try {
+                const raw=localStorage.getItem(k); if(!raw) return;
+                const arr=JSON.parse(raw);
+                if(!Array.isArray(arr)) return;
+                const migrated=arr.map(it=>{
+                    if(typeof it==='string') return normalizeHref(it);
+                    if(it && it.href) it.href=normalizeHref(it.href);
+                    return it;
+                });
+                localStorage.setItem(k, JSON.stringify(migrated));
+            } catch(e){}
+        });
+        [LS_FREQUENT].forEach(k=>{
+            try {
+                const raw=localStorage.getItem(k); if(!raw) return;
+                const obj=JSON.parse(raw); if(typeof obj!=='object' || Array.isArray(obj)) return;
+                const out={}; Object.entries(obj).forEach(([hk,v])=>{ out[normalizeHref(hk)]=v; });
+                localStorage.setItem(k, JSON.stringify(out));
+            } catch(e){}
+        });
+    }
     function init(){
+        migrateLegacy();
         const topInput=document.getElementById('navSearchInput');
         const topDropdown=document.getElementById('navSearchDropdown');
         const topList=document.getElementById('navSearchList');
