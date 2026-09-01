@@ -126,6 +126,17 @@ function initDataTables() {
         if (table.closest('.modal')) return;
         if (!table.querySelector('thead')) return;
         if (!table.querySelectorAll('tbody tr').length) return;
+        // Skip tables where column count mismatches (colspan "No data" rows break DataTables)
+        const headerCols = table.querySelectorAll('thead th').length;
+        let hasMismatch = false;
+        table.querySelectorAll('tbody tr').forEach(tr => {
+            const cells = tr.querySelectorAll('td');
+            if (!cells.length) return;
+            // If row uses colspan (e.g. "No data" row), skip DataTables for this table
+            if (tr.querySelector('td[colspan]')) { hasMismatch = true; }
+            else if (cells.length !== headerCols) { hasMismatch = true; }
+        });
+        if (hasMismatch) return;
 
         $(table).DataTable({
             pageLength: 15,

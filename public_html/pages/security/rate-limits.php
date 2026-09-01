@@ -185,7 +185,7 @@ require_once INCLUDES_PATH . '/header.php';
             <div class="card">
                 <div class="card-header fw-semibold">Locked / throttled accounts</div>
                 <div class="table-responsive">
-                    <table class="table table-striped mb-0">
+                    <table class="table table-striped mb-0 no-datatable">
                         <thead><tr><th>User</th><th>Attempts</th><th>Locked until</th><th></th></tr></thead>
                         <tbody>
                         <?php if (empty($lockedUsers)): ?>
@@ -218,7 +218,7 @@ require_once INCLUDES_PATH . '/header.php';
             <div class="card">
                 <div class="card-header fw-semibold">Active rate limits (window)</div>
                 <div class="table-responsive">
-                    <table class="table table-striped mb-0">
+                    <table class="table table-striped mb-0 no-datatable">
                         <thead><tr><th>Action</th><th>Identifier</th><th>#</th><th></th></tr></thead>
                         <tbody>
                         <?php if (empty($activeLimits)): ?>
@@ -249,7 +249,7 @@ require_once INCLUDES_PATH . '/header.php';
     <div class="card">
         <div class="card-header fw-semibold">Recent security events</div>
         <div class="table-responsive">
-            <table class="table table-striped mb-0">
+            <table class="table table-striped mb-0 no-datatable">
                 <thead><tr><th>When</th><th>Event</th><th>Details</th></tr></thead>
                 <tbody>
                 <?php if (empty($recentLogs)): ?>
