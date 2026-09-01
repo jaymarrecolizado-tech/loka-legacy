@@ -17,6 +17,7 @@ $dateTo = get('date_to', date('Y-m-t')); // Default to last day of current month
 
 // Action can be to print
 $isPrint = get('print') == '1';
+$templateType = get('template', 'vehicle'); // 'vehicle' or 'travelorder'
 
 // Fetch vehicles for dropdown
 $vehicles = db()->fetchAll("SELECT id, plate_number, make, model FROM vehicles WHERE deleted_at IS NULL ORDER BY plate_number");
@@ -27,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $isPrint) {
     if (!$dateFrom)
         $errors[] = "Please select a start date.";
     if (!$dateTo)
-        $errors[] = "Please select an end date.";
+        $errors[] = "Please select a end date.";
 
     if (empty($errors)) {
         // Fetch driver information (the generator)
@@ -48,16 +49,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $isPrint) {
 
         // Fetch drivers for dropdown
         $drivers = db()->fetchAll("SELECT u.id, u.name FROM drivers d JOIN users u ON d.user_id = u.id ORDER BY u.name");
-
-        // Fetch motorpool heads (Reviewers) and Chief Admin & Finance / Admin (Approvers) for signatory dropdowns
-        $reviewers = db()->fetchAll(
-            "SELECT name FROM users WHERE role IN (?, ?) AND status = 'active' AND deleted_at IS NULL ORDER BY name",
-            [ROLE_MOTORPOOL, ROLE_ADMIN]
-        );
-        $approvers = db()->fetchAll(
-            "SELECT name, role FROM users WHERE role IN (?, ?, ?) AND status = 'active' AND deleted_at IS NULL ORDER BY name",
-            [ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE, ROLE_ADMIN]
-        );
 
         // Fetch all completed trips (requests) for this vehicle within date range
         $sql = "SELECT r.id as req_id, r.destination, r.purpose,
@@ -164,11 +155,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $isPrint) {
         }
 
         if ($isPrint) {
-            // Include html layout directly (variant: summary or travel order)
-            $variant = get('variant', 'summary') === 'travel_order'
-                ? 'summary-print-travelorder.php'
-                : 'summary-print.php';
-            require_once __DIR__ . '/' . $variant;
+            // Include html layout directly based on template type
+            if ($templateType === 'travelorder') {
+                require_once __DIR__ . '/summary-print-travelorder.php';
+            } else {
+                require_once __DIR__ . '/summary-print.php';
+            }
             exit;
         }
     }
@@ -177,37 +169,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $isPrint) {
 require_once INCLUDES_PATH . '/header.php';
 ?>
 
-<div class="container-fluid py-4">
-    <div class="mb-4 d-flex justify-content-between align-items-center">
+<div class="p-4 md:p-6 space-y-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <h4 class="mb-1"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Generate Vehicle Summary</h4>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-0">
-                    <li class="breadcrumb-item"><a href="<?= APP_URL ?>">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="<?= APP_URL ?>/?page=my-trip-tickets">My Trip Tickets</a></li>
-                    <li class="breadcrumb-item active">Generate Summary</li>
-                </ol>
+            <h1 class="text-2xl font-bold">
+                <i class="bi bi-file-earmark-spreadsheet mr-2"></i>Generate Vehicle Summary
+            </h1>
+            <nav class="text-sm breadcrumbs mt-1">
+                <ul>
+                    <li><a href="<?= APP_URL ?>">Dashboard</a></li>
+                    <li><a href="<?= APP_URL ?>/?page=my-trip-tickets">My Trip Tickets</a></li>
+                    <li class="text-base-content/60">Generate Summary</li>
+                </ul>
             </nav>
         </div>
-        <a href="?page=my-trip-tickets" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-1"></i>Back
+        <a href="?page=my-trip-tickets" class="loka-btn-secondary">
+            <i class="bi bi-arrow-left mr-1"></i>Back
         </a>
     </div>
 
-    <div class="row row-cols-md-2 justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Filter Parameters</h5>
-                </div>
-                <div class="card-body">
+    <div class="flex justify-center">
+        <div class="w-full max-w-2xl">
+            <div class="loka-card">
+                <div class="p-6">
+                    <div class="font-bold text-lg mb-4">Filter Parameters</div>
+
                     <?php if (!empty($errors)): ?>
-                        <div class="alert alert-danger">
-                            <ul class="mb-0">
-                                <?php foreach ($errors as $e): ?>
-                                    <li>
-                                        <?= e($e) ?>
-                                    </li>
+                        <div class="loka-alert loka-alert-danger">
+                            <ul class="list-disc list-inside">
+                                <?php foreach ($errors as $err): ?>
+                                    <li><?= e($err) ?></li>
                                 <?php endforeach; ?>
                             </ul>
                         </div>
@@ -219,43 +210,51 @@ require_once INCLUDES_PATH . '/header.php';
                         <input type="hidden" name="action" value="generate-summary">
                         <input type="hidden" name="print" value="1">
 
-                        <div class="mb-3">
-                            <label class="form-label">Ticket Template <span class="text-danger">*</span></label>
-                            <select class="form-select" name="variant">
-                                <option value="summary" selected>Vehicle Trip Ticket (Weekly Summary)</option>
-                                <option value="travel_order">Travel Order</option>
-                            </select>
-                            <small class="text-muted">Both templates let you edit every field and add rows before printing.</small>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Vehicle <span class="text-danger">*</span></label>
-                            <select class="form-select" name="vehicle_id" required>
+                        <div class="flex flex-col gap-1.5 mb-4">
+                            <label class="label">
+                                <span class="label-text font-medium">Vehicle <span class="text-error">*</span></span>
+                            </label>
+                            <select class="select select-bordered w-full" name="vehicle_id" required>
                                 <option value="">Select Vehicle...</option>
                                 <?php foreach ($vehicles as $v): ?>
                                     <option value="<?= $v->id ?>" <?= $vehicleId == $v->id ? 'selected' : '' ?>>
-                                        <?= e($v->plate_number) ?> -
-                                        <?= e($v->make) ?>
-                                        <?= e($v->model) ?>
+                                        <?= e($v->plate_number) ?> - <?= e($v->make) ?> <?= e($v->model) ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Date From <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" name="date_from" value="<?= $dateFrom ?>"
-                                    required>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div class="flex flex-col gap-1.5">
+                                <label class="label">
+                                    <span class="label-text font-medium">Date From <span class="text-error">*</span></span>
+                                </label>
+                                <input type="date" class="input input-bordered w-full" name="date_from" value="<?= $dateFrom ?>" required>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Date To <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" name="date_to" value="<?= $dateTo ?>" required>
+                            <div class="flex flex-col gap-1.5">
+                                <label class="label">
+                                    <span class="label-text font-medium">Date To <span class="text-error">*</span></span>
+                                </label>
+                                <input type="date" class="input input-bordered w-full" name="date_to" value="<?= $dateTo ?>" required>
                             </div>
                         </div>
 
-                        <div class="d-grid mt-3">
-                            <button type="submit" class="btn btn-success">
-                                <i class="bi bi-printer me-2"></i>Generate & Print Ticket
+                        <div class="flex flex-col gap-1.5 mb-4">
+                            <label class="label">
+                                <span class="label-text font-medium">Template Style</span>
+                            </label>
+                            <select class="select select-bordered w-full" name="template" id="templateSelect">
+                                <option value="vehicle" <?= $templateType === 'vehicle' ? 'selected' : '' ?>>Vehicle Trip Ticket</option>
+                                <option value="travelorder" <?= $templateType === 'travelorder' ? 'selected' : '' ?>>Travel Order</option>
+                            </select>
+                            <label class="label">
+                                <span class="label-text-alt text-base-content/60">Select the format for your trip ticket printout.</span>
+                            </label>
+                        </div>
+
+                        <div class="mt-4">
+                            <button type="submit" class="bg-success text-success-content hover:bg-success/90 px-4 py-2 text-sm font-medium rounded-xl inline-flex items-center gap-2 transition-colors w-full">
+                                <i class="bi bi-printer mr-2"></i>Generate & Print Ticket
                             </button>
                         </div>
                     </form>

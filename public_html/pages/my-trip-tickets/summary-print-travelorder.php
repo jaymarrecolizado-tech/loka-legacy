@@ -549,22 +549,6 @@ if (!defined('BASE_PATH'))
             border-bottom: 1px solid var(--border);
             padding-bottom: 2px;
         }
-
-        .info-item textarea.val {
-            width: 100%;
-            border: none;
-            border-bottom: 1px solid var(--border);
-            outline: none;
-            background: transparent;
-            font-family: inherit;
-            font-size: 11px;
-            font-weight: 700;
-            color: var(--ink);
-            text-align: center;
-            resize: none;
-            overflow: hidden;
-            line-height: 1.35;
-        }
     </style>
 </head>
 
@@ -630,19 +614,19 @@ if (!defined('BASE_PATH'))
             <div class="info-grid">
                 <div class="info-item">
                     <span class="lbl">Plate Number</span>
-                    <textarea class="val af-grow" rows="1" id="plateDisplay"><?= e($vInfo->plate_number ?? '') ?></textarea>
+                    <div class="val" id="plateDisplay"><?= e($vInfo->plate_number ?? '') ?></div>
                 </div>
                 <div class="info-item">
                     <span class="lbl">Make / Model</span>
-                    <textarea class="val af-grow" rows="1" id="modelDisplay"><?= e(($vInfo->make ?? '') . ' ' . ($vInfo->model ?? '')) ?></textarea>
+                    <div class="val"><?= e(($vInfo->make ?? '') . ' ' . ($vInfo->model ?? '')) ?></div>
                 </div>
                 <div class="info-item">
                     <span class="lbl">Fuel Type</span>
-                    <textarea class="val af-grow" rows="1" id="fuelDisplay"><?= ucfirst(e($vInfo->fuel_type ?? 'Diesel')) ?></textarea>
+                    <div class="val"><?= ucfirst(e($vInfo->fuel_type ?? 'Diesel')) ?></div>
                 </div>
                 <div class="info-item">
                     <span class="lbl">Color</span>
-                    <textarea class="val af-grow" rows="1" id="colorDisplay"><?= ucfirst(e($vInfo->color ?? '')) ?></textarea>
+                    <div class="val"><?= ucfirst(e($vInfo->color ?? '')) ?></div>
                 </div>
             </div>
         </div>
@@ -839,14 +823,15 @@ if (!defined('BASE_PATH'))
 
     </div><!-- /ticket -->
 
-    <?php
-    $ticketAutosaveKey = 'to-' . ($tripTicketNumber ?? '') . '-' . ($vehicleId ?? '') . '-' . ($dateFrom ?? '') . '-' . ($dateTo ?? '');
-    require __DIR__ . '/partials/ticket_shared.php';
-    ?>
-
     <script>
         function resetForm() {
-            TicketKit.reset();
+            if (!confirm('Reset all form entries?')) return;
+            const keepIds = ['driverName', 'plateDisplay', 'odoStart', 'odoEnd', 'distTraveled', 'fuelConsumed', 'fuelCost', 'sigDriver'];
+            document.querySelectorAll('input:not([type="hidden"]), textarea').forEach(el => {
+                if (!keepIds.includes(el.id) && el.value && !el.readOnly) {
+                    el.value = '';
+                }
+            });
         }
 
         window.addEventListener('load', function() {

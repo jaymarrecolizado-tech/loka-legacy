@@ -201,13 +201,11 @@ if (!defined('BASE_PATH'))
         /* INFO ROWS */
         .irow {
             display: flex;
-            flex-wrap: wrap;
             border-bottom: 1px solid var(--border);
         }
 
         .if {
-            flex: 1 1 120px;
-            min-width: 0;
+            flex: 1;
             padding: 4px 9px 5px;
             border-right: 1px solid var(--border);
             min-height: 34px;
@@ -244,7 +242,10 @@ if (!defined('BASE_PATH'))
         }
 
         .if input,
-        .if textarea {
+        .if textarea,
+        .if select {
+            -webkit-appearance: none;
+            appearance: none;
             width: 100%;
             border: none;
             outline: none;
@@ -269,41 +270,31 @@ if (!defined('BASE_PATH'))
             font-weight: 400;
         }
 
-        .if.fuel {
-            flex: 0 0 80px;
-        }
-
-        .if.plate {
-            flex: 0 0 95px;
-        }
-
-        .if textarea.wrap-in {
-            height: 100%;
-            font-size: 11px;
-            font-weight: 700;
-            line-height: 1.3;
-            white-space: normal;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            resize: none;
-            overflow: hidden;
-        }
-
         .date-pair {
             display: flex;
-            flex-direction: column;
-            gap: 3px;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            margin-top: 2px;
         }
 
         .date-pair>span {
-            display: none;
+            font-size: 8px;
+            color: var(--sub);
+            white-space: nowrap;
+            font-weight: 600;
         }
 
         .date-pair input {
-            flex: 1 1 0;
-            min-width: 0;
+            flex: 1;
+            width: 100%;
             font-size: 10px;
-            padding: 0;
+            text-align: center;
+            padding: 2px 0;
+            margin: 0;
+            -webkit-appearance: none;
+            appearance: none;
         }
 
         /* TABLES */
@@ -372,14 +363,11 @@ if (!defined('BASE_PATH'))
         }
 
         /* Destination, Purpose, and Driver/Passenger Name columns */
-        .tbl-trip td:nth-child(6) textarea,
-        .tbl-trip td:nth-child(7) textarea {
+        .tbl-trip textarea.auto-expand {
             white-space: normal !important;
             word-wrap: break-word !important;
             overflow-wrap: break-word !important;
             line-height: 1.4;
-            min-height: 40px !important;
-            height: 100% !important;
             width: 100% !important;
             padding: 2px 4px !important;
             text-align: left !important;
@@ -393,11 +381,9 @@ if (!defined('BASE_PATH'))
             background: transparent;
             box-sizing: border-box;
             display: block;
-            min-height: 22px !important;
-        }
+            }
 
-        .tbl-trip td:nth-child(6) textarea::placeholder,
-        .tbl-trip td:nth-child(7) textarea::placeholder {
+        .tbl-trip textarea.auto-expand::placeholder {
             color: #ccc;
             font-weight: 400;
         }
@@ -409,7 +395,6 @@ if (!defined('BASE_PATH'))
 
         @media print {
             .tbl-trip textarea {
-                overflow: hidden !important;
                 -webkit-appearance: none;
                 appearance: none;
             }
@@ -525,8 +510,7 @@ if (!defined('BASE_PATH'))
 
         td[rowspan] input {
             height: auto;
-            min-height: 40px !important;
-        }
+            }
 
         td[rowspan] {
             vertical-align: top;
@@ -537,33 +521,13 @@ if (!defined('BASE_PATH'))
         }
 
         /* trip col widths - portrait */
-        .tbl-trip col.c-date {
-            width: 8%;
-        }
-
-        .tbl-trip col.c-time {
-            width: 7%;
-        }
-
-        .tbl-trip col.c-odo {
-            width: 7%;
-        }
-
-        .tbl-trip col.c-dest {
-            width: 20%;
-        }
-
-        .tbl-trip col.c-proj {
-            width: 20%;
-        }
-
-        .tbl-trip col.c-user {
-            width: 17%;
-        }
-
-        .tbl-trip col.c-sig {
-            width: 7%;
-        }
+        .tbl-trip col.c-date { width: 8%; }
+        .tbl-trip col.c-time { width: 6%; }
+        .tbl-trip col.c-odo { width: 7%; }
+        .tbl-trip col.c-dest { width: 21%; }
+        .tbl-trip col.c-proj { width: 21%; }
+        .tbl-trip col.c-user { width: 16%; }
+        .tbl-trip col.c-sig { width: 8%; }
 
         /* fuel col widths */
         .tbl-fuel col.c-qty {
@@ -664,12 +628,12 @@ if (!defined('BASE_PATH'))
         /* SIGNATORIES */
         .sigs {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: 1fr 1fr 1fr 1fr;
             border-top: 1.5px solid var(--border2);
         }
 
         .sig {
-            padding: 7px 12px 10px;
+            padding: 7px 16px 10px;
             border-right: 1px solid var(--border);
             text-align: center;
         }
@@ -790,55 +754,69 @@ if (!defined('BASE_PATH'))
 
         <!-- HEADER -->
         <div class="hdr">
-            <div class="hdr-left">
-                <strong>Republic of the Philippines</strong>
-                Department of Information and<br>
-                Communications Technology<br>
-                Regional Office No. II
+            <div class="hdr-left" style="display: flex; align-items: center; gap: 8px; text-align: left;">
+                <img src="<?= APP_URL ?>/assets/img/dict_logo.png" style="width: 50px; height: auto; object-fit: contain; mix-blend-mode: multiply;" alt="DICT" onerror="this.style.display='none'">
+                <div>
+                    <strong>Republic of the Philippines</strong>
+                    Department of Information and<br>
+                    Communications Technology<br>
+                    Regional Office No. II
+                </div>
             </div>
             <div class="hdr-center">
                 <div class="hdr-title">Vehicle Trip Ticket</div>
                 <div class="hdr-bar"></div>
                 <div class="hdr-sub">Motorpool Unit &nbsp;·&nbsp; Admin and Finance Division</div>
             </div>
-            <div class="hdr-right">
-                <span class="lbl">Trip No.</span>
-                <span class="tno" id="tripnoBadge">
-                    <?= e($tripTicketNumber) ?>
-                </span>
-                <span class="lbl" style="margin-top:5px;">Location / Base</span>
-                <!-- Default Base -->
-                <span class="base">Tuguegarao City</span>
+            <div class="hdr-right" style="display: flex; align-items: center; gap: 10px; justify-content: flex-end; text-align: right;">
+                <div>
+                    <span class="lbl">Trip No.</span>
+                    <span class="tno" id="tripnoBadge">
+                        <?= e($tripTicketNumber) ?>
+                    </span>
+                    <span class="lbl" style="margin-top:5px;">Location / Base</span>
+                    <!-- Default Base -->
+                    <span class="base">Tuguegarao City</span>
+                </div>
+                <img src="<?= APP_URL ?>/assets/img/bp_logo.png" style="width: 50px; height: auto; object-fit: contain; mix-blend-mode: multiply;" alt="BP" onerror="this.style.display='none'">
             </div>
         </div>
 
         <!-- VEHICLE INFORMATION -->
         <div class="sec">Vehicle Information</div>
         <div class="irow">
-            <div class="if plate">
+            <div class="if">
                 <span class="lbl">Plate Number</span>
                 <input type="text" id="plate" value="<?= e($vInfo->plate_number) ?>">
             </div>
-            <div class="if f3">
+            <div class="if f2">
                 <span class="lbl">Make / Model</span>
-                <textarea class="wrap-in" id="model" rows="1"><?= e($vInfo->make . ' ' . $vInfo->model) ?></textarea>
+                <input type="text" id="model" value="<?= e($vInfo->make . ' ' . $vInfo->model) ?>">
             </div>
-            <div class="if fuel">
+            <div class="if">
                 <span class="lbl">Fuel Type</span>
                 <input type="text" id="fuel" value="<?= ucfirst(e($vInfo->fuel_type ?? 'Diesel')) ?>">
             </div>
             <div class="if f2">
                 <span class="lbl">Location / Base</span>
-                <textarea class="wrap-in" id="location" rows="1">Tuguegarao City</textarea>
+                <input type="text" id="location" value="Tuguegarao City">
             </div>
+        </div>
+        <div class="irow">
             <div class="if f2">
                 <span class="lbl">Driver Assigned</span>
-                <textarea class="wrap-in" id="driver" rows="1" placeholder="Full name of driver"><?= e($generatorName) ?></textarea>
+                <select id="driver">
+                    <option value="">Select Driver...</option>
+                    <?php foreach ($drivers as $drv): ?>
+                        <option value="<?= e($drv->name) ?>" <?= $drv->name === $generatorName ? 'selected' : '' ?>><?= strtoupper(e($drv->name)) ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div class="if f2">
                 <span class="lbl">Date of Trip</span>
                 <div class="date-pair">
                     <input type="date" id="dateFrom" value="<?= $dateFrom ?>">
+                    <span>to</span>
                     <input type="date" id="dateTo" value="<?= $dateTo ?>">
                 </div>
             </div>
@@ -852,10 +830,6 @@ if (!defined('BASE_PATH'))
 
         <!-- TRIP DETAILS -->
         <div class="sec">Trip Details &nbsp;<em>(to be filled-up by driver assigned)</em></div>
-        <div class="af-rowbtns af-no-print">
-            <button type="button" class="af-btn" onclick="TicketKit.addRow('tripBody', 'tripRowTemplate')">+ Add trip row</button>
-            <button type="button" class="af-btn danger" onclick="TicketKit.removeRow('tripBody', 1);">− Remove last</button>
-        </div>
         <div class="tbl-wrap">
             <table class="tbl-trip">
                 <colgroup>
@@ -866,8 +840,8 @@ if (!defined('BASE_PATH'))
                     <col class="c-odo">
                     <col class="c-dest">
                     <col class="c-proj">
-                    <col class="c-user">
-                    <col class="c-sig">
+                     <col class="c-user">
+                     <col class="c-sig">
                 </colgroup>
                 <thead>
                     <tr>
@@ -899,11 +873,11 @@ if (!defined('BASE_PATH'))
                                 <td rowspan="<?= $peopleCount ?>"><input type="time" value="<?= date('H:i', strtotime($t->end_date)) ?>"></td>
                                 <td rowspan="<?= $peopleCount ?>"><input type="text" placeholder="km" value="<?= $t->start_mileage ?>"></td>
                                 <td rowspan="<?= $peopleCount ?>"><input type="text" placeholder="km" value="<?= $t->end_mileage ?>"></td>
-                                <td rowspan="<?= $peopleCount ?>"><textarea class="left" placeholder="Destination" rows="2"><?= e($t->destination) ?></textarea></td>
-                                <td rowspan="<?= $peopleCount ?>"><textarea class="left" placeholder="Purpose" rows="2"><?= e($t->purpose) ?></textarea></td>
+                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Destination" rows="1" maxlength="500"><?= e($t->destination) ?></textarea></td>
+                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Purpose" rows="1" maxlength="500"><?= e($t->purpose) ?></textarea></td>
                             <?php endif; ?>
                             <td>
-                                <input class="left" type="text" placeholder="Name" value="<?= e($person['name']) ?><?php if ($person['role'] === 'Driver'): ?> (Driver)<?php endif; ?>">
+                                <textarea class="left auto-expand" placeholder="Name" rows="1" maxlength="500"><?= e($person['name']) ?><?php if ($person['role'] === 'Driver'): ?> (Driver)<?php endif; ?></textarea>
                                 <input type="hidden" class="person-role" value="<?= e($person['role']) ?>">
                             </td>
                              <td><input type="text"></td>
@@ -922,9 +896,9 @@ if (!defined('BASE_PATH'))
                             <td><input type="time"></td>
                             <td><input type="text" placeholder="km"></td>
                             <td><input type="text" placeholder="km"></td>
-                            <td><textarea class="left" placeholder="Destination" rows="2"></textarea></td>
-                            <td><textarea class="left" placeholder="Purpose" rows="2"></textarea></td>
-                             <td><input class="left" type="text" placeholder="Name (Driver)"></td>
+                            <td><textarea class="left auto-expand" placeholder="Destination" rows="1" maxlength="500"></textarea></td>
+                            <td><textarea class="left auto-expand" placeholder="Purpose" rows="1" maxlength="500"></textarea></td>
+                             <td><textarea class="left auto-expand" placeholder="Name (Driver)" rows="1" maxlength="500"></textarea></td>
                             <td><input type="text"></td>
                         </tr>
                     <?php endfor; ?>
@@ -934,10 +908,6 @@ if (!defined('BASE_PATH'))
 
         <!-- FUEL REFILLING DATA -->
         <div class="sec">Fuel Refilling Data &nbsp;<em>(to be filled-up by driver)</em></div>
-        <div class="af-rowbtns af-no-print">
-            <button type="button" class="af-btn" onclick="TicketKit.addRow('fuelBody', 'fuelRowTemplate'); calcTotals();">+ Add fuel entry</button>
-            <button type="button" class="af-btn danger" onclick="TicketKit.removeRow('fuelBody', 1);">− Remove last</button>
-        </div>
         <div class="tbl-wrap">
             <table class="tbl-fuel">
                 <colgroup>
@@ -1023,12 +993,6 @@ if (!defined('BASE_PATH'))
             </div>
         </div>
 
-        <!-- REMARKS -->
-        <div class="sec" id="remarksSection">Remarks</div>
-        <div style="padding:5px 10px 7px;border-bottom:1px solid var(--border);">
-            <textarea id="remarks" class="af-grow" rows="1" placeholder="Add remarks, notes, or annotations for this trip ticket (optional — hidden when empty)"></textarea>
-        </div>
-
         <!-- SIGNATORIES -->
         <div class="sec">Signatories</div>
         <div class="sigs">
@@ -1060,41 +1024,15 @@ if (!defined('BASE_PATH'))
                 <div class="sig-role">Reviewed by</div>
                 <div style="height:20px;"></div>
                 <div class="sig-line"></div>
-                <select class="sig-select" id="sigReviewer">
-                    <option value="">Select Reviewer...</option>
-                    <?php
-                    $defaultReviewer = 'ENGR. RONALD S. BARIUAN';
-                    $reviewerNames = array_column($reviewers ?? [], 'name');
-                    if (!in_array($defaultReviewer, $reviewerNames)) {
-                        $reviewerNames[] = $defaultReviewer;
-                    }
-                    foreach ($reviewerNames as $rname): ?>
-                        <option value="<?= e($rname) ?>" <?= $rname === $defaultReviewer ? 'selected' : '' ?>><?= strtoupper(e($rname)) ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <div class="sig-name">ENGR. RONALD S. BARIUAN</div>
                 <div class="sig-title">Motorpool Unit</div>
             </div>
             <div class="sig">
                 <div class="sig-role">Approved</div>
                 <div style="height:20px;"></div>
                 <div class="sig-line"></div>
-                <select class="sig-select" id="sigApprover" onchange="updateApproverTitle()">
-                    <option value="">Select Approver...</option>
-                    <?php
-                    $defaultApprover = 'MINA FLOR T. VILLAFUERTE';
-                    $approverRows = $approvers ?? [];
-                    $hasDefault = false;
-                    foreach ($approverRows as $arow) {
-                        if (strcasecmp($arow->name, $defaultApprover) === 0) { $hasDefault = true; break; }
-                    }
-                    if (!$hasDefault) {
-                        $approverRows[] = (object) ['name' => $defaultApprover, 'role' => ROLE_CHIEF_ADMIN_FINANCE];
-                    }
-                    foreach ($approverRows as $arow): ?>
-                        <option value="<?= e($arow->name) ?>" data-role="<?= e($arow->role) ?>" <?= strcasecmp($arow->name, $defaultApprover) === 0 ? 'selected' : '' ?>><?= strtoupper(e($arow->name)) ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <div class="sig-title" id="sigApproverTitle">Admin and Finance Division</div>
+                <div class="sig-name">MINA FLOR T. VILLAFUERTE</div>
+                <div class="sig-title">Admin and Finance Division</div>
             </div>
         </div>
 
@@ -1107,35 +1045,6 @@ if (!defined('BASE_PATH'))
 
     </div><!-- /ticket -->
 
-    <!-- Row templates for dynamic rows (never rendered directly) -->
-    <template id="tripRowTemplate">
-        <tr>
-            <td><input type="date"></td>
-            <td><input type="time"></td>
-            <td><input type="time"></td>
-            <td><input type="text" placeholder="km"></td>
-            <td><input type="text" placeholder="km"></td>
-            <td><textarea class="left af-grow" placeholder="Destination" rows="2"></textarea></td>
-            <td><textarea class="left af-grow" placeholder="Purpose" rows="2"></textarea></td>
-            <td><input class="left" type="text" placeholder="Name (Driver)"></td>
-            <td><input type="text"></td>
-        </tr>
-    </template>
-    <template id="fuelRowTemplate">
-        <tr>
-            <td><input type="date"></td>
-            <td><input type="number" step="0.01" placeholder="0.00" oninput="calcTotals()"></td>
-            <td><input type="number" step="0.01" placeholder="0.00" oninput="calcTotals()"></td>
-            <td><input class="left" type="text" placeholder="e.g. Engine oil, oil filter, fuel filter..."></td>
-            <td><input class="left" type="text" placeholder="GAS Voucher No."></td>
-        </tr>
-    </template>
-
-    <?php
-    $ticketAutosaveKey = 'vtt-' . ($tripTicketNumber ?? '') . '-' . ($vehicleId ?? '') . '-' . ($dateFrom ?? '') . '-' . ($dateTo ?? '');
-    require __DIR__ . '/partials/ticket_shared.php';
-    ?>
-
     <script>
         function calcTotals() {
             let qty = 0, amt = 0;
@@ -1144,32 +1053,40 @@ if (!defined('BASE_PATH'))
                 amt += parseFloat(r.cells[2].querySelector('input').value) || 0; // cells[2] is amt column
             });
             document.getElementById('fuelQtyTotal').value = qty > 0 ? qty.toFixed(2) : '';
-            document.getElementById('fuelAmtTotal').value = qty > 0 || amt > 0 ? amt.toFixed(2) : '';
+            document.getElementById('fuelAmtTotal').value = amt > 0 ? amt.toFixed(2) : '';
             document.getElementById('fuelLoaded').value = qty > 0 ? qty.toFixed(2) : '';
             document.getElementById('fuelConsumed').value = qty > 0 ? qty.toFixed(2) : '';
             document.getElementById('distTotal').value = '<?= $totalDist > 0 ? number_format($totalDist) : '' ?>'; // Keep as is for now
         }
 
-        // Approved signatory: job title follows the selected user's role
-        // chief_admin_finance -> "Admin and Finance Division"; OIC/admin -> "OIC, Admin and Finance Division"
-        function updateApproverTitle() {
-            const sel = document.getElementById('sigApprover');
-            const titleEl = document.getElementById('sigApproverTitle');
-            if (!sel || !titleEl) return;
-            const opt = sel.options[sel.selectedIndex];
-            const role = opt ? (opt.dataset.role || '') : '';
-            titleEl.textContent = (role === 'chief_admin_finance')
-                ? 'Admin and Finance Division'
-                : 'OIC, Admin and Finance Division';
+        function syncTripNo(v) {
+            const val = v || 'e2014;';
+            document.getElementById('tripnoBadge').textContent = val;
+            document.getElementById('footerTno').textContent = 'Trip No: ' + val;
         }
-        window.addEventListener('load', updateApproverTitle);
 
         function resetForm() {
-            TicketKit.reset();
+            if (!confirm('Clear all entered data?')) return;
+            const keep = ['plate', 'model', 'fuel', 'location', 'tripno', 'dateFrom', 'dateTo', 'datePrepared'];
+            document.querySelectorAll('input, textarea').forEach(el => {
+                if (!keep.includes(el.id)) el.value = '';
+            });
+            calcTotals();
         }
 
         // Page numbering for printing
+                function autoResizeTextarea(el) {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+        }
+
         window.addEventListener('load', function() {
+            document.querySelectorAll('textarea.auto-expand').forEach(el => {
+                autoResizeTextarea(el);
+                el.addEventListener('input', function() {
+                    autoResizeTextarea(this);
+                });
+            });
             calcTotals();
         });
 
@@ -1182,3 +1099,7 @@ if (!defined('BASE_PATH'))
 </body>
 
 </html>
+
+
+
+
