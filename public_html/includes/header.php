@@ -26,6 +26,16 @@
 
     <!-- Custom CSS -->
     <link href="<?= ASSETS_PATH ?>/css/style.css?v=<?= e(APP_VERSION) ?>" rel="stylesheet">
+    <style>
+        .nav-search-dropdown .nav-search-item:hover, .nav-search-dropdown .nav-search-item.active,
+        #navSearchPalette .nav-search-item:hover, #navSearchPalette .nav-search-item.active { background: #f1f5f9; }
+        .nav-search-item { color: #1f2937; }
+        .nav-search-item small { font-size: 0.75rem; }
+        #navSearchPalette { position: fixed; top: 12%; left: 50%; transform: translateX(-50%); width: 90%; max-width: 560px; z-index: 1060; max-height: 70vh; overflow: auto; }
+        #paletteBackdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1055; }
+    </style>
+    <!-- Nav search data -->
+    <script>window.LOKA_NAV_ITEMS = <?= json_encode($navItems, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>; window.LOKA_USER_ID = <?= (int) userId() ?>;</script>
 </head>
 <body>
     <!-- Top Navigation -->
@@ -40,9 +50,29 @@
             <a class="navbar-brand" href="<?= APP_URL ?>">
                 <i class="bi bi-truck me-2"></i><?= APP_NAME ?>
             </a>
+
+            <!-- Nav Search (top bar + Ctrl+K palette) -->
+            <?php
+            require_once INCLUDES_PATH . '/nav_search.php';
+            $navItems = getNavSearchItems();
+            ?>
+            <div class="ms-3 me-auto d-none d-lg-block flex-grow-1" style="max-width:480px;">
+                <div class="position-relative">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                        <input type="text" id="navSearchInput" class="form-control" placeholder="Search features… (Ctrl+K)" autocomplete="off" aria-label="Search navigation">
+                        <span class="input-group-text bg-white small text-muted d-none d-xl-inline">Ctrl+K</span>
+                    </div>
+                    <div id="navSearchDropdown" class="nav-search-dropdown card shadow d-none position-absolute w-100 mt-1" style="z-index:1050; max-height:380px; overflow:auto;">
+                        <div id="navSearchList" class="py-1"></div>
+                    </div>
+                </div>
+            </div>
+            <!-- Mobile search button -->
+            <button class="btn btn-outline-light btn-sm d-lg-none ms-2" type="button" onclick="document.getElementById('navSearchPalette')?.classList.remove('d-none'); document.getElementById('paletteBackdrop')?.classList.remove('d-none'); document.getElementById('paletteInput')?.focus()"><i class="bi bi-search"></i></button>
             
             <!-- Right Side -->
-            <div class="ms-auto d-flex align-items-center">
+            <div class="ms-auto ms-lg-2 d-flex align-items-center">
                 <!-- Notifications -->
                 <div class="dropdown me-3">
                     <a class="nav-link text-white position-relative" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="notificationDropdown">

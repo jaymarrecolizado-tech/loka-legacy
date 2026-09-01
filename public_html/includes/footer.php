@@ -21,8 +21,26 @@
     <!-- Tom Select JS -->
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     
+    <!-- Palette backdrop + modal -->
+    <div id="paletteBackdrop" class="d-none"></div>
+    <div id="navSearchPalette" class="card shadow d-none">
+        <div class="p-2 border-bottom">
+            <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                <input type="text" id="paletteInput" class="form-control" placeholder="Search features, pages, actions…" autocomplete="off">
+                <span class="input-group-text bg-white small text-muted">Esc</span>
+            </div>
+            <small class="text-muted px-1">Tip: Press Ctrl+K to open anywhere • Arrows + Enter to navigate</small>
+        </div>
+        <div id="paletteFrequent" class="py-1"></div>
+        <div id="paletteRecent" class="py-1 border-top"></div>
+        <div id="paletteList" class="py-1 border-top"></div>
+        <div class="p-2 text-center"><button class="btn btn-sm btn-link text-muted" onclick="localStorage.removeItem('loka_nav_recent_'+window.LOKA_USER_ID); localStorage.removeItem('loka_nav_frequent_'+window.LOKA_USER_ID); location.reload();">Clear history</button></div>
+    </div>
+
     <!-- Custom JS -->
     <script src="<?= ASSETS_PATH ?>/js/app.js"></script>
+    <script src="<?= ASSETS_PATH ?>/js/nav-search.js"></script>
     
     <?php if (isset($pageScripts)): ?>
     <?= $pageScripts ?>
