@@ -402,7 +402,7 @@ require_once INCLUDES_PATH . '/header.php';
                     </form>
 
                     <div class="table-responsive">
-                        <table class="table table-striped table-hover align-middle" id="smsLogsTable">
+                        <table class="table table-striped table-hover align-middle no-datatable" id="smsLogsTable">
                             <thead>
                                 <tr>
                                     <th>ID</th>
