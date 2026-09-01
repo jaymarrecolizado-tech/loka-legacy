@@ -776,7 +776,7 @@ if ($__verifyUrl) {
                             <tr>
                                 <td><?= $pCount ?></td>
                                 <td style="padding:2px 4px;">
-                                    <input class="left" type="text" style="font-weight:700; text-transform:uppercase;" value="<?= e(strtoupper($person['name'])) ?>">
+                                    <input class="left" type="text" style="font-weight:700;" value="<?= e(mb_convert_case($person['name'], MB_CASE_TITLE, 'UTF-8')) ?>">
                                     <?php if ($person['role'] === 'Driver'): ?><div style="font-size:6px; font-weight:700; color:#dc3545; text-align:center; letter-spacing:.06em; line-height:1; margin-top:1px;">(DRIVER)</div><?php endif; ?>
                                 </td>
                                 <td><input class="left" type="text" placeholder="Position/Office"></td>

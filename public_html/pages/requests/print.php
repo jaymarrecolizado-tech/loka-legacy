@@ -500,10 +500,10 @@ if (!empty($assignmentHistory)) {
                 </div>
                 <div class="row">
                     <span class="label">Passengers:</span>
-                    <span class="value print-name">
-                        <?= e(strtoupper($request->requester_name)) ?> (REQUESTER)<?php if (!empty($passengers)): ?>,
+                    <span class="value">
+                        <span class="print-name"><?= e(strtoupper($request->requester_name)) ?> (REQUESTER)</span><?php if (!empty($passengers)): ?>,
                             <?= implode(', ', array_map(function ($p) {
-                                return e(strtoupper($p->name ?: $p->guest_name)); }, $passengers)) ?>
+                                return e(mb_convert_case($p->name ?: $p->guest_name, MB_CASE_TITLE, 'UTF-8')); }, $passengers)) ?>
                         <?php endif; ?>
                     </span>
                 </div>

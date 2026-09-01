@@ -233,10 +233,10 @@ if (!empty($passengers)) {
     foreach ($passengers as $p) {
         if ($twoCols) {
             $pdf->Cell(12, 5, $passNum . '.', 0, 0);
-            $pdf->WriteHTMLCell(85, 0, '', '', '<b>' . htmlspecialchars(strtoupper($p->passenger_name ?: '(Guest)')) . '</b>', 'B', 0, 0, true, 'L', true);
+            $pdf->WriteHTMLCell(85, 0, '', '', '<b>' . htmlspecialchars(mb_convert_case($p->passenger_name ?: '(Guest)', MB_CASE_TITLE, 'UTF-8')) . '</b>', 'B', 0, 0, true, 'L', true);
         } else {
             $pdf->Cell(12, 5, $passNum . '.', 0, 0);
-            $pdf->WriteHTMLCell(85, 0, '', '', '<b>' . htmlspecialchars(strtoupper($p->passenger_name ?: '(Guest)')) . '</b>', 'B', 1, 0, true, 'L', true);
+            $pdf->WriteHTMLCell(85, 0, '', '', '<b>' . htmlspecialchars(mb_convert_case($p->passenger_name ?: '(Guest)', MB_CASE_TITLE, 'UTF-8')) . '</b>', 'B', 1, 0, true, 'L', true);
         }
         $twoCols = !$twoCols;
         $passNum++;

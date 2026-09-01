@@ -945,7 +945,7 @@ if ($__verifyUrl) {
                                 <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Purpose" rows="1" maxlength="500"><?= e($t->purpose) ?></textarea></td>
                             <?php endif; ?>
                             <td style="padding:0;">
-                                <textarea class="left auto-expand" placeholder="Name" rows="1" maxlength="500" style="font-weight:700; text-transform:uppercase;"><?= e(strtoupper($person['name'])) ?></textarea>
+                                <textarea class="left auto-expand" placeholder="Name" rows="1" maxlength="500" style="font-weight:700;"><?= e(mb_convert_case($person['name'], MB_CASE_TITLE, 'UTF-8')) ?></textarea>
                                 <?php if ($person['role'] === 'Driver'): ?><div style="font-size:6px; font-weight:700; color:#dc3545; text-align:center; letter-spacing:.06em; line-height:1; padding:1px 0 2px;">(DRIVER)</div><?php endif; ?>
                                 <input type="hidden" class="person-role" value="<?= e($person['role']) ?>">
                             </td>
