@@ -503,8 +503,9 @@ if ($__verifyUrl) {
                 padding: 0;
             }
 
-            .controls {
-                display: none;
+            .controls,
+            .verify-bar {
+                display: none !important;
             }
 
             .ticket {
@@ -513,12 +514,37 @@ if ($__verifyUrl) {
                 width: 100%;
             }
 
-            .sec,
-            .tbl-wrap,
+            table {
+                page-break-inside: auto;
+            }
+
+            tr {
+                page-break-inside: avoid;
+            }
+
+            .sec {
+                page-break-inside: avoid;
+                page-break-after: avoid;
+            }
+
+            .tbl-wrap {
+                page-break-inside: auto;
+            }
+
             .sigs,
             .approval-box,
             .remarks {
                 page-break-inside: avoid;
+            }
+
+            .ftr {
+                page-break-inside: avoid;
+                page-break-before: avoid;
+            }
+
+            .ftr img {
+                width: 38px !important;
+                height: 38px !important;
             }
 
             th,
@@ -593,7 +619,7 @@ if ($__verifyUrl) {
         <button class="btn btn-reset" onclick="resetForm()">↺ Reset Form</button>
     </div>
     <?php if ($__verifyUrl): ?>
-    <div style="text-align:center; font-size:10px; color:#334155; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px 10px; margin-bottom:10px; max-width:210mm;">
+    <div class="verify-bar" style="text-align:center; font-size:10px; color:#334155; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px 10px; margin-bottom:10px; max-width:210mm;">
         <strong>Verify:</strong> <span style="word-break:break-all; font-family:monospace; font-size:9px;"><?= e($__verifyUrl) ?></span>
     </div>
     <?php endif; ?>

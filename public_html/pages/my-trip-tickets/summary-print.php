@@ -455,8 +455,9 @@ if ($__verifyUrl) {
                 padding: 0;
             }
 
-            .controls {
-                display: none;
+            .controls,
+            .verify-bar {
+                display: none !important;
             }
 
             .ticket {
@@ -466,27 +467,29 @@ if ($__verifyUrl) {
                 margin-bottom: 25px;
             }
 
-            /* Ensure all tables have clean borders when printing */
+            /* Allow trip and fuel tables to split across pages; keep rows intact */
             table {
-                page-break-inside: avoid;
+                page-break-inside: auto;
             }
 
-            /* Prevent breaking within rows - keep passengers together */
             tr {
                 page-break-inside: avoid;
+                page-break-after: auto;
             }
 
-            /* Prevent breaking sections */
-            .sec,
-            .tbl-wrap,
+            /* Headings stay with next block; content blocks may break */
+            .sec {
+                page-break-inside: avoid;
+                page-break-after: avoid;
+            }
+
+            .tbl-wrap {
+                page-break-inside: auto;
+            }
+
             .sigs,
             .summary {
                 page-break-inside: avoid;
-            }
-
-            /* Allow page breaks before major sections if needed */
-            .sec {
-                page-break-before: auto;
             }
 
             th,
@@ -499,13 +502,24 @@ if ($__verifyUrl) {
                 display: table-header-group;
             }
 
-            /* Footer - appears at end of document only */
+            /* Footer - keep with signatories, shrink QR on print */
             .ftr {
                 position: relative;
                 padding: 4px 12px;
-                margin: 20px 0 10px 0;
+                margin: 8px 0 0 0;
                 border-top: 2px solid #000;
                 background: white;
+                page-break-inside: avoid;
+                page-break-before: avoid;
+            }
+
+            .ftr img {
+                width: 38px !important;
+                height: 38px !important;
+            }
+
+            .ftr div[style*="border:1px solid #bbb"] {
+                padding: 2px 4px !important;
             }
 
             /* Hide the footer page number element - using @page margin instead */
@@ -785,7 +799,7 @@ if ($__verifyUrl) {
         <button class="btn btn-reset" onclick="resetForm()">↺ Clear Form</button>
     </div>
     <?php if ($__verifyUrl): ?>
-    <div style="text-align:center; font-size:10px; color:#334155; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px 10px; margin-bottom:10px; max-width:210mm;">
+    <div class="verify-bar" style="text-align:center; font-size:10px; color:#334155; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px 10px; margin-bottom:10px; max-width:210mm;">
         <strong>Verify:</strong> <span style="word-break:break-all; font-family:monospace; font-size:9px;"><?= e($__verifyUrl) ?></span>
         <?php if ($__siteLooksLocal): ?><br><span style="color:#92400e; font-size:9px;">Localhost link — set <code>SITE_URL</code> in <code>.env</code> to your LAN IP/domain for phone scanning.</span><?php endif; ?>
     </div>
