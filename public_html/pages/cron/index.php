@@ -55,6 +55,24 @@ try {
         exit;
     }
 
+    if ($action === 'trips') {
+        if (!is_file(BASE_PATH . '/cron/process_trip_confirmations.php')) {
+            http_response_code(500);
+            echo "process_trip_confirmations.php unavailable\n";
+            exit;
+        }
+        require_once BASE_PATH . '/cron/process_trip_confirmations.php';
+        if (!function_exists('processTripJobs')) {
+            http_response_code(500);
+            echo "processTripJobs() unavailable\n";
+            exit;
+        }
+        $r = processTripJobs();
+        echo date('c') . " TRIPS ok sent={$r['sent']} expired={$r['expired']} "
+            . "overdue={$r['overdue']} reminders={$r['reminders']}\n";
+        exit;
+    }
+
     // default: email
     if (!class_exists('EmailQueue')) {
         http_response_code(500);

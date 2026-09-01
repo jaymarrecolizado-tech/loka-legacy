@@ -171,6 +171,31 @@ require_once INCLUDES_PATH . '/header.php';
                     <i class="bi bi-arrow-counterclockwise me-1"></i>Rollback
                 </a>
             <?php endif; ?>
+
+            <?php
+            // Manage Passengers - motorpool head (or admin / all father) can add/remove
+            // passengers while the request is approved or still on routing (before dispatch)
+            $canManagePassengers = false;
+            if ($request->actual_dispatch_datetime === null
+                && in_array($request->status, [STATUS_PENDING, STATUS_PENDING_MOTORPOOL, STATUS_APPROVED], true)) {
+
+                if (isAdmin() || isAllFather()) {
+                    $canManagePassengers = true;
+                } elseif (isMotorpool()) {
+                    if ($request->motorpool_head_id && $request->motorpool_head_id == userId()) {
+                        $canManagePassengers = true;
+                    } elseif (!$request->motorpool_head_id) {
+                        $canManagePassengers = true;
+                    }
+                }
+            }
+            ?>
+            <?php if ($canManagePassengers): ?>
+                <a href="<?= APP_URL ?>/?page=requests&action=manage-passengers&id=<?= $requestId ?>"
+                   class="btn btn-outline-info me-2">
+                    <i class="bi bi-people me-1"></i>Manage Passengers
+                </a>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -373,6 +398,28 @@ require_once INCLUDES_PATH . '/header.php';
                                     </div>
                                 </div>
                             <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <!-- Uploaded Travel Order / OB Slip File -->
+            <?php if (!empty($request->travel_order_file)): ?>
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-paperclip me-2"></i>Uploaded Travel Order / OB Slip</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded">
+                            <div class="me-3">
+                                <div class="fw-bold"><i class="bi bi-file-earmark-text me-1"></i>
+                                    <?= e($request->travel_order_original_name ?? basename($request->travel_order_file)) ?>
+                                </div>
+                                <small class="text-muted">
+                                    Uploaded <?= $request->travel_order_uploaded_at ? e(formatDateTime($request->travel_order_uploaded_at)) : '—' ?>
+                                </small>
+                            </div>
+                            <?= fileDownloadLink($request->travel_order_file, 'Download') ?>
                         </div>
                     </div>
                 </div>

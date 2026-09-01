@@ -79,6 +79,7 @@ require_once __DIR__ . '/includes/view_as.php';
 require_once __DIR__ . '/includes/sms.php';
 require_once __DIR__ . '/includes/mail_delivery.php';
 require_once __DIR__ . '/includes/badge_counts.php';
+require_once __DIR__ . '/includes/trip-enhancements.php';
 
 // Initialize Security and send headers
 $security = Security::getInstance();
@@ -203,6 +204,11 @@ switch ($page) {
             require_once PAGES_PATH . '/requests/rollback.php';
         } elseif ($action === 'print') {
             require_once PAGES_PATH . '/requests/print.php';
+        } elseif ($action === 'confirm') {
+            // Public pre-trip confirmation (token-gated, no login)
+            require_once PAGES_PATH . '/requests/confirm.php';
+        } elseif ($action === 'manage-passengers') {
+            require_once PAGES_PATH . '/requests/manage-passengers.php';
         } else {
             require_once PAGES_PATH . '/requests/index.php';
         }
@@ -330,6 +336,10 @@ switch ($page) {
             require_once PAGES_PATH . '/reports/export-gas-vouchers-csv.php';
         } elseif ($action === 'export-gas-vouchers-pdf') {
             require_once PAGES_PATH . '/reports/export-gas-vouchers-pdf.php';
+        } elseif ($action === 'driver-rankings') {
+            require_once PAGES_PATH . '/reports/driver-rankings.php';
+        } elseif ($action === 'export-driver-rankings-csv') {
+            require_once PAGES_PATH . '/reports/export-driver-rankings-csv.php';
         } else {
             require_once PAGES_PATH . '/reports/index.php';
         }
@@ -482,6 +492,16 @@ switch ($page) {
 
     case 'completed-trips':
         require_once PAGES_PATH . '/completed-trips/index.php';
+        break;
+
+    case 'evaluations':
+        if ($action === 'submit') {
+            // Public evaluation form (token-gated, no login)
+            require_once PAGES_PATH . '/evaluations/submit.php';
+        } else {
+            requireReportsAccess();
+            require_once PAGES_PATH . '/evaluations/index.php';
+        }
         break;
 
     case 'patch-notes':

@@ -289,6 +289,26 @@ class FileUpload
     }
 
     /**
+     * Create an upload handler for Travel Order / OB Slip documents
+     *
+     * @param int $requestId Request ID for subdirectory organization
+     * @return self
+     */
+    public static function createTravelOrderHandler(int $requestId): self
+    {
+        $uploadDir = __DIR__ . '/../uploads/travel_orders/' . $requestId;
+        $handler = new self($uploadDir);
+        $handler->setAllowedTypes([
+            'application/pdf',
+            'image/jpeg',
+            'image/png'
+        ]);
+        $handler->setAllowedExtensions(['pdf', 'jpg', 'jpeg', 'png']);
+        $handler->setMaxFileSize(5242880); // 5MB
+        return $handler;
+    }
+
+    /**
      * Create an upload handler for PDF documents
      *
      * @param string $subdirectory Subdirectory within uploads

@@ -166,6 +166,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // Travel Order / OB Slip required check (toggled by admin / all_father)
+    $hasExistingTravelOrderFile = !empty($request->travel_order_file);
+    if (requireTravelOrderUpload() && !$hasExistingTravelOrderFile && empty($_FILES['travel_order_file']['name'])) {
+        $errors[] = 'A Travel Order / Official Business Slip upload is required for this request.';
+    }
+
     if (empty($errors)) {
         try {
             db()->beginTransaction();
@@ -227,6 +233,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             db()->update('requests', $updateData, 'id = ?', [$requestId]);
+
+            // Travel Order / OB Slip upload (optional replacement; blocked when enforcement is ON and none exists)
+            if (!empty($_FILES['travel_order_file']['name'])) {
+                $travelOrderUpload = handleTravelOrderFileUpload($requestId);
+                if ($travelOrderUpload['error']) {
+                    if (requireTravelOrderUpload() && !$hasExistingTravelOrderFile) {
+                        throw new Exception($travelOrderUpload['error']);
+                    }
+                    error_log('Travel Order upload skipped during edit (non-blocking): ' . $travelOrderUpload['error']);
+                }
+                if ($travelOrderUpload && $travelOrderUpload['path']) {
+                    // Remove the previous file (if any) before storing the new one
+                    $oldPath = $request->travel_order_file;
+                    if ($oldPath) {
+                        FileUpload::delete($oldPath);
+                    }
+                    db()->update('requests', [
+                        'travel_order_file' => $travelOrderUpload['path'],
+                        'travel_order_original_name' => $travelOrderUpload['original_name'],
+                        'travel_order_uploaded_at' => date(DATETIME_FORMAT),
+                        'updated_at' => date(DATETIME_FORMAT)
+                    ], 'id = ?', [$requestId]);
+                    auditLog('travel_order_uploaded', 'request', $requestId,
+                        ['file' => $oldPath ?? null], ['file' => $travelOrderUpload['path']]);
+                }
+            }
             
             // Handle passenger changes (Syncing users and guests)
             $newPassengerValues = array_map('trim', $passengerIds);
@@ -443,7 +475,7 @@ require_once INCLUDES_PATH . '/header.php';
                         </div>
                     <?php endif; ?>
 
-                    <form method="POST">
+                    <form method="POST" enctype="multipart/form-data">
                         <?= csrfField() ?>
 
                         <div class="row g-3">
@@ -630,6 +662,39 @@ require_once INCLUDES_PATH . '/header.php';
                         </div>
 
                         <hr class="my-4">
+
+                        <!-- Travel Order / Official Business Slip Upload -->
+                        <div class="card border mb-4">
+                            <div class="card-header bg-light py-2">
+                                <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Travel Order / Official Business Slip</h6>
+                            </div>
+                            <div class="card-body">
+                                <?php if (!empty($request->travel_order_file)): ?>
+                                <div class="mb-2">
+                                    <div class="alert alert-success py-2 mb-2 d-flex align-items-center justify-content-between">
+                                        <span class="small"><i class="bi bi-paperclip me-1"></i>
+                                            Current: <?= e($request->travel_order_original_name ?? basename($request->travel_order_file)) ?>
+                                            (uploaded <?= $request->travel_order_uploaded_at ? e(formatDateTime($request->travel_order_uploaded_at)) : '—' ?>)
+                                        </span>
+                                        <?= fileDownloadLink($request->travel_order_file, 'Download') ?>
+                                    </div>
+                                    <small class="text-muted">Upload a new file below to replace it (optional unless required).</small>
+                                </div>
+                                <?php endif; ?>
+                                <div class="mb-2">
+                                    <input type="file" class="form-control" id="travel_order_file" name="travel_order_file"
+                                           accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
+                                    <small class="text-muted">
+                                        <?php if (requireTravelOrderUpload() && empty($request->travel_order_file)): ?>
+                                            <span class="text-danger fw-semibold">Required.</span> 
+                                        <?php else: ?>
+                                            Optional. 
+                                        <?php endif; ?>
+                                        Travel Order or Official Business Slip (PDF, JPG, PNG - max 5 MB).
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">

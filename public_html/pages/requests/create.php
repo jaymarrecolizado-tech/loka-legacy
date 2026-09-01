@@ -201,6 +201,11 @@ $vehicleId = postInt('vehicle_id') ?: null;
         }
     }
     
+    // Travel Order / OB Slip required check (toggled by admin / all_father)
+    if (requireTravelOrderUpload() && empty($_FILES['travel_order_file']['name'])) {
+        $errors[] = 'A Travel Order / Official Business Slip upload is required for this request.';
+    }
+
     // Heuristic duplicate backstop: identical request from this user in the last 10 minutes
     if (empty($errors)) {
         $dupe = db()->fetch(
@@ -266,6 +271,30 @@ $vehicleId = postInt('vehicle_id') ?: null;
                 throw $e;
             }
             
+            // Travel Order / OB Slip upload (inside transaction — failure rolls back the request)
+            $travelOrderUpload = null;
+            if (!empty($_FILES['travel_order_file']['name'])) {
+                $travelOrderUpload = handleTravelOrderFileUpload($requestId);
+                if ($travelOrderUpload['error']) {
+                    if (requireTravelOrderUpload()) {
+                        throw new Exception($travelOrderUpload['error']);
+                    }
+                    error_log('Travel Order upload skipped (non-blocking): ' . $travelOrderUpload['error']);
+                }
+            }
+            if ($travelOrderUpload && $travelOrderUpload['path']) {
+                $travelOrderData = [
+                    'travel_order_file' => $travelOrderUpload['path'],
+                    'travel_order_original_name' => $travelOrderUpload['original_name'],
+                    'travel_order_uploaded_at' => date(DATETIME_FORMAT)
+                ];
+                db()->update('requests', $travelOrderData, 'id = ?', [$requestId]);
+                auditLog('travel_order_uploaded', 'request', $requestId,null, [
+                    'file' => $travelOrderUpload['path'],
+                    'original_name' => $travelOrderUpload['original_name']
+                ]);
+            }
+
             // Insert passengers
             foreach ($passengerIds as $p) {
                 if (is_numeric($p)) {
@@ -432,7 +461,7 @@ require_once INCLUDES_PATH . '/header.php';
                     </div>
                     <?php endif; ?>
                     
-                    <form method="POST" class="needs-validation" novalidate id="requestForm">
+                    <form method="POST" class="needs-validation" novalidate id="requestForm" enctype="multipart/form-data">
                         <?= csrfField() ?>
                         <!-- Idempotency token: one submission per form render -->
                         <input type="hidden" name="submission_token" value="<?= e(bin2hex(random_bytes(16))) ?>">
@@ -674,6 +703,27 @@ require_once INCLUDES_PATH . '/header.php';
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Travel Order / Official Business Slip Upload -->
+                        <div class="card border mb-4">
+                            <div class="card-header bg-light py-2">
+                                <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Travel Order / Official Business Slip</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <input type="file" class="form-control" id="travel_order_file" name="travel_order_file"
+                                           accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
+                                    <small class="text-muted">
+                                        <?php if (requireTravelOrderUpload()): ?>
+                                            <span class="text-danger fw-semibold">Required.</span> 
+                                        <?php else: ?>
+                                            Optional. 
+                                        <?php endif; ?>
+                                        Upload your Travel Order or Official Business Slip (PDF, JPG, PNG - max 5 MB).
+                                    </small>
                                 </div>
                             </div>
                         </div>
