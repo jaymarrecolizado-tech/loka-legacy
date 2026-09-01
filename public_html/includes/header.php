@@ -45,7 +45,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
         <div class="container-fluid">
             <!-- Sidebar Toggle -->
-            <button class="btn btn-primary me-2" type="button" id="sidebarToggle">
+            <button class="btn btn-outline-light me-2" type="button" id="sidebarToggle" aria-label="Toggle sidebar">
                 <i class="bi bi-list"></i>
             </button>
             
@@ -59,14 +59,14 @@
             require_once INCLUDES_PATH . '/nav_search.php';
             $navItems = getNavSearchItems();
             ?>
-            <div class="ms-3 me-auto d-none d-lg-block flex-grow-1" style="max-width:480px;">
+            <div class="ms-3 me-auto d-none d-lg-block flex-grow-1 mw-nav-search">
                 <div class="position-relative">
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                         <input type="text" id="navSearchInput" class="form-control" placeholder="Search features… (Ctrl+K)" autocomplete="off" aria-label="Search navigation">
                         <span class="input-group-text bg-white small text-muted d-none d-xl-inline">Ctrl+K</span>
                     </div>
-                    <div id="navSearchDropdown" class="nav-search-dropdown card shadow d-none position-absolute w-100 mt-1" style="z-index:1050; max-height:380px; overflow:auto;">
+                    <div id="navSearchDropdown" class="nav-search-dropdown card shadow d-none position-absolute w-100 mt-1">
                         <div id="navSearchList" class="py-1"></div>
                     </div>
                 </div>

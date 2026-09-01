@@ -108,6 +108,7 @@ body {
     padding: 0.75rem 1.25rem;
     display: flex;
     align-items: center;
+    gap: 0.625rem;
     transition: all 0.2s ease;
     border-left: 3px solid transparent;
 }
@@ -124,9 +125,10 @@ body {
 }
 
 .sidebar .nav-link i {
-    width: 24px;
-    margin-right: 10px;
+    width: 20px;
+    text-align: center;
     font-size: 1.1rem;
+    flex-shrink: 0;
 }
 
 .sidebar .nav-link .badge {
@@ -406,15 +408,9 @@ a.stat-card-link:focus .stat-hint {
         overflow: hidden;
     }
 
-    /* Main content padding adjustment */
+    /* Main content - let container-fluid.py-4 handle vertical spacing */
     .main-content {
-        padding: 1rem;
-    }
-
-    /* Container-fluid padding */
-    .container-fluid {
-        padding-left: 1rem;
-        padding-right: 1rem;
+        padding: 0;
     }
 
     /* ===== MOBILE SIDEBAR FIXES ===== */
@@ -423,8 +419,8 @@ a.stat-card-link:focus .stat-hint {
         transform: translateX(0) !important;
         visibility: visible !important;
         opacity: 1 !important;
-        width: 280px; /* Slightly wider on mobile for better touch targets */
-        max-width: 85vw; /* Don't exceed 85% of viewport width */
+        width: var(--sidebar-width);
+        max-width: 85vw;
     }
 
     /* Ensure sidebar content is visible */
@@ -730,20 +726,7 @@ a.stat-card-link:focus .stat-hint {
         padding: 0.75rem 1rem;
     }
 
-    /* Hide less important columns on very small screens */
-    .table-responsive .table th:nth-child(n+4),
-    .table-responsive .table td:nth-child(n+4) {
-        display: none;
-    }
-
-    .table-responsive .table th:first-child,
-    .table-responsive .table td:first-child,
-    .table-responsive .table th:nth-child(2),
-    .table-responsive .table td:nth-child(2),
-    .table-responsive .table th:nth-child(3),
-    .table-responsive .table td:nth-child(3) {
-        display: table-cell;
-    }
+    /* Keep all columns visible - rely on horizontal scroll for tables */
 }
 
 /* ===== TABLET STYLES (768px - 991px) ===== */
@@ -1216,3 +1199,30 @@ a.stat-card-link:focus .stat-hint {
 
 /* Gas voucher filter utility */
 .min-w-140 { min-width: 140px; }
+#navSearchDropdown { z-index: 1050; max-height: 380px; overflow: auto; }
+
+/* ===== LAYOUT UTILITIES (Phase 1 - replace inline styles) ===== */
+.mw-nav-search { max-width: 480px; }
+.mw-palette { max-width: 560px; width: 90%; }
+.min-w-45 { min-width: 45px; }
+.max-h-300 { max-height: 300px; overflow-y: auto; }
+.max-h-250 { max-height: 250px; overflow-y: auto; }
+.mw-700 { max-width: 700px; }
+.bg-bronze { background: #cd7f32 !important; color: #fff !important; }
+
+/* Button touch target - consistent 44px */
+.btn { min-height: 38px; }
+@media (max-width: 991.98px) {
+    .btn { min-height: 44px; }
+}
+
+/* Card header consistency */
+.card-header { padding: 1rem 1.25rem; }
+.card-header h5, .card-header h6 { margin-bottom: 0; }
+
+/* Table card body - consistent padding around tables */
+.table-card .card-body { padding: 1rem; }
+.table-card .card-body.p-0 { padding: 0; }
+
+/* Filter bar - unified 12-col pattern helper */
+.filter-bar .form-control, .filter-bar .form-select { min-height: 38px; }
