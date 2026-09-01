@@ -39,8 +39,8 @@
     </div>
 
     <!-- Custom JS -->
-    <script src="<?= ASSETS_PATH ?>/js/app.js"></script>
-    <script src="<?= ASSETS_PATH ?>/js/nav-search.js"></script>
+    <script src="<?= ASSETS_PATH ?>/js/app.js?v=<?= e(APP_VERSION) ?>"></script>
+    <script src="<?= ASSETS_PATH ?>/js/nav-search.js?v=<?= e(APP_VERSION) ?>"></script>
     
     <?php if (isset($pageScripts)): ?>
     <?= $pageScripts ?>

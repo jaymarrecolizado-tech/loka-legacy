@@ -127,6 +127,8 @@
     }
 
     function renderItem(a, item, query, showPinBtn){
+        // Always normalize to absolute to avoid XAMPP root redirect (/dashboard/ bug when subfolder install)
+        item.href = normalizeHref(item.href);
         const pinned=isPinned(item.href);
         const hlLabel=highlight(item.label, query);
         const hlSection=highlight(item.section, query);

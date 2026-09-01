@@ -38,7 +38,7 @@
         #paletteBackdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1055; }
     </style>
     <!-- Nav search data -->
-    <script>window.LOKA_NAV_ITEMS = <?= json_encode($navItems, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>; window.LOKA_USER_ID = <?= (int) userId() ?>; window.LOKA_APP_URL = "<?= e(APP_URL) ?>";</script>
+    <script>window.LOKA_NAV_ITEMS = <?= json_encode($navItems, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>; window.LOKA_USER_ID = <?= (int) userId() ?>; window.LOKA_APP_URL = "<?= e(rtrim(APP_URL,'/')) ?>"; window.LOKA_ASSETS_VER = "<?= e(APP_VERSION) ?>";</script>
 </head>
 <body>
     <!-- Top Navigation -->
