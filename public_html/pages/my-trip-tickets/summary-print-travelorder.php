@@ -390,6 +390,7 @@ if ($__verifyUrl) {
             font-size: 10px;
             font-weight: 700;
             color: var(--ink);
+            text-transform: uppercase;
         }
 
         .sig-title {
@@ -774,7 +775,7 @@ if ($__verifyUrl) {
                     ?>
                             <tr>
                                 <td><?= $pCount ?></td>
-                                <td><input class="left" type="text" value="<?= e($person['name']) ?><?php if ($person['role'] === 'Driver'): ?> (Driver)<?php endif; ?>"></td>
+                                <td><input class="left" type="text" style="font-weight:700; text-transform:uppercase;" value="<?= e(strtoupper($person['name'])) ?><?php if ($person['role'] === 'Driver'): ?> (DRIVER)<?php endif; ?>"></td>
                                 <td><input class="left" type="text" placeholder="Position/Office"></td>
                                 <td><input type="text"></td>
                                 <td><input type="text" placeholder="In/Out"></td>

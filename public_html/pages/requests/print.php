@@ -337,6 +337,11 @@ if (!empty($assignmentHistory)) {
             margin-top: 5px;
         }
 
+        .print-name {
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
         .footer {
             margin-top: 15px;
             text-align: center;
@@ -452,7 +457,7 @@ if (!empty($assignmentHistory)) {
             <div class="section-content">
                 <div class="row">
                     <span class="label">Name:</span>
-                    <span class="value"><?= e($request->requester_name) ?></span>
+                    <span class="value print-name"><?= e(strtoupper($request->requester_name)) ?></span>
                 </div>
                 <div class="row">
                     <span class="label">Department:</span>
@@ -495,10 +500,10 @@ if (!empty($assignmentHistory)) {
                 </div>
                 <div class="row">
                     <span class="label">Passengers:</span>
-                    <span class="value">
-                        <?= e($request->requester_name) ?> (Requester)<?php if (!empty($passengers)): ?>,
+                    <span class="value print-name">
+                        <?= e(strtoupper($request->requester_name)) ?> (REQUESTER)<?php if (!empty($passengers)): ?>,
                             <?= implode(', ', array_map(function ($p) {
-                                return e($p->name ?: $p->guest_name); }, $passengers)) ?>
+                                return e(strtoupper($p->name ?: $p->guest_name)); }, $passengers)) ?>
                         <?php endif; ?>
                     </span>
                 </div>
@@ -527,7 +532,7 @@ if (!empty($assignmentHistory)) {
                     </div>
                     <div class="row">
                         <span class="label">Driver:</span>
-                        <span class="value"><?= e($request->driver_name) ?></span>
+                        <span class="value print-name"><?= e(strtoupper($request->driver_name)) ?></span>
                     </div>
                     <div class="row">
                         <span class="label">Driver Contact:</span>
@@ -544,15 +549,15 @@ if (!empty($assignmentHistory)) {
                         <?php if ($i === 0): ?>
                             <div style="margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dotted #ccc;">
                                 <strong style="font-size: 9pt;">Original Assignment (<?= formatDateTime($ah->created_at) ?>)</strong><br>
-                                <span style="font-size: 9pt;">
+                                 <span style="font-size: 9pt;">
                                     Vehicle: <?= e($ah->plate_number) ?> - <?= e($ah->make . ' ' . $ah->vehicle_model) ?><br>
-                                    Driver: <?= e($ah->driver_name) ?>
+                                    Driver: <span class="print-name"><?= e(strtoupper($ah->driver_name)) ?></span>
                                 </span>
                             </div>
                         <?php elseif ($ah->action === 'overridden'): ?>
                             <div style="margin-bottom: 6px; padding-bottom: 4px; <?= $i < count($assignmentHistory) - 1 ? 'border-bottom: 1px dotted #ccc;' : '' ?>">
                                 <strong style="font-size: 9pt; color: #856404;">
-                                    Override #<?= $i ?> - <?= formatDateTime($ah->created_at) ?> by <?= e($ah->assigned_by_name) ?>
+                                    Override #<?= $i ?> - <?= formatDateTime($ah->created_at) ?> by <span class="print-name"><?= e(strtoupper($ah->assigned_by_name)) ?></span>
                                 </strong><br>
                                 <span style="font-size: 9pt;">
                                     <?php if ($ah->prev_plate_number): ?>
@@ -560,8 +565,8 @@ if (!empty($assignmentHistory)) {
                                         → <strong><?= e($ah->plate_number) ?></strong><br>
                                     <?php endif; ?>
                                     <?php if ($ah->prev_driver_name): ?>
-                                        Driver: <span style="text-decoration: line-through; color: #999;"><?= e($ah->prev_driver_name) ?></span>
-                                        → <strong><?= e($ah->driver_name) ?></strong><br>
+                                        Driver: <span style="text-decoration: line-through; color: #999;"><?= e(strtoupper($ah->prev_driver_name)) ?></span>
+                                        → <strong class="print-name"><?= e(strtoupper($ah->driver_name)) ?></strong><br>
                                     <?php endif; ?>
                                     <?php if ($ah->reason): ?>
                                         <em style="color: #666;">Reason: <?= e($ah->reason) ?></em>
@@ -633,7 +638,7 @@ if (!empty($assignmentHistory)) {
                             <?php endif; ?>
 
                             <div style="text-align: center; margin-top: 8px; font-size: 9pt;">
-                                <strong><?= e($deptApproval->approver_name) ?></strong><br>
+                                <strong class="print-name"><?= e(strtoupper($deptApproval->approver_name)) ?></strong><br>
                                 <span style="color: #555;">
                                     <?php if ($deptApproval->status === 'approved'): ?>
                                         Approved on <?= date('F j, Y', strtotime($deptApproval->created_at)) ?>
@@ -708,7 +713,7 @@ if (!empty($assignmentHistory)) {
                             <?php endif; ?>
 
                             <div style="text-align: center; margin-top: 8px; font-size: 9pt;">
-                                <strong><?= e($motorpoolApproval->approver_name) ?></strong><br>
+                                <strong class="print-name"><?= e(strtoupper($motorpoolApproval->approver_name)) ?></strong><br>
                                 <span style="color: #555;">
                                     <?php if ($motorpoolApproval->status === 'approved'): ?>
                                         Approved on <?= date('F j, Y', strtotime($motorpoolApproval->created_at)) ?>
@@ -759,7 +764,7 @@ if (!empty($assignmentHistory)) {
                                 <?= date('M j, Y - g:i A', strtotime($request->actual_dispatch_datetime)) ?>
                             </div>
                             <div style="font-size: 9pt; margin-top: 5px;">
-                                <strong><?= e($dispatchGuard->name ?? 'Guard') ?></strong>
+                                <strong class="print-name"><?= e(strtoupper($dispatchGuard->name ?? 'Guard')) ?></strong>
                             </div>
                         <?php else: ?>
                             <div class="approval-status status-pending">PENDING</div>
@@ -774,7 +779,7 @@ if (!empty($assignmentHistory)) {
                                 <?= date('M j, Y - g:i A', strtotime($request->actual_arrival_datetime)) ?>
                             </div>
                             <div style="font-size: 9pt; margin-top: 5px;">
-                                <strong><?= e($arrivalGuard->name ?? 'Guard') ?></strong>
+                                <strong class="print-name"><?= e(strtoupper($arrivalGuard->name ?? 'Guard')) ?></strong>
                             </div>
                             <?php
                             if ($request->actual_dispatch_datetime && $request->actual_arrival_datetime) {

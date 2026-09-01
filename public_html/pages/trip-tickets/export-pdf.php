@@ -202,10 +202,10 @@ $pdf->SetFont('helvetica', '', 9);
   $pdf->Cell(25, 6, 'Plate Number:', 0, 0);
   $pdf->WriteHTMLCell(85, 0, '', '', ($ticket->plate_number ?: 'N/A'), 'B', 0, 0, true, 'L', true);
   $pdf->Cell(22, 6, 'Driver:', 0, 0);
-  $pdf->WriteHTMLCell(0, 0, '', '', ($ticket->driver_name ?: 'N/A'), 'B', 1, 0, true, 'L', true);
+  $pdf->WriteHTMLCell(0, 0, '', '', '<b>' . htmlspecialchars(strtoupper($ticket->driver_name ?: 'N/A')) . '</b>', 'B', 1, 0, true, 'L', true);
 
   // Row 2: Make / Model & License
-  $pdf->Cell(25, 6, 'Make / Model:', 0, 0);
+   $pdf->Cell(25, 6, 'Make / Model:', 0, 0);
   $makeModel = trim((($ticket->make ?: 'N/A') . ' ' . ($ticket->vehicle_model ?: 'N/A')));
   $pdf->WriteHTMLCell(85, 0, '', '', $makeModel, 'B', 0, 0, true, 'L', true);
   $pdf->Cell(22, 6, 'License No.:', 0, 0);
@@ -233,10 +233,10 @@ if (!empty($passengers)) {
     foreach ($passengers as $p) {
         if ($twoCols) {
             $pdf->Cell(12, 5, $passNum . '.', 0, 0);
-            $pdf->WriteHTMLCell(85, 0, '', '', ($p->passenger_name ?: '(Guest)'), 'B', 0, 0, true, 'L', true);
+            $pdf->WriteHTMLCell(85, 0, '', '', '<b>' . htmlspecialchars(strtoupper($p->passenger_name ?: '(Guest)')) . '</b>', 'B', 0, 0, true, 'L', true);
         } else {
             $pdf->Cell(12, 5, $passNum . '.', 0, 0);
-            $pdf->WriteHTMLCell(85, 0, '', '', ($p->passenger_name ?: '(Guest)'), 'B', 1, 0, true, 'L', true);
+            $pdf->WriteHTMLCell(85, 0, '', '', '<b>' . htmlspecialchars(strtoupper($p->passenger_name ?: '(Guest)')) . '</b>', 'B', 1, 0, true, 'L', true);
         }
         $twoCols = !$twoCols;
         $passNum++;
@@ -324,7 +324,7 @@ $pdf->Ln(2);
 
 $pdf->SetFont('helvetica', '', 9);
 $pdf->Cell(30, 8, 'Name:', 0, 0);
-$pdf->WriteHTMLCell(100, 0, '', '', $ticket->driver_name, 'B', 0, 0, true, 'L', true);
+$pdf->WriteHTMLCell(100, 0, '', '', '<b>' . htmlspecialchars(strtoupper($ticket->driver_name)) . '</b>', 'B', 0, 0, true, 'L', true);
 $pdf->Cell(25, 8, 'Date:', 0, 0);
 $pdf->Cell(0, 8, '', 'B', 1);
 
