@@ -42,6 +42,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'min_advance_booking_hours' => $trackClamp('Minimum notice', post('min_advance_booking_hours', '24'), 0, 168, 24),
         'max_trip_duration_hours' => $trackClamp('Maximum trip duration', post('max_trip_duration_hours', '72'), 1, 720, 72),
         'require_return_confirmation' => post('require_return_confirmation', '0') === '1' ? '1' : '0',
+        // Travel Order / OB Slip toggle — Admin and All Father only (both pass requireRole admin via level)
+        'require_travel_order_upload' => post('require_travel_order_upload', '0') === '1' ? '1' : '0',
+        // Trip confirmation settings
+        'trip_confirmation_enabled' => post('trip_confirmation_enabled', '1') === '1' ? '1' : '0',
+        'trip_confirmation_lead_hours' => $trackClamp('Confirmation lead (hours)', post('trip_confirmation_lead_hours', '24'), 1, 168, 24),
+        'trip_confirmation_same_day_lead_minutes' => $trackClamp('Same-day lead (minutes)', post('trip_confirmation_same_day_lead_minutes', '60'), 5, 1440, 60),
+        'trip_confirmation_window_minutes' => $trackClamp('Confirmation window (minutes)', post('trip_confirmation_window_minutes', '60'), 15, 720, 60),
+        // Overdue + evaluation settings
+        'trip_overdue_renotify_hours' => $trackClamp('Overdue renotify (hours)', post('trip_overdue_renotify_hours', '24'), 1, 168, 24),
+        'driver_evaluation_reminder_hours' => $trackClamp('Evaluation reminder (hours)', post('driver_evaluation_reminder_hours', '48'), 1, 720, 48),
+        'driver_evaluation_expiry_days' => $trackClamp('Evaluation expiry (days)', post('driver_evaluation_expiry_days', '30'), 1, 90, 30),
     ];
     
     foreach ($settingsToUpdate as $key => $value) {
@@ -133,6 +144,79 @@ require_once INCLUDES_PATH . '/header.php';
                                     <option value="1" <?= ($settings['require_return_confirmation'] ?? '0') === '1' ? 'selected' : '' ?>>Yes</option>
                                 </select>
                                 <small class="text-muted">Require users to confirm vehicle return</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Travel Documents Enforcement -->
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0"><i class="bi bi-file-earmark-check me-2"></i>Travel Documents</h5></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Enforce Travel Order / Official Business Slip Upload <span class="badge bg-warning text-dark ms-1">Admin / All Father</span></label>
+                                <select class="form-select" name="require_travel_order_upload">
+                                    <option value="0" <?= ($settings['require_travel_order_upload'] ?? '0') === '0' ? 'selected' : '' ?>>No — optional</option>
+                                    <option value="1" <?= ($settings['require_travel_order_upload'] ?? '0') === '1' ? 'selected' : '' ?>>Yes — required during application</option>
+                                </select>
+                                <small class="text-muted">When Yes, the application form blocks submission if no TO/OB Slip file is attached. Toggleable by Admin and All Father only.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trip Confirmation -->
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0"><i class="bi bi-envelope-check me-2"></i>Trip Confirmation</h5></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Enable Confirmatory Email</label>
+                                <select class="form-select" name="trip_confirmation_enabled">
+                                    <option value="0" <?= ($settings['trip_confirmation_enabled'] ?? '1') === '0' ? 'selected' : '' ?>>Disabled</option>
+                                    <option value="1" <?= ($settings['trip_confirmation_enabled'] ?? '1') === '1' ? 'selected' : '' ?>>Enabled</option>
+                                </select>
+                                <small class="text-muted">Sends Proceed / Don't Proceed email before approved trips</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Lead Time — Multi-day trips (hours)</label>
+                                <input type="number" class="form-control" name="trip_confirmation_lead_hours" value="<?= e($settings['trip_confirmation_lead_hours'] ?? '24') ?>" min="1" max="168">
+                                <small class="text-muted">Hours before start when trip is on a later day than creation (default 24 = 1 day)</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Lead Time — Same-day trips (minutes)</label>
+                                <input type="number" class="form-control" name="trip_confirmation_same_day_lead_minutes" value="<?= e($settings['trip_confirmation_same_day_lead_minutes'] ?? '60') ?>" min="5" max="1440">
+                                <small class="text-muted">Minutes before start when trip is same calendar day as request creation</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Response Window (minutes)</label>
+                                <input type="number" class="form-control" name="trip_confirmation_window_minutes" value="<?= e($settings['trip_confirmation_window_minutes'] ?? '60') ?>" min="15" max="720">
+                                <small class="text-muted">Deadline = start − window. No response = proceed (default). Min 15 minutes.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trip Monitoring & Evaluations -->
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0"><i class="bi bi-shield-exclamation me-2"></i>Trip Monitoring &amp; Evaluations</h5></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Overdue Renotify (hours)</label>
+                                <input type="number" class="form-control" name="trip_overdue_renotify_hours" value="<?= e($settings['trip_overdue_renotify_hours'] ?? '24') ?>" min="1" max="168">
+                                <small class="text-muted">Re-alert motorpool while trip exceeds end time</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Evaluation Reminder (hours)</label>
+                                <input type="number" class="form-control" name="driver_evaluation_reminder_hours" value="<?= e($settings['driver_evaluation_reminder_hours'] ?? '48') ?>" min="1" max="720">
+                                <small class="text-muted">Hours after trip completion before reminder email</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Evaluation Link Expiry (days)</label>
+                                <input type="number" class="form-control" name="driver_evaluation_expiry_days" value="<?= e($settings['driver_evaluation_expiry_days'] ?? '30') ?>" min="1" max="90">
+                                <small class="text-muted">Token expiry for anonymous evaluation</small>
                             </div>
                         </div>
                     </div>
