@@ -39,8 +39,18 @@
     </div>
 
     <!-- Custom JS -->
-    <script src="<?= ASSETS_PATH ?>/js/app.js?v=<?= e(APP_VERSION) ?>"></script>
-    <script src="<?= ASSETS_PATH ?>/js/nav-search.js?v=<?= e(APP_VERSION) ?>"></script>
+    <script src="<?= ASSETS_PATH ?>/js/app.js?v=<?= e(APP_VERSION) ?>&t=<?= time() ?>"></script>
+    <script src="<?= ASSETS_PATH ?>/js/nav-search.js?v=<?= e(APP_VERSION) ?>&t=<?= time() ?>"></script>
+    <script>try{ // one-time cleanup of old relative hrefs that caused XAMPP /dashboard/ redirect
+        const uid=window.LOKA_USER_ID||'0';
+        ['loka_nav_recent_','loka_nav_frequent_','loka_nav_pinned_'].forEach(p=>{
+            const k=p+uid; const raw=localStorage.getItem(k); if(!raw) return;
+            if(raw.includes('"href":"/?page=')){ // has old relative entries
+                localStorage.removeItem(k);
+            }
+        });
+        if(localStorage.getItem('loka_nav_queries_'+uid)?.includes('/dashboard/')) localStorage.removeItem('loka_nav_queries_'+uid);
+    }catch(e){}</script>
     
     <?php if (isset($pageScripts)): ?>
     <?= $pageScripts ?>
