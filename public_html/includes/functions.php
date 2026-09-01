@@ -1641,3 +1641,34 @@ function gasVoucherVerifyHashValid(object $voucher, string $hash): bool
 
     return hash_equals($full, $hash);
 }
+
+// ---- Trip Ticket verification (vehicle summary) ----
+function tripTicketVerifySecret(): string
+{
+    return gasVoucherVerifySecret();
+}
+
+function tripTicketVerifyHash(string $ticketNo): string
+{
+    return substr(hash_hmac('sha256', 'trip-ticket:' . $ticketNo, tripTicketVerifySecret()), 0, 16);
+}
+
+function tripTicketVerifyUrl(string $ticketNo): string
+{
+    $hash = tripTicketVerifyHash($ticketNo);
+    $base = rtrim((string) SITE_URL, '/');
+    if ($base === '') {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $base = $scheme . '://' . $host . rtrim((string) APP_URL, '/');
+    }
+    return $base . '/?page=verify-ticket&no=' . urlencode($ticketNo) . '&hash=' . urlencode($hash);
+}
+
+function tripTicketVerifyHashValid(string $ticketNo, string $hash): bool
+{
+    if ($hash === '' || $ticketNo === '') return false;
+    $full = hash_hmac('sha256', 'trip-ticket:' . $ticketNo, tripTicketVerifySecret());
+    $short = substr($full, 0, 16);
+    return hash_equals($short, $hash) || hash_equals($full, $hash);
+}

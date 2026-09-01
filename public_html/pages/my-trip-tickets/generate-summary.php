@@ -169,34 +169,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $isPrint) {
 require_once INCLUDES_PATH . '/header.php';
 ?>
 
-<div class="p-4 md:p-6 space-y-6">
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
         <div>
-            <h1 class="text-2xl font-bold">
-                <i class="bi bi-file-earmark-spreadsheet mr-2"></i>Generate Vehicle Summary
-            </h1>
-            <nav class="text-sm breadcrumbs mt-1">
-                <ul>
-                    <li><a href="<?= APP_URL ?>">Dashboard</a></li>
-                    <li><a href="<?= APP_URL ?>/?page=my-trip-tickets">My Trip Tickets</a></li>
-                    <li class="text-base-content/60">Generate Summary</li>
-                </ul>
+            <h4 class="mb-1"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Generate Vehicle Summary</h4>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="<?= APP_URL ?>">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="<?= APP_URL ?>/?page=my-trip-tickets">My Trip Tickets</a></li>
+                    <li class="breadcrumb-item active">Generate Summary</li>
+                </ol>
             </nav>
         </div>
-        <a href="?page=my-trip-tickets" class="loka-btn-secondary">
-            <i class="bi bi-arrow-left mr-1"></i>Back
-        </a>
+        <div class="d-flex gap-2">
+            <a href="<?= APP_URL ?>/" class="btn btn-outline-secondary"><i class="bi bi-house me-1"></i>Home</a>
+            <a href="<?= APP_URL ?>/?page=my-trip-tickets" class="btn btn-outline-primary"><i class="bi bi-arrow-left me-1"></i>Back</a>
+        </div>
     </div>
 
-    <div class="flex justify-center">
-        <div class="w-full max-w-2xl">
-            <div class="loka-card">
-                <div class="p-6">
-                    <div class="font-bold text-lg mb-4">Filter Parameters</div>
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8 col-xl-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">Filter Parameters</h5>
+                    <small class="text-muted">Select vehicle and date range to generate a printable trip ticket</small>
+                </div>
+                <div class="card-body p-4">
 
                     <?php if (!empty($errors)): ?>
-                        <div class="loka-alert loka-alert-danger">
-                            <ul class="list-disc list-inside">
+                        <div class="alert alert-danger">
+                            <ul class="mb-0 ps-3">
                                 <?php foreach ($errors as $err): ?>
                                     <li><?= e($err) ?></li>
                                 <?php endforeach; ?>
@@ -205,16 +207,13 @@ require_once INCLUDES_PATH . '/header.php';
                     <?php endif; ?>
 
                     <form method="GET" action="" target="_blank">
-                        <!-- Keep page and action hidden -->
                         <input type="hidden" name="page" value="my-trip-tickets">
                         <input type="hidden" name="action" value="generate-summary">
                         <input type="hidden" name="print" value="1">
 
-                        <div class="flex flex-col gap-1.5 mb-4">
-                            <label class="label">
-                                <span class="label-text font-medium">Vehicle <span class="text-error">*</span></span>
-                            </label>
-                            <select class="select select-bordered w-full" name="vehicle_id" required>
+                        <div class="mb-3">
+                            <label class="form-label">Vehicle <span class="text-danger">*</span></label>
+                            <select class="form-select" name="vehicle_id" required>
                                 <option value="">Select Vehicle...</option>
                                 <?php foreach ($vehicles as $v): ?>
                                     <option value="<?= $v->id ?>" <?= $vehicleId == $v->id ? 'selected' : '' ?>>
@@ -224,38 +223,31 @@ require_once INCLUDES_PATH . '/header.php';
                             </select>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div class="flex flex-col gap-1.5">
-                                <label class="label">
-                                    <span class="label-text font-medium">Date From <span class="text-error">*</span></span>
-                                </label>
-                                <input type="date" class="input input-bordered w-full" name="date_from" value="<?= $dateFrom ?>" required>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Date From <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" name="date_from" value="<?= $dateFrom ?>" required>
                             </div>
-                            <div class="flex flex-col gap-1.5">
-                                <label class="label">
-                                    <span class="label-text font-medium">Date To <span class="text-error">*</span></span>
-                                </label>
-                                <input type="date" class="input input-bordered w-full" name="date_to" value="<?= $dateTo ?>" required>
+                            <div class="col-md-6">
+                                <label class="form-label">Date To <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" name="date_to" value="<?= $dateTo ?>" required>
                             </div>
                         </div>
 
-                        <div class="flex flex-col gap-1.5 mb-4">
-                            <label class="label">
-                                <span class="label-text font-medium">Template Style</span>
-                            </label>
-                            <select class="select select-bordered w-full" name="template" id="templateSelect">
+                        <div class="mb-3">
+                            <label class="form-label">Template Style</label>
+                            <select class="form-select" name="template" id="templateSelect">
                                 <option value="vehicle" <?= $templateType === 'vehicle' ? 'selected' : '' ?>>Vehicle Trip Ticket</option>
                                 <option value="travelorder" <?= $templateType === 'travelorder' ? 'selected' : '' ?>>Travel Order</option>
                             </select>
-                            <label class="label">
-                                <span class="label-text-alt text-base-content/60">Select the format for your trip ticket printout.</span>
-                            </label>
+                            <small class="text-muted">Select the format for your trip ticket printout.</small>
                         </div>
 
-                        <div class="mt-4">
-                            <button type="submit" class="bg-success text-success-content hover:bg-success/90 px-4 py-2 text-sm font-medium rounded-xl inline-flex items-center gap-2 transition-colors w-full">
-                                <i class="bi bi-printer mr-2"></i>Generate & Print Ticket
-                            </button>
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="bi bi-printer me-2"></i>Generate &amp; Print Ticket
+                        </button>
+                        <div class="text-center mt-2">
+                            <small class="text-muted">Opens in a new tab — use Print/Save PDF there. QR code included for verification.</small>
                         </div>
                     </form>
                 </div>

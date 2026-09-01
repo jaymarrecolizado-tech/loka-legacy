@@ -4,6 +4,38 @@
  */
 if (!defined('BASE_PATH'))
     exit;
+$__verifyUrl = function_exists('tripTicketVerifyUrl') ? tripTicketVerifyUrl($tripTicketNumber ?? '') : '';
+$__siteLooksLocal = $__verifyUrl ? (bool) preg_match('#://(localhost|127\.0\.0\.1)([:/]|$)#i', $__verifyUrl) : false;
+$__qrHtml = '';
+if ($__verifyUrl) {
+    require_once BASE_PATH . '/vendor/tecnickcom/tcpdf/tcpdf_barcodes_2d.php';
+    $__qrBarcode = new TCPDF2DBarcode($__verifyUrl, 'QRCODE,M');
+    $__pngRaw = function_exists('imagecreate') ? $__qrBarcode->getBarcodePngData(4, 4, [0,0,0]) : false;
+    if (is_string($__pngRaw) && $__pngRaw !== '' && function_exists('imagecreatefromstring')) {
+        $__src = @imagecreatefromstring($__pngRaw);
+        if ($__src !== false) {
+            $__sw = imagesx($__src); $__sh = imagesy($__src);
+            $__pad = (int) max(16, round(min($__sw,$__sh)*0.14));
+            $__flat = imagecreatetruecolor($__sw, $__sh);
+            $__w = imagecolorallocate($__flat,255,255,255); imagefilledrectangle($__flat,0,0,$__sw,$__sh,$__w);
+            imagecopy($__flat,$__src,0,0,0,0,$__sw,$__sh); imagedestroy($__src);
+            $__dst = imagecreatetruecolor($__sw+($__pad*2), $__sh+($__pad*2));
+            $__white = imagecolorallocate($__dst,255,255,255); imagefilledrectangle($__dst,0,0,$__sw+($__pad*2),$__sh+($__pad*2),$__white);
+            imagecopy($__dst,$__flat,$__pad,$__pad,0,0,$__sw,$__sh); imagedestroy($__flat);
+            ob_start(); imagepng($__dst); $__padded = ob_get_clean(); imagedestroy($__dst);
+            $__qrHtml = '<img alt="Verify QR" style="width:84px;height:84px;display:block;" src="data:image/png;base64,' . base64_encode($__padded) . '">';
+        }
+    }
+    if ($__qrHtml === '') {
+        $__svg = $__qrBarcode->getBarcodeSVGcode(3,3,'black');
+        $__svg = preg_replace('/<\?xml[^>]*\?>\s*/i','',$__svg);
+        $__svg = preg_replace('/<!DOCTYPE[^>]*>\s*/i','',$__svg);
+        if (preg_match('/<svg[^>]+width="([\d.]+)"[^>]+height="([\d.]+)"/i',$__svg,$m)) {
+            $__svg = preg_replace('/<svg([^>]+)>/i','<svg$1 viewBox="0 0 '.$m[1].' '.$m[2].'">',$__svg,1);
+        }
+        $__qrHtml = '<div style="background:#fff;padding:8px;line-height:0;">' . $__svg . '</div>';
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -745,10 +777,19 @@ if (!defined('BASE_PATH'))
 
 <body>
 
-    <div class="controls">
+    <div class="controls" style="flex-wrap:wrap; justify-content:center; align-items:center;">
+        <a href="<?= APP_URL ?>/" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><span>🏠</span> Home</a>
+        <a href="<?= APP_URL ?>/?page=my-trip-tickets" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">← Back to My Trip Tickets</a>
+        <a href="<?= APP_URL ?>/?page=my-trip-tickets&action=generate-summary" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">↩ Generate</a>
         <button class="btn btn-print" onclick="window.print()">🖨 Print / Save PDF</button>
         <button class="btn btn-reset" onclick="resetForm()">↺ Clear Form</button>
     </div>
+    <?php if ($__verifyUrl): ?>
+    <div style="text-align:center; font-size:10px; color:#334155; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px 10px; margin-bottom:10px; max-width:210mm;">
+        <strong>Verify:</strong> <span style="word-break:break-all; font-family:monospace; font-size:9px;"><?= e($__verifyUrl) ?></span>
+        <?php if ($__siteLooksLocal): ?><br><span style="color:#92400e; font-size:9px;">Localhost link — set <code>SITE_URL</code> in <code>.env</code> to your LAN IP/domain for phone scanning.</span><?php endif; ?>
+    </div>
+    <?php endif; ?>
 
     <div class="ticket">
 
@@ -1036,11 +1077,20 @@ if (!defined('BASE_PATH'))
             </div>
         </div>
 
-        <!-- FOOTER -->
-        <div class="ftr" id="mainFooter">
-            <span>Department of Information and Communications Technology — Region II</span>
-            <span class="ftr-tno" id="footerTno">Trip No: <?= e($tripTicketNumber) ?></span>
-            <span class="page-number" id="pageNumberDisplay">Page 1</span>
+        <!-- FOOTER WITH QR -->
+        <div class="ftr" id="mainFooter" style="display:flex; justify-content:space-between; align-items:flex-end; gap:10px;">
+            <div>
+                <div>Department of Information and Communications Technology — Region II</div>
+                <div class="ftr-tno" id="footerTno" style="font-family:'DM Mono',monospace; color:#003580;">Trip No: <?= e($tripTicketNumber) ?></div>
+                <div class="page-number" id="pageNumberDisplay" style="font-size:7px; color:#666;">Page 1</div>
+            </div>
+            <?php if ($__qrHtml): ?>
+            <div style="text-align:center; background:#fff; border:1px solid #bbb; padding:4px 6px;">
+                <?= $__qrHtml ?>
+                <div style="font-size:6px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#111; margin-top:3px;">Scan to Verify</div>
+                <div style="font-size:5.5px; color:#555; font-family:'DM Mono',monospace;"><?= e($tripTicketNumber) ?></div>
+            </div>
+            <?php endif; ?>
         </div>
 
     </div><!-- /ticket -->
