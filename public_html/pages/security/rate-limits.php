@@ -147,7 +147,7 @@ $recentLogs = db()->fetchAll(
 require_once INCLUDES_PATH . '/header.php';
 ?>
 
-<div class="container-fluid px-4">
+<div class="container-fluid py-4">
     <div class="mb-2">
         <h4 class="mb-1"><i class="bi bi-shield-lock me-2"></i>Rate Limits &amp; Lockouts</h4>
         <p class="text-muted mb-0">All Father only — unlock accounts and clear login throttles</p>

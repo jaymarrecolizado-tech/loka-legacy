@@ -167,14 +167,14 @@ require_once INCLUDES_PATH . '/header.php';
                     </select>
                 </div>
                 
-                <div class="col-md-4">
+                <div class="col-md-5">
                     <label class="form-label">Search</label>
                     <input type="text" name="search" class="form-control" 
                            placeholder="Search purpose or destination..." 
                            value="<?= e($searchFilter) ?>">
                 </div>
                 
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <button type="submit" class="btn btn-outline-primary me-2">
                         <i class="bi bi-search me-1"></i>Filter
                     </button>

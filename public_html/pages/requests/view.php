@@ -112,7 +112,7 @@ require_once INCLUDES_PATH . '/header.php';
 
 <div class="container-fluid py-4">
     <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
         <div>
             <h4 class="mb-1">Request #<?= $requestId ?></h4>
             <nav aria-label="breadcrumb">
@@ -127,7 +127,7 @@ require_once INCLUDES_PATH . '/header.php';
                 </ol>
             </nav>
         </div>
-        <div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
             <?php if ($canPrintForm): ?>
             <a href="<?= APP_URL ?>/?page=requests&action=print&id=<?= $requestId ?>"
                 class="btn btn-outline-secondary me-2" target="_blank">

@@ -78,7 +78,7 @@ require_once INCLUDES_PATH . '/header.php';
                     <input type="text" name="search" class="form-control" placeholder="Plate, make, model, type..." value="<?= e($searchFilter) ?>">
                 </div>
 
-                <div class="col-md-2">
+                <div class="col-md-3">
                     <label class="form-label">Status</label>
                     <select name="status" class="form-select">
                         <option value="">All Statuses</option>
@@ -125,9 +125,9 @@ require_once INCLUDES_PATH . '/header.php';
                                 <th>Plate #</th>
                                 <th>Vehicle</th>
                                 <th>Type</th>
-                                <th>Capacity</th>
+                                <th class="text-center">Capacity</th>
                                 <th>Status</th>
-                                <th>Mileage</th>
+                                <th class="text-end">Mileage</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -141,9 +141,9 @@ require_once INCLUDES_PATH . '/header.php';
                                             <?= e($vehicle->color) ?></small>
                                     </td>
                                     <td><span class="badge bg-light text-dark"><?= e($vehicle->type_name) ?></span></td>
-                                    <td><?= $vehicle->passenger_capacity ?></td>
+                                    <td class="text-center"><?= $vehicle->passenger_capacity ?></td>
                                     <td><?= vehicleStatusBadge($vehicle->status) ?></td>
-                                    <td><?= number_format($vehicle->mileage) ?> km</td>
+                                    <td class="text-end text-nowrap"><?= number_format($vehicle->mileage) ?> km</td>
                                      <td>
                                         <div class="btn-group">
                                             <a href="<?= APP_URL ?>/?page=vehicles&action=view&id=<?= $vehicle->id ?>"
@@ -155,7 +155,7 @@ require_once INCLUDES_PATH . '/header.php';
                                                     class="btn btn-sm btn-outline-secondary" title="Edit">
                                                     <i class="bi bi-pencil"></i>
                                                 </a>
-                                                <form method="POST" action="<?= APP_URL ?>/?page=vehicles&action=delete" style="display:inline;">
+                                                <form method="POST" action="<?= APP_URL ?>/?page=vehicles&action=delete" class="d-inline">
                                                     <?= csrfField() ?>
                                                     <input type="hidden" name="id" value="<?= $vehicle->id ?>">
                                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"

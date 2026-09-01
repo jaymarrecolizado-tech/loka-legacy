@@ -60,11 +60,11 @@ require_once INCLUDES_PATH . '/header.php';
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 <input type="hidden" name="page" value="drivers">
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">Search</label>
                     <input type="text" name="search" class="form-control" placeholder="Name, email, license..." value="<?= e($searchFilter) ?>">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">Status</label>
                     <select name="status" class="form-select">
                         <option value="">All Statuses</option>
@@ -75,7 +75,7 @@ require_once INCLUDES_PATH . '/header.php';
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <button type="submit" class="btn btn-outline-primary me-2"><i
                             class="bi bi-search me-1"></i>Filter</button>
                     <a href="<?= APP_URL ?>/?page=drivers" class="btn btn-outline-secondary">Reset</a>
@@ -130,7 +130,7 @@ require_once INCLUDES_PATH . '/header.php';
                                                     <i class="bi bi-pencil"></i>
                                                 </a>
                                                 <form method="POST" action="<?= APP_URL ?>/?page=drivers&action=delete"
-                                                    style="display:inline;">
+                                                    class="d-inline">
                                                     <?= csrfField() ?>
                                                     <input type="hidden" name="id" value="<?= $driver->id ?>">
                                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"
