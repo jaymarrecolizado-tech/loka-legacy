@@ -158,6 +158,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $newEndDate = post('end_date');
     $destinationInput = postSafe('destination', '', 255);
     $purposeInput = postSafe('purpose', '', 500);
+    if (mb_strlen($purposeInput) > 200) $errors[] = 'Purpose must be 200 characters or fewer (currently ' . mb_strlen($purposeInput) . ').';
+    if (mb_strlen($destinationInput) > 100) $errors[] = 'Destination must be 100 characters or fewer (currently ' . mb_strlen($destinationInput) . ').';
     $destinationValue = $destinationInput ?: $destination;
     $purposeValue = $purposeInput ?: $tripPurpose;
     $passengersValue = (int) post('passengers', $passengers);
@@ -473,9 +475,12 @@ require_once INCLUDES_PATH . '/header.php';
                         <small class="text-muted">Select the nature of this trip</small>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Purpose</label>
-                        <textarea class="form-control" name="purpose" rows="2" placeholder="Detailed purpose of the trip..."><?= e($purposeValue) ?></textarea>
-                        <small class="text-muted">Original: <?= truncate($tripPurpose, 60) ?></small>
+                        <label class="form-label">Purpose <small class="text-muted">(max 200)</small></label>
+                        <textarea class="form-control" name="purpose" rows="2" maxlength="200" placeholder="Detailed purpose (max 200)..." oninput="document.getElementById('purposeCount2').textContent=this.value.length"><?= e($purposeValue) ?></textarea>
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted">Original: <?= truncate($tripPurpose, 60) ?></small>
+                            <small class="text-muted"><span id="purposeCount2"><?= mb_strlen($purposeValue) ?></span>/200</small>
+                        </div>
                     </div>
                 </div>
 
@@ -508,9 +513,12 @@ require_once INCLUDES_PATH . '/header.php';
 
                 <!-- Destination (Pre-filled but editable) -->
                 <div class="mb-3">
-                    <label class="form-label">Destination <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" name="destination" value="<?= e($destinationValue) ?>" required>
-                    <small class="text-muted">From request: <?= e($destination) ?></small>
+                    <label class="form-label">Destination <span class="text-danger">*</span> <small class="text-muted">(max 100)</small></label>
+                    <input type="text" class="form-control" name="destination" value="<?= e($destinationValue) ?>" maxlength="100" required oninput="document.getElementById('destCount').textContent=this.value.length">
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted">From request: <?= e($destination) ?></small>
+                        <small class="text-muted"><span id="destCount"><?= mb_strlen($destinationValue) ?></span>/100</small>
+                    </div>
                 </div>
 
                 <!-- Passengers -->

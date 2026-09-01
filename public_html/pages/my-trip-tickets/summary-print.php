@@ -429,6 +429,18 @@ if ($__verifyUrl) {
             .tbl-trip textarea {
                 -webkit-appearance: none;
                 appearance: none;
+                overflow: visible !important;
+                height: auto !important;
+                white-space: pre-wrap !important;
+                word-break: break-word !important;
+            }
+            .tbl-trip textarea.auto-expand {
+                overflow: visible !important;
+                height: auto !important;
+            }
+            .tbl-trip td {
+                height: auto !important;
+                vertical-align: top !important;
             }
         }
 

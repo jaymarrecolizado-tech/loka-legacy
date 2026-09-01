@@ -172,9 +172,18 @@ $vehicleId = postInt('vehicle_id') ?: null;
     }
     if (empty($purpose)) {
         $errors[] = 'Purpose is required';
+    } elseif (mb_strlen($purpose) > 200) {
+        $errors[] = 'Purpose must be 200 characters or fewer (currently ' . mb_strlen($purpose) . '). Please shorten it.';
     }
     if (empty($destinations)) {
         $errors[] = 'At least one destination is required';
+    } else {
+        foreach ($destinations as $d) {
+            if (mb_strlen($d) > 100) {
+                $errors[] = 'Each destination must be 100 characters or fewer (found: "' . mb_strimwidth($d,0,40,'...') . '" = ' . mb_strlen($d) . ').';
+                break;
+            }
+        }
     }
     if (!$vehicleId) {
         $errors[] = 'Please select a vehicle';
@@ -486,10 +495,13 @@ require_once INCLUDES_PATH . '/header.php';
                             
                             <!-- Purpose -->
                             <div class="col-12">
-                                <label for="purpose" class="form-label">Purpose <span class="text-danger">*</span></label>
-                                <textarea class="form-control" id="purpose" name="purpose" rows="3" 
-                                          placeholder="Describe the purpose of this trip..." required><?= e(post('purpose', '')) ?></textarea>
-                                <div class="invalid-feedback">Please enter the purpose</div>
+                                <label for="purpose" class="form-label">Purpose <span class="text-danger">*</span> <small class="text-muted fw-normal">(max 200)</small></label>
+                                <textarea class="form-control" id="purpose" name="purpose" rows="3" maxlength="200"
+                                          placeholder="Describe the purpose of this trip (max 200 characters)..." required><?= e(post('purpose', '')) ?></textarea>
+                                <div class="d-flex justify-content-between">
+                                    <div class="invalid-feedback">Please enter the purpose</div>
+                                    <small class="text-muted ms-auto"><span id="purposeCount">0</span>/200</small>
+                                </div>
                             </div>
                             
                             <!-- Destinations (Multiple) -->
@@ -1766,7 +1778,25 @@ ob_start();
                 const maxDate = new Date(today);
                 maxDate.setDate(maxDate.getDate() + bookingMaxAdvanceDays);
 
-                flatpickr('#start_datetime', {
+                // Purpose + destination character counters (200/100) – mirrors validation
+        const purposeEl = document.getElementById('purpose');
+        const purposeCount = document.getElementById('purposeCount');
+        if (purposeEl && purposeCount) {
+            const updPurpose = () => { purposeCount.textContent = purposeEl.value.length; purposeCount.classList.toggle('text-danger', purposeEl.value.length > 200); };
+            purposeEl.addEventListener('input', updPurpose); updPurpose();
+        }
+        document.addEventListener('input', e => {
+            if (e.target.classList.contains('destination-input')) {
+                const len = e.target.value.length;
+                e.target.classList.toggle('is-invalid', len > 100);
+                let hint = e.target.parentElement.querySelector('.dest-hint');
+                if (!hint) { hint = document.createElement('small'); hint.className = 'dest-hint text-muted ms-2'; e.target.parentElement.appendChild(hint); }
+                hint.textContent = len + '/100';
+                hint.classList.toggle('text-danger', len > 100);
+            }
+        });
+
+        flatpickr('#start_datetime', {
                     enableTime: true,
                     dateFormat: "Y-m-d H:i",
                     time_24hr: true,
