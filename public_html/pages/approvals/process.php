@@ -615,6 +615,34 @@ try {
 
     db()->commit();
 
+    // Create trip confirmation for fully approved requests (best-effort, post-commit)
+    // Uses same-day vs lead-hours scheduling; idempotent and respects trip_confirmation_enabled.
+    if ($approvalAction === 'approve' && $approvalType === 'motorpool' && $newStatus === STATUS_APPROVED) {
+        try {
+            if (function_exists('createTripConfirmation')) {
+                // Clear prior reschedule flags — new cycle will be created clean
+                if (!empty($request->reschedule_requested)) {
+                    db()->update('requests', ['reschedule_requested' => 0, 'reschedule_note' => null], 'id = ?', [$requestId]);
+                }
+                createTripConfirmation((int) $requestId);
+            }
+        } catch (Throwable $e) {
+            error_log('post-approval createTripConfirmation #' . $requestId . ': ' . $e->getMessage());
+        }
+    }
+    // If re-approving a rescheduled request routed via department path that lands on pending_motorpool -> approved,
+    // the above motorpool-only branch covers the normal case. For completeness, also handle department approve
+    // that directly completes a rescheduled trip (rare), by checking newStatus.
+    if ($approvalAction === 'approve' && $newStatus === STATUS_APPROVED && $approvalType !== 'motorpool') {
+        try {
+            if (function_exists('createTripConfirmation')) {
+                createTripConfirmation((int) $requestId);
+            }
+        } catch (Throwable $e) {
+            error_log('post-approval (dept) createTripConfirmation #' . $requestId . ': ' . $e->getMessage());
+        }
+    }
+
     // =====================================================
     // SEND NOTIFICATIONS AFTER SUCCESSFUL COMMIT
     // This prevents orphaned emails if transaction fails
