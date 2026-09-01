@@ -109,7 +109,7 @@ require_once INCLUDES_PATH . '/header.php';
                             <label class="form-label">System Name</label>
                             <input type="text" class="form-control" name="system_name" 
                                    value="<?= e($settings['system_name'] ?? APP_NAME) ?>">
-                            <small class="text-muted">Displayed in the header and emails</small>
+                            <small class="text-muted form-help">Displayed in the header and emails</small>
                         </div>
                     </div>
                 </div>
@@ -123,19 +123,19 @@ require_once INCLUDES_PATH . '/header.php';
                                 <label class="form-label">Maximum Advance Booking (days)</label>
                                 <input type="number" class="form-control" name="max_advance_booking_days" 
                                        value="<?= e($settings['max_advance_booking_days'] ?? '30') ?>" min="1" max="365">
-                                <small class="text-muted">How far in advance can requests be made</small>
+                                <small class="text-muted form-help">How far in advance can requests be made</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Minimum Notice (hours)</label>
                                 <input type="number" class="form-control" name="min_advance_booking_hours" 
                                        value="<?= e($settings['min_advance_booking_hours'] ?? '24') ?>" min="0" max="168">
-                                <small class="text-muted">Minimum hours before trip start</small>
+                                <small class="text-muted form-help">Minimum hours before trip start</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Maximum Trip Duration (hours)</label>
                                 <input type="number" class="form-control" name="max_trip_duration_hours" 
                                        value="<?= e($settings['max_trip_duration_hours'] ?? '72') ?>" min="1" max="720">
-                                <small class="text-muted">Maximum allowed trip length</small>
+                                <small class="text-muted form-help">Maximum allowed trip length</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Require Return Confirmation</label>
@@ -143,7 +143,7 @@ require_once INCLUDES_PATH . '/header.php';
                                     <option value="0" <?= ($settings['require_return_confirmation'] ?? '0') === '0' ? 'selected' : '' ?>>No</option>
                                     <option value="1" <?= ($settings['require_return_confirmation'] ?? '0') === '1' ? 'selected' : '' ?>>Yes</option>
                                 </select>
-                                <small class="text-muted">Require users to confirm vehicle return</small>
+                                <small class="text-muted form-help">Require users to confirm vehicle return</small>
                             </div>
                         </div>
                     </div>
@@ -155,12 +155,12 @@ require_once INCLUDES_PATH . '/header.php';
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label">Enforce Travel Order / Official Business Slip Upload <span class="badge bg-warning text-dark ms-1">Admin / All Father</span></label>
+                                <label class="form-label">Enforce Travel Order / Official Business Slip Upload <span class="badge bg-warning text-dark ms-1 badge-keep">Admin / All Father</span></label>
                                 <select class="form-select" name="require_travel_order_upload">
                                     <option value="0" <?= ($settings['require_travel_order_upload'] ?? '0') === '0' ? 'selected' : '' ?>>No — optional</option>
                                     <option value="1" <?= ($settings['require_travel_order_upload'] ?? '0') === '1' ? 'selected' : '' ?>>Yes — required during application</option>
                                 </select>
-                                <small class="text-muted">When Yes, the application form blocks submission if no TO/OB Slip file is attached. Toggleable by Admin and All Father only.</small>
+                                <small class="text-muted form-help">When Yes, the application form blocks submission if no TO/OB Slip file is attached. Toggleable by Admin and All Father only.</small>
                             </div>
                         </div>
                     </div>
@@ -177,22 +177,22 @@ require_once INCLUDES_PATH . '/header.php';
                                     <option value="0" <?= ($settings['trip_confirmation_enabled'] ?? '1') === '0' ? 'selected' : '' ?>>Disabled</option>
                                     <option value="1" <?= ($settings['trip_confirmation_enabled'] ?? '1') === '1' ? 'selected' : '' ?>>Enabled</option>
                                 </select>
-                                <small class="text-muted">Sends Proceed / Don't Proceed email before approved trips</small>
+                                <small class="text-muted form-help">Sends Proceed / Don't Proceed email before approved trips</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Lead Time — Multi-day trips (hours)</label>
                                 <input type="number" class="form-control" name="trip_confirmation_lead_hours" value="<?= e($settings['trip_confirmation_lead_hours'] ?? '24') ?>" min="1" max="168">
-                                <small class="text-muted">Hours before start when trip is on a later day than creation (default 24 = 1 day)</small>
+                                <small class="text-muted form-help">Hours before start when trip is on a later day than creation (default 24 = 1 day)</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Lead Time — Same-day trips (minutes)</label>
                                 <input type="number" class="form-control" name="trip_confirmation_same_day_lead_minutes" value="<?= e($settings['trip_confirmation_same_day_lead_minutes'] ?? '60') ?>" min="5" max="1440">
-                                <small class="text-muted">Minutes before start when trip is same calendar day as request creation</small>
+                                <small class="text-muted form-help">Minutes before start when trip is same calendar day as request creation</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Response Window (minutes)</label>
                                 <input type="number" class="form-control" name="trip_confirmation_window_minutes" value="<?= e($settings['trip_confirmation_window_minutes'] ?? '60') ?>" min="15" max="720">
-                                <small class="text-muted">Deadline = start − window. No response = proceed (default). Min 15 minutes.</small>
+                                <small class="text-muted form-help">Deadline = start − window. No response = proceed (default). Min 15 minutes.</small>
                             </div>
                         </div>
                     </div>
@@ -206,23 +206,23 @@ require_once INCLUDES_PATH . '/header.php';
                             <div class="col-md-4">
                                 <label class="form-label">Overdue Renotify (hours)</label>
                                 <input type="number" class="form-control" name="trip_overdue_renotify_hours" value="<?= e($settings['trip_overdue_renotify_hours'] ?? '24') ?>" min="1" max="168">
-                                <small class="text-muted">Re-alert motorpool while trip exceeds end time</small>
+                                <small class="text-muted form-help">Re-alert motorpool while trip exceeds end time</small>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Evaluation Reminder (hours)</label>
                                 <input type="number" class="form-control" name="driver_evaluation_reminder_hours" value="<?= e($settings['driver_evaluation_reminder_hours'] ?? '48') ?>" min="1" max="720">
-                                <small class="text-muted">Hours after trip completion before reminder email</small>
+                                <small class="text-muted form-help">Hours after trip completion before reminder email</small>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Evaluation Link Expiry (days)</label>
                                 <input type="number" class="form-control" name="driver_evaluation_expiry_days" value="<?= e($settings['driver_evaluation_expiry_days'] ?? '30') ?>" min="1" max="90">
-                                <small class="text-muted">Token expiry for anonymous evaluation</small>
+                                <small class="text-muted form-help">Token expiry for anonymous evaluation</small>
                             </div>
                         </div>
                     </div>
                 </div>
                 
-                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save Settings</button>
+                <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-check-lg me-1"></i>Save Settings</button>
             </form>
         </div>
         

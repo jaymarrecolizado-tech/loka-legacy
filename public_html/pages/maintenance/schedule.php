@@ -355,13 +355,13 @@ require_once INCLUDES_PATH . '/header.php';
                 <table class="table table-bordered calendar-table">
                     <thead>
                         <tr>
-                            <th class="text-center" style="width: 14%">Mon</th>
-                            <th class="text-center" style="width: 14%">Tue</th>
-                            <th class="text-center" style="width: 14%">Wed</th>
-                            <th class="text-center" style="width: 14%">Thu</th>
-                            <th class="text-center" style="width: 14%">Fri</th>
-                            <th class="text-center" style="width: 14%">Sat</th>
-                            <th class="text-center" style="width: 14%">Sun</th>
+                            <th class="text-center">Mon</th>
+                            <th class="text-center">Tue</th>
+                            <th class="text-center">Wed</th>
+                            <th class="text-center">Thu</th>
+                            <th class="text-center">Fri</th>
+                            <th class="text-center">Sat</th>
+                            <th class="text-center">Sun</th>
                         </tr>
                     </thead>
                     <tbody>

@@ -112,7 +112,7 @@ function renderStarsStatic($rating) {
     </style>
 </head>
 <body class="bg-light">
-<div class="container py-5" style="max-width:700px;">
+<div class="container py-5 mw-700 mx-auto">
 
 <?php if ($error && !$done): ?>
     <div class="card shadow-sm">

@@ -1199,12 +1199,13 @@ a.stat-card-link:focus .stat-hint {
 
 /* Gas voucher filter utility */
 .min-w-140 { min-width: 140px; }
+.min-w-80 { min-width: 80px; }
+.min-w-45 { min-width: 45px; }
 #navSearchDropdown { z-index: 1050; max-height: 380px; overflow: auto; }
 
 /* ===== LAYOUT UTILITIES (Phase 1 - replace inline styles) ===== */
 .mw-nav-search { max-width: 480px; }
 .mw-palette { max-width: 560px; width: 90%; }
-.min-w-45 { min-width: 45px; }
 .max-h-300 { max-height: 300px; overflow-y: auto; }
 .max-h-250 { max-height: 250px; overflow-y: auto; }
 .mw-700 { max-width: 700px; }
@@ -1226,3 +1227,7 @@ a.stat-card-link:focus .stat-hint {
 
 /* Filter bar - unified 12-col pattern helper */
 .filter-bar .form-control, .filter-bar .form-select { min-height: 38px; }
+
+/* Settings help text - even height */
+.form-help { min-height: 20px; display: block; }
+.badge-keep { white-space: nowrap; display: inline-block; }

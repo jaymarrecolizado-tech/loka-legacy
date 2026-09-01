@@ -339,23 +339,23 @@ require_once INCLUDES_PATH . '/header.php';
                         <h5 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Mileage Information</h5>
                     </div>
                     <div class="card-body">
-                        <div class="row g-4">
+                        <div class="row g-3">
                             <?php if ($request->mileage_start): ?>
-                                <div class="col-md-4">
+                                <div class="col-12 col-md-4">
                                     <h6 class="text-muted mb-2">Starting Mileage</h6>
                                     <div class="fs-4 fw-bold text-primary"><?= number_format($request->mileage_start) ?> km</div>
                                     <small class="text-muted">Recorded at dispatch</small>
                                 </div>
                             <?php endif; ?>
                             <?php if ($request->mileage_end): ?>
-                                <div class="col-md-4">
+                                <div class="col-12 col-md-4">
                                     <h6 class="text-muted mb-2">Ending Mileage</h6>
                                     <div class="fs-4 fw-bold text-success"><?= number_format($request->mileage_end) ?> km</div>
                                     <small class="text-muted">Recorded at arrival</small>
                                 </div>
                             <?php endif; ?>
                             <?php if ($request->mileage_actual): ?>
-                                <div class="col-md-4">
+                                <div class="col-12 col-md-4">
                                     <h6 class="text-muted mb-2">Actual Distance</h6>
                                     <div class="fs-4 fw-bold text-info"><?= number_format($request->mileage_actual) ?> km</div>
                                     <small class="text-muted">Total trip distance</small>
@@ -375,7 +375,7 @@ require_once INCLUDES_PATH . '/header.php';
                         <h5 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Travel Documents</h5>
                     </div>
                     <div class="card-body">
-                        <div class="row g-3">
+                        <div class="row g-3 align-items-center">
                             <?php if ($request->has_travel_order): ?>
                                 <div class="col-md-6">
                                     <div class="d-flex align-items-center p-3 bg-success bg-opacity-10 rounded">
@@ -432,7 +432,7 @@ require_once INCLUDES_PATH . '/header.php';
                         <h5 class="mb-0"><i class="bi bi-car-front me-2"></i>Assignment</h5>
                     </div>
                     <div class="card-body">
-                        <div class="row g-4">
+                        <div class="row g-3">
                             <?php if ($request->vehicle_id): ?>
                                 <div class="col-md-6">
                                     <h6 class="text-muted mb-2">Vehicle</h6>
@@ -564,7 +564,7 @@ require_once INCLUDES_PATH . '/header.php';
                         <h5 class="mb-0"><i class="bi bi-shield-check me-2"></i>Guard Tracking</h5>
                     </div>
                     <div class="card-body">
-                        <div class="row g-4">
+                        <div class="row g-3">
                             <?php if ($request->actual_dispatch_datetime): ?>
                                 <div class="col-md-6">
                                     <h6 class="text-muted mb-2">
@@ -758,7 +758,7 @@ require_once INCLUDES_PATH . '/header.php';
 <?php if (isMotorpool() && $request->status === STATUS_APPROVED): ?>
     <!-- Override Vehicle/Driver Modal -->
     <div class="modal fade" id="overrideModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <form method="POST" action="<?= APP_URL ?>/?page=requests&action=override">
                     <?= csrfField() ?>
@@ -852,7 +852,7 @@ require_once INCLUDES_PATH . '/header.php';
     
     <!-- Complete Trip Modal -->
     <div class="modal fade" id="completeModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <form method="POST" action="<?= APP_URL ?>/?page=requests&action=complete">
                     <?= csrfField() ?>
@@ -917,7 +917,7 @@ require_once INCLUDES_PATH . '/header.php';
                 <input type="hidden" name="confirm_cancel" value="1">
                 <div class="modal-body">
                     <div class="text-center mb-4">
-                        <i class="bi bi-x-circle-fill text-danger" style="font-size: 4rem;"></i>
+                        <i class="bi bi-x-circle-fill text-danger fs-1" style="font-size: 3rem !important;"></i>
                     </div>
 
                     <h5 class="text-center mb-3">Are you sure you want to cancel this request?</h5>

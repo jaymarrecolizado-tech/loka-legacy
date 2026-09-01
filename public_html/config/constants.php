@@ -7,7 +7,7 @@
  */
 
 define('APP_NAME', 'LOKA Fleet Management');
-define('APP_VERSION', '2.7.1');
+define('APP_VERSION', '2.7.2');
 
 $isProduction = (getenv('APP_ENV') === 'production');
 

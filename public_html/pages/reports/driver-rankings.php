@@ -114,7 +114,7 @@ require_once INCLUDES_PATH . '/header.php';
                                 <td>
                                     <?php if ($rank===1): ?><span class="badge bg-warning text-dark"><i class="bi bi-trophy-fill me-1"></i>1</span>
                                     <?php elseif ($rank===2): ?><span class="badge bg-secondary">2</span>
-                                    <?php elseif ($rank===3): ?><span class="badge" style="background:#cd7f32;color:white;">3</span>
+                                    <?php elseif ($rank===3): ?><span class="badge bg-bronze">3</span>
                                     <?php else: ?><span class="badge bg-light text-dark"><?= $rank ?></span><?php endif; ?>
                                 </td>
                                 <td><strong><?= e($row->driver_name) ?></strong></td>
@@ -136,7 +136,6 @@ require_once INCLUDES_PATH . '/header.php';
 </div>
 
 <?php if (!empty($chartDrivers)): ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){
     const labels = <?= json_encode(array_map(fn($r)=>$r->driver_name, $chartDrivers)) ?>;

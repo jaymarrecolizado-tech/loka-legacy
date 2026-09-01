@@ -509,7 +509,7 @@ require_once INCLUDES_PATH . '/header.php';
                                      ?>
                                      <div class="destination-row mb-2">
                                          <div class="input-group">
-                                             <span class="input-group-text bg-primary text-white" style="min-width: 45px;">
+                                             <span class="input-group-text bg-primary text-white min-w-45">
                                                  <i class="bi bi-geo-alt"></i> <?= $index + 1 ?>
                                              </span>
                                              <input type="text" class="form-control destination-input" 
@@ -850,7 +850,7 @@ require_once INCLUDES_PATH . '/header.php';
                     
                     <!-- Employee List with Checkboxes -->
                     <div class="mb-4">
-                        <div class="border rounded p-2" style="max-height: 300px; overflow-y: auto;">
+                        <div class="border rounded p-2 max-h-300">
                             <div id="employeeList">
                                 <?php 
                                 $selectedPassengers = post('passengers', []);
@@ -909,7 +909,7 @@ require_once INCLUDES_PATH . '/header.php';
                         <h6 class="small fw-bold text-uppercase text-muted border-bottom pb-2 mb-3">
                             <i class="bi bi-list-check me-1"></i>Selected Passengers (<span id="selectedCount">0</span>)
                         </h6>
-                        <div class="border rounded p-2" style="max-height: 250px; overflow-y: auto;">
+                        <div class="border rounded p-2 max-h-250">
                             <ul class="list-unstyled mb-0" id="selectedPassengerList">
                                 <!-- Populated by JS -->
                             </ul>
@@ -920,7 +920,7 @@ require_once INCLUDES_PATH . '/header.php';
                     </div>
                     
                     <!-- Hidden inputs for form submission -->
-                    <div id="passengerInputs" style="display: none;">
+                    <div id="passengerInputs" class="d-none">
                         <!-- Will be populated by JS before form submission -->
                     </div>
                 </div>
@@ -1420,7 +1420,7 @@ ob_start();
             row.className = 'destination-row mb-2';
             row.innerHTML = `
                 <div class="input-group">
-                    <span class="input-group-text bg-primary text-white" style="min-width: 45px;">
+                    <span class="input-group-text bg-primary text-white min-w-45">
                         <i class="bi bi-geo-alt"></i> ${index + 1}
                     </span>
                     <input type="text" class="form-control destination-input" 

@@ -218,10 +218,15 @@ if ($showCharts) {
 
 <div class="container-fluid py-4">
     <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
         <div>
             <h4 class="mb-1">Dashboard</h4>
-            <p class="text-muted mb-0">Welcome back, <?= e(currentUser()->name) ?>!</p>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item active">Dashboard</li>
+                </ol>
+            </nav>
+            <p class="text-muted mb-0 mt-1 small">Welcome back, <?= e(currentUser()->name) ?>!</p>
         </div>
         <div>
             <a href="<?= APP_URL ?>/?page=requests&action=create" class="btn btn-primary">

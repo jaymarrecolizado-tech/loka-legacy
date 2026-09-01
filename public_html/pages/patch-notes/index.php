@@ -10,6 +10,29 @@ $pageTitle = 'Patch Notes';
 // Patch notes data - organized by version (from git history)
 $patchNotes = [
     [
+        'version' => '2.7.2',
+        'date' => '2026-09-02',
+        'title' => 'Layout: industry-standard spacing, balanced cards/tables/filters',
+        'changes' => [
+            ['type' => 'improvement', 'text' => 'Standardized layout foundation: 250px sidebar fixed, 56px navbar, unified 12-col filter bars (12/12), g-3/g-4 spacing, card header 1rem 1.25rem, 250px transform-only mobile'],
+            ['type' => 'improvement', 'text' => 'Removed hidden columns at 575px — tables now scroll horizontally on mobile; unified buttons (38→44px), table alignment (numeric center, date nowrap)'],
+            ['type' => 'improvement', 'text' => 'Replaced 36 inline styles with utilities (.mw-nav-search, .min-w-45, .max-h-300, .mw-700, .bg-bronze); deduped CSS'],
+            ['type' => 'improvement', 'text' => 'Page polish: dashboard breadcrumb + welcome, reports cards hover -2px + fs-1 icons, request view mileage g-3 col-12 col-md-4, settings help even height + btn-lg'],
+            ['type' => 'fix', 'text' => 'Fixed view header 5-button wrap with flex-wrap gap-2, vehicle assigner truncate, tabs scrollbar hidden'],
+        ]
+    ],
+    [
+        'version' => '2.7.1',
+        'date' => '2026-09-01',
+        'title' => 'Navigation Search Fixes & Top-bar Search',
+        'changes' => [
+            ['type' => 'feature', 'text' => 'Top-bar navigation search + Ctrl+K command palette with recent & frequent (localStorage per user, fuzzy search)'],
+            ['type' => 'fix', 'text' => 'Absolute href normalization for nav search — fixes XAMPP subfolder /dashboard redirect, legacy href migration'],
+            ['type' => 'fix', 'text' => 'Global search now points to actual items: live API vehicle/driver lookup, debounced merge, actual view links with highlight'],
+            ['type' => 'fix', 'text' => 'Nav search: badges, pin/favorite, quick-jump #ID and plate, frequent/recent with localStorage'],
+        ]
+    ],
+    [
         'version' => '2.7.0',
         'date' => '2026-09-01',
         'title' => 'Trip Confirmations, Overdue Alerts & Anonymous Driver Evaluations',
@@ -303,7 +326,7 @@ require_once INCLUDES_PATH . '/header.php';
                 <ul class="list-unstyled mb-0">
                     <?php foreach ($note['changes'] as $change): ?>
                     <li class="d-flex align-items-start mb-2">
-                        <span class="badge <?= getChangeBadgeClass($change['type']) ?> me-2 mt-1" style="min-width: 80px;">
+                        <span class="badge <?= getChangeBadgeClass($change['type']) ?> me-2 mt-1 min-w-80">
                             <?= ucfirst($change['type']) ?>
                         </span>
                         <span class="change-text"><?= e($change['text']) ?></span>

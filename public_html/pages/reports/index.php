@@ -35,7 +35,7 @@ require_once INCLUDES_PATH . '/header.php';
                 <div class="card h-100 report-card">
                     <div class="card-body text-center py-5">
                         <div class="mb-3">
-                            <i class="bi bi-car-front text-primary" style="font-size: 3.5rem;"></i>
+                            <i class="bi bi-car-front text-primary fs-1"></i>
                         </div>
                         <h5>Vehicle History</h5>
                         <p class="text-muted mb-3">View trip history and utilization for each vehicle with export options</p>
@@ -52,7 +52,7 @@ require_once INCLUDES_PATH . '/header.php';
                 <div class="card h-100 report-card">
                     <div class="card-body text-center py-5">
                         <div class="mb-3">
-                            <i class="bi bi-person-badge text-success" style="font-size: 3.5rem;"></i>
+                            <i class="bi bi-person-badge text-success fs-1"></i>
                         </div>
                         <h5><?= $selfScoped ? 'My Driver Report' : 'Driver Report' ?></h5>
                         <p class="text-muted mb-3">
@@ -73,7 +73,7 @@ require_once INCLUDES_PATH . '/header.php';
                 <div class="card h-100 report-card">
                     <div class="card-body text-center py-5">
                         <div class="mb-3">
-                            <i class="bi bi-journal-text text-info" style="font-size: 3.5rem;"></i>
+                            <i class="bi bi-journal-text text-info fs-1"></i>
                         </div>
                         <h5>Trip Requests</h5>
                         <p class="text-muted mb-3">View all trip requests with filtering and export options</p>
@@ -91,7 +91,7 @@ require_once INCLUDES_PATH . '/header.php';
                 <div class="card h-100 report-card">
                     <div class="card-body text-center py-5">
                         <div class="mb-3">
-                            <i class="bi bi-bar-chart-fill text-warning" style="font-size: 3.5rem;"></i>
+                            <i class="bi bi-bar-chart-fill text-warning fs-1"></i>
                         </div>
                         <h5>Admin Reports</h5>
                         <p class="text-muted mb-3">Advanced reports: users, vehicles, departments, audit logs</p>
@@ -108,7 +108,7 @@ require_once INCLUDES_PATH . '/header.php';
                 <div class="card h-100 report-card">
                     <div class="card-body text-center py-5">
                         <div class="mb-3">
-                            <i class="bi bi-trophy text-warning" style="font-size: 3.5rem;"></i>
+                            <i class="bi bi-trophy text-warning fs-1"></i>
                         </div>
                         <h5>Driver Rankings</h5>
                         <p class="text-muted mb-3">Anonymous passenger evaluations — per-driver averages, GRAB-like rankings</p>
@@ -124,7 +124,7 @@ require_once INCLUDES_PATH . '/header.php';
                 <div class="card h-100 report-card">
                     <div class="card-body text-center py-5">
                         <div class="mb-3">
-                            <i class="bi bi-star-half text-primary" style="font-size: 3.5rem;"></i>
+                            <i class="bi bi-star-half text-primary fs-1"></i>
                         </div>
                         <h5>Evaluations</h5>
                         <p class="text-muted mb-3">Response rates per trip and anonymous remarks dashboard</p>
@@ -138,12 +138,13 @@ require_once INCLUDES_PATH . '/header.php';
 
 <style>
 .report-card {
-    transition: transform 0.2s, box-shadow 0.2s;
-    border: 2px solid transparent;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
 }
 .report-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,.10);
     border-color: var(--bs-primary);
 }
 .report-card h5 {
