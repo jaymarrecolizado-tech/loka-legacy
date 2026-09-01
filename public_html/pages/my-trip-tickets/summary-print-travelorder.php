@@ -775,7 +775,10 @@ if ($__verifyUrl) {
                     ?>
                             <tr>
                                 <td><?= $pCount ?></td>
-                                <td><input class="left" type="text" style="font-weight:700; text-transform:uppercase;<?= $person['role'] === 'Driver' ? ' color:#dc3545;' : '' ?>" value="<?= e(strtoupper($person['name'])) ?><?php if ($person['role'] === 'Driver'): ?> (DRIVER)<?php endif; ?>"></td>
+                                <td style="padding:2px 4px;">
+                                    <input class="left" type="text" style="font-weight:700; text-transform:uppercase;" value="<?= e(strtoupper($person['name'])) ?>">
+                                    <?php if ($person['role'] === 'Driver'): ?><div style="font-size:6px; font-weight:700; color:#dc3545; text-align:center; letter-spacing:.06em; line-height:1; margin-top:1px;">(DRIVER)</div><?php endif; ?>
+                                </td>
                                 <td><input class="left" type="text" placeholder="Position/Office"></td>
                                 <td><input type="text"></td>
                                 <td><input type="text" placeholder="In/Out"></td>

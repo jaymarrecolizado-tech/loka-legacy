@@ -944,8 +944,9 @@ if ($__verifyUrl) {
                                 <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Destination" rows="1" maxlength="500"><?= e($t->destination) ?></textarea></td>
                                 <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Purpose" rows="1" maxlength="500"><?= e($t->purpose) ?></textarea></td>
                             <?php endif; ?>
-                            <td>
-                                <textarea class="left auto-expand" placeholder="Name" rows="1" maxlength="500" style="font-weight:700; text-transform:uppercase;<?= $person['role'] === 'Driver' ? ' color:#dc3545;' : '' ?>"><?= e(strtoupper($person['name'])) ?><?php if ($person['role'] === 'Driver'): ?> (DRIVER)<?php endif; ?></textarea>
+                            <td style="padding:0;">
+                                <textarea class="left auto-expand" placeholder="Name" rows="1" maxlength="500" style="font-weight:700; text-transform:uppercase;"><?= e(strtoupper($person['name'])) ?></textarea>
+                                <?php if ($person['role'] === 'Driver'): ?><div style="font-size:6px; font-weight:700; color:#dc3545; text-align:center; letter-spacing:.06em; line-height:1; padding:1px 0 2px;">(DRIVER)</div><?php endif; ?>
                                 <input type="hidden" class="person-role" value="<?= e($person['role']) ?>">
                             </td>
                              <td><input type="text"></td>

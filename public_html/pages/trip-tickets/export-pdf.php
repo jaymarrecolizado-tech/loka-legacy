@@ -202,7 +202,7 @@ $pdf->SetFont('helvetica', '', 9);
   $pdf->Cell(25, 6, 'Plate Number:', 0, 0);
   $pdf->WriteHTMLCell(85, 0, '', '', ($ticket->plate_number ?: 'N/A'), 'B', 0, 0, true, 'L', true);
   $pdf->Cell(22, 6, 'Driver:', 0, 0);
-  $pdf->WriteHTMLCell(0, 0, '', '', '<b><span style="color:#dc3545;">' . htmlspecialchars(strtoupper($ticket->driver_name ?: 'N/A')) . '</span></b>', 'B', 1, 0, true, 'L', true);
+  $pdf->WriteHTMLCell(0, 0, '', '', '<b>' . htmlspecialchars(strtoupper($ticket->driver_name ?: 'N/A')) . '</b>', 'B', 1, 0, true, 'L', true);
 
   // Row 2: Make / Model & License
    $pdf->Cell(25, 6, 'Make / Model:', 0, 0);
@@ -324,7 +324,7 @@ $pdf->Ln(2);
 
 $pdf->SetFont('helvetica', '', 9);
 $pdf->Cell(30, 8, 'Name:', 0, 0);
-$pdf->WriteHTMLCell(100, 0, '', '', '<b><span style="color:#dc3545;">' . htmlspecialchars(strtoupper($ticket->driver_name)) . '</span></b>', 'B', 0, 0, true, 'L', true);
+$pdf->WriteHTMLCell(100, 0, '', '', '<b>' . htmlspecialchars(strtoupper($ticket->driver_name)) . '</b>', 'B', 0, 0, true, 'L', true);
 $pdf->Cell(25, 8, 'Date:', 0, 0);
 $pdf->Cell(0, 8, '', 'B', 1);
 
