@@ -5,7 +5,10 @@
 **Author:** Plan for user request — 5 features (passenger mgmt + TO/OB toggle + confirmatory email + overdue alerts + anonymous driver evaluation)
 **Codebase:** `public_html/` PHP 8.2 + MySQL, no framework. Router `index.php` → `pages/*`. Migrations `migrations/*.php`. Mail queue `classes/EmailQueue.php`.
 
-> This plan is **execution-ready**. It inventories what is already implemented vs what is still missing/truncated, and defines every file, schema, and QA step. No code is changed in this plan step.
+> **Implementation Status (2026-09-01): ✅ ALL PHASES COMPLETED — commits 37a84e8 → 5f9b1fa (master). Lint clean, no remote configured.**
+> Phase 0 foundation ✅ | Phase 1 passenger mgmt ✅ (2ecf80b) | Phase 2 settings UI ✅ (da01191) | Phase 3 confirmation hook ✅ (7aaee41) | Phase 4 evaluations ✅ (8c0c2a3) | Phase 5 polish ✅ (5f9b1fa)
+
+> Original plan was execution-ready; this document now reflects the as-built state.
 
 ---
 
