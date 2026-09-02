@@ -33,9 +33,18 @@ class Database
         'password_reset_tokens',
         'maintenance_requests',
         'assignment_history',
-        'trip_tickets',
         'vehicle_care_assignments',
-        'vehicle_care_schedules'
+        'vehicle_care_schedules',
+        'gas_vouchers',
+        'gas_stations',
+        'gas_voucher_signatories',
+        'gas_voucher_reports',
+        'sms_logs',
+        'user_badge_acks',
+        'vehicle_observations',
+        'vehicle_observation_photos',
+        'trip_confirmations',
+        'driver_evaluations'
     ];
 
     private function __construct()
