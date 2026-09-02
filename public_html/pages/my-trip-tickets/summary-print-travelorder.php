@@ -788,9 +788,9 @@ if ($__verifyUrl) {
                             <tr>
                                 <td><?= $pCount ?></td>
                                 <td style="padding:1px 2px;">
-                                    <div style="display:flex; align-items:center; justify-content:center; gap:4px; white-space:nowrap; width:100%;">
-                                        <input class="left" type="text" style="flex:0 1 auto; width:auto; min-width:0; max-width:70%; font-size:6.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:1px 2px; border:none; background:transparent; text-align:center; display:inline-block;" value="<?= e(mb_convert_case($person['name'], MB_CASE_TITLE, 'UTF-8')) ?>">
-                                        <?php if ($person['role'] === 'Driver'): ?><span style="font-size:5.5px; font-weight:700; color:#dc3545; letter-spacing:.04em; flex-shrink:0; white-space:nowrap;">(DRIVER)</span><?php endif; ?>
+                                    <div style="display:flex; align-items:center; justify-content:center; gap:0; white-space:nowrap; width:100%;">
+                                        <input class="left" type="text" style="flex:0 1 auto; width:auto; min-width:0; max-width:78%; font-size:6.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:1px 1px; border:none; background:transparent; text-align:center; display:inline-block;" value="<?= e(mb_convert_case($person['name'], MB_CASE_TITLE, 'UTF-8')) ?>">
+                                        <?php if ($person['role'] === 'Driver'): ?><span style="font-size:5.5px; font-weight:700; color:#dc3545; letter-spacing:.04em; flex-shrink:0; white-space:nowrap; margin-left:1px;">(DRIVER)</span><?php endif; ?>
                                     </div>
                                 </td>
                                 <td><input class="left" type="text" placeholder="Position/Office"></td>
