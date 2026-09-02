@@ -82,7 +82,7 @@ define('SECURITY_HEADERS', [
     'X-Frame-Options' => 'DENY',
     'X-XSS-Protection' => '1; mode=block',
     'Referrer-Policy' => 'strict-origin-when-cross-origin',
-    'Permissions-Policy' => 'geolocation=(), microphone=(), camera=()',
+    'Permissions-Policy' => 'geolocation=(), microphone=(), camera=(self)',
     'Cache-Control' => 'no-store, no-cache, must-revalidate, proxy-revalidate',
     'Pragma' => 'no-cache',
 ]);
