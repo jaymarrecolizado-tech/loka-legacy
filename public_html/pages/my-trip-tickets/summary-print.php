@@ -961,9 +961,9 @@ if ($__verifyUrl) {
                                 <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Purpose" rows="1" maxlength="500"><?= e($t->purpose) ?></textarea></td>
                             <?php endif; ?>
                             <td style="padding:1px 2px;">
-                                <div style="display:flex; align-items:center; justify-content:center; gap:2px; white-space:nowrap;">
-                                    <textarea class="left auto-expand" placeholder="Name" rows="1" maxlength="500" style="flex:1; min-width:0; font-size:6.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:1px 2px; border:none; background:transparent; text-align:center;"><?= e(mb_convert_case($person['name'], MB_CASE_TITLE, 'UTF-8')) ?></textarea>
-                                    <?php if ($person['role'] === 'Driver'): ?><span style="font-size:5.5px; font-weight:700; color:#dc3545; letter-spacing:.04em; flex-shrink:0;">(DRIVER)</span><?php endif; ?>
+                                <div style="display:inline-flex; align-items:center; justify-content:center; gap:3px; white-space:nowrap; width:100%;">
+                                    <textarea class="left auto-expand" placeholder="Name" rows="1" maxlength="500" style="flex:0 1 auto; width:auto; min-width:0; max-width:70%; font-size:6.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:1px 2px; border:none; background:transparent; text-align:center; display:inline-block;"><?= e(mb_convert_case($person['name'], MB_CASE_TITLE, 'UTF-8')) ?></textarea>
+                                    <?php if ($person['role'] === 'Driver'): ?><span style="font-size:5.5px; font-weight:700; color:#dc3545; letter-spacing:.04em; flex-shrink:0; white-space:nowrap;">(DRIVER)</span><?php endif; ?>
                                 </div>
                                 <input type="hidden" class="person-role" value="<?= e($person['role']) ?>">
                             </td>
