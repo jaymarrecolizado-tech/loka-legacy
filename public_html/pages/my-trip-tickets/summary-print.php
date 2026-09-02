@@ -557,6 +557,13 @@ if ($__verifyUrl) {
                 padding: 2px 4px !important;
             }
 
+            /* Driver name column: keep single line even with (DRIVER) tag */
+            .tbl-trip td:nth-child(8) input,
+            .tbl-trip td:nth-child(8) textarea {
+                font-size: 6.5px !important;
+                padding: 1px 2px !important;
+            }
+
             .tbl-trip th {
                 padding: 3px 2px !important;
             }
@@ -953,9 +960,11 @@ if ($__verifyUrl) {
                                 <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Destination" rows="1" maxlength="500"><?= e($t->destination) ?></textarea></td>
                                 <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Purpose" rows="1" maxlength="500"><?= e($t->purpose) ?></textarea></td>
                             <?php endif; ?>
-                            <td style="padding:0;">
-                                <textarea class="left auto-expand" placeholder="Name" rows="1" maxlength="500" style="font-weight:700;"><?= e(mb_convert_case($person['name'], MB_CASE_TITLE, 'UTF-8')) ?></textarea>
-                                <?php if ($person['role'] === 'Driver'): ?><div style="font-size:6px; font-weight:700; color:#dc3545; text-align:center; letter-spacing:.06em; line-height:1; padding:1px 0 2px;">(DRIVER)</div><?php endif; ?>
+                            <td style="padding:1px 2px;">
+                                <div style="display:flex; align-items:center; justify-content:center; gap:2px; white-space:nowrap;">
+                                    <textarea class="left auto-expand" placeholder="Name" rows="1" maxlength="500" style="flex:1; min-width:0; font-size:6.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:1px 2px; border:none; background:transparent; text-align:center;"><?= e(mb_convert_case($person['name'], MB_CASE_TITLE, 'UTF-8')) ?></textarea>
+                                    <?php if ($person['role'] === 'Driver'): ?><span style="font-size:5.5px; font-weight:700; color:#dc3545; letter-spacing:.04em; flex-shrink:0;">(DRIVER)</span><?php endif; ?>
+                                </div>
                                 <input type="hidden" class="person-role" value="<?= e($person['role']) ?>">
                             </td>
                              <td><input type="text"></td>

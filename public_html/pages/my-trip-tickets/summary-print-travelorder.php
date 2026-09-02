@@ -548,6 +548,11 @@ if ($__verifyUrl) {
                 height: 38px !important;
             }
 
+            /* Driver name single line: shrink to fit name + (DRIVER) */
+            td:nth-child(2) input {
+                font-size: 6.5px !important;
+            }
+
             th,
             td {
                 border-color: #000 !important;
@@ -782,9 +787,11 @@ if ($__verifyUrl) {
                     ?>
                             <tr>
                                 <td><?= $pCount ?></td>
-                                <td style="padding:2px 4px;">
-                                    <input class="left" type="text" style="font-weight:700;" value="<?= e(mb_convert_case($person['name'], MB_CASE_TITLE, 'UTF-8')) ?>">
-                                    <?php if ($person['role'] === 'Driver'): ?><div style="font-size:6px; font-weight:700; color:#dc3545; text-align:center; letter-spacing:.06em; line-height:1; margin-top:1px;">(DRIVER)</div><?php endif; ?>
+                                <td style="padding:1px 2px;">
+                                    <div style="display:flex; align-items:center; justify-content:center; gap:2px; white-space:nowrap;">
+                                        <input class="left" type="text" style="flex:1; min-width:0; font-size:6.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:1px 2px; border:none; background:transparent; text-align:center;" value="<?= e(mb_convert_case($person['name'], MB_CASE_TITLE, 'UTF-8')) ?>">
+                                        <?php if ($person['role'] === 'Driver'): ?><span style="font-size:5.5px; font-weight:700; color:#dc3545; letter-spacing:.04em; flex-shrink:0;">(DRIVER)</span><?php endif; ?>
+                                    </div>
                                 </td>
                                 <td><input class="left" type="text" placeholder="Position/Office"></td>
                                 <td><input type="text"></td>
