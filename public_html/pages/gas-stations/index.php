@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($row) {
             $new = $row->status === 'active' ? 'inactive' : 'active';
             db()->update('gas_stations', ['status'=>$new, 'updated_at'=>date(DATETIME_FORMAT)], 'id=?', [$id]);
-            auditLog('gas_station_toggled','gas_station',$id,$row->status,$new);
+            auditLog('gas_station_toggled','gas_station',$id,['status'=>$row->status],['status'=>$new]);
             redirectWith('/?page=gas-stations', 'success', $row->name . ' is now ' . $new . '.');
         }
     }
