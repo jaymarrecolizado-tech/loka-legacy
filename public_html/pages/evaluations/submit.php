@@ -31,7 +31,7 @@ if (!$rawToken || !$eval) {
 if (!$error && !$done && !$expired && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // No CSRF for public token page — token is the capability
     $ratings = [];
-    $criteria = ['punctuality','safety','courtesy','driving','vehicle'];
+    $criteria = ['cleanliness','behavior','appearance','safety'];
     $valid = true;
     $errMsg = '';
     foreach ($criteria as $c) {
@@ -39,7 +39,7 @@ if (!$error && !$done && !$expired && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $val = postInt($key, 0);
         if ($val < 1 || $val > 5) {
             $valid = false;
-            $errMsg = 'Please rate all 5 criteria (1-5 stars).';
+            $errMsg = 'Please rate all 4 categories (1-5 stars).';
             break;
         }
         $ratings[$c] = $val;
@@ -58,11 +58,10 @@ if (!$error && !$done && !$expired && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $done = true;
         } else {
             $affected = db()->update('driver_evaluations', [
-                'rating_punctuality' => $ratings['punctuality'],
+                'rating_cleanliness' => $ratings['cleanliness'],
+                'rating_behavior' => $ratings['behavior'],
+                'rating_appearance' => $ratings['appearance'],
                 'rating_safety' => $ratings['safety'],
-                'rating_courtesy' => $ratings['courtesy'],
-                'rating_driving' => $ratings['driving'],
-                'rating_vehicle' => $ratings['vehicle'],
                 'overall' => $overall,
                 'remarks' => $remarks !== '' ? $remarks : null,
                 'submitted_at' => $now
@@ -158,19 +157,18 @@ function renderStarsStatic($rating) {
             <form method="POST" id="evalForm">
                 <?php
                 $criteriaInfo = [
-                    'punctuality' => ['label'=>'Punctuality','hint'=>'On time, efficient'],
-                    'safety' => ['label'=>'Safety','hint'=>'Safe driving practices'],
-                    'courtesy' => ['label'=>'Courtesy','hint'=>'Polite & helpful'],
-                    'driving' => ['label'=>'Driving Skill','hint'=>'Smooth, skilled driving'],
-                    'vehicle' => ['label'=>'Vehicle Condition','hint'=>'Clean & well-maintained'],
+                    'cleanliness' => ['label'=>'Cleanliness of the Vehicle','hint'=>'Exterior washed • Interior vacuumed & wiped • Trash-free • Odor & A/C clean • Cargo area neat'],
+                    'behavior' => ['label'=>'Behavior of the Driver','hint'=>'Courteous & respectful • Helpful with luggage/boarding • Clear communication • Patient & calm • Responsive to requests'],
+                    'appearance' => ['label'=>'Appearance & Hygiene','hint'=>'Uniform & ID clean • Grooming neat • Personal hygiene • Professional bearing'],
+                    'safety' => ['label'=>'Road Safety & Driving Skills','hint'=>'Obeys speed/signals • Smooth braking/cornering • Defensive & hazard-aware • Seatbelt briefing • Route & handling'],
                 ];
                 foreach ($criteriaInfo as $key => $info):
                 ?>
                 <div class="mb-4">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap">
-                        <div>
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                        <div style="min-width:220px; flex:1;">
                             <span class="criterion-label"><?= e($info['label']) ?></span>
-                            <small class="text-muted d-block"><?= e($info['hint']) ?></small>
+                            <small class="text-muted d-block" style="max-width:420px; line-height:1.3;"><?= e($info['hint']) ?></small>
                         </div>
                         <div class="star-rating" data-criterion="<?= e($key) ?>">
                             <?php for ($i=1; $i<=5; $i++): ?>
@@ -230,7 +228,7 @@ document.getElementById('evalForm')?.addEventListener('submit', function(e){
         const hid = document.getElementById('rating_' + g.dataset.criterion);
         if (!hid.value) { document.getElementById('err_' + g.dataset.criterion).style.display = 'block'; ok = false; }
     });
-    if (!ok) { e.preventDefault(); alert('Please rate all 5 criteria.'); }
+    if (!ok) { e.preventDefault(); alert('Please rate all 4 categories.'); }
 });
 </script>
 </body>

@@ -52,11 +52,10 @@ $perDriver = db()->fetchAll(
     "SELECT de.driver_id, u.name AS driver_name,
             COUNT(*) AS eval_count,
             AVG(de.overall) AS avg_overall,
-            AVG(de.rating_punctuality) AS avg_punctuality,
-            AVG(de.rating_safety) AS avg_safety,
-            AVG(de.rating_courtesy) AS avg_courtesy,
-            AVG(de.rating_driving) AS avg_driving,
-            AVG(de.rating_vehicle) AS avg_vehicle
+            AVG(de.rating_cleanliness) AS avg_cleanliness,
+            AVG(de.rating_behavior) AS avg_behavior,
+            AVG(de.rating_appearance) AS avg_appearance,
+            AVG(de.rating_safety) AS avg_safety
      FROM driver_evaluations de
      JOIN requests r ON de.request_id = r.id AND r.deleted_at IS NULL
      JOIN drivers d ON de.driver_id = d.id AND d.deleted_at IS NULL
@@ -124,18 +123,17 @@ require_once INCLUDES_PATH . '/header.php';
             <?php else: ?>
             <div class="table-responsive">
                 <table class="table table-hover mb-0 align-middle">
-                    <thead class="table-light"><tr><th>Driver</th><th class="text-center">Evaluations</th><th class="text-center">Overall</th><th class="text-center">Punct.</th><th class="text-center">Safety</th><th class="text-center">Courtesy</th><th class="text-center">Driving</th><th class="text-center">Vehicle</th></tr></thead>
+                    <thead class="table-light"><tr><th>Driver</th><th class="text-center">Evaluations</th><th class="text-center">Overall</th><th class="text-center">Cleanliness<br><small class="text-muted">Vehicle</small></th><th class="text-center">Behavior<br><small class="text-muted">Driver</small></th><th class="text-center">Appearance<br><small class="text-muted">Hygiene</small></th><th class="text-center">Safety<br><small class="text-muted">Driving</small></th></tr></thead>
                     <tbody>
                     <?php foreach ($perDriver as $row): ?>
                         <tr>
                             <td><strong><?= e($row->driver_name) ?></strong></td>
                             <td class="text-center"><?= (int) $row->eval_count ?></td>
                             <td class="text-center"><span class="badge bg-success"><?= $row->avg_overall !== null ? number_format((float)$row->avg_overall,2) : '—' ?></span></td>
-                            <td class="text-center"><?= $row->avg_punctuality !== null ? number_format((float)$row->avg_punctuality,2) : '—' ?></td>
+                            <td class="text-center"><?= $row->avg_cleanliness !== null ? number_format((float)$row->avg_cleanliness,2) : '—' ?></td>
+                            <td class="text-center"><?= $row->avg_behavior !== null ? number_format((float)$row->avg_behavior,2) : '—' ?></td>
+                            <td class="text-center"><?= $row->avg_appearance !== null ? number_format((float)$row->avg_appearance,2) : '—' ?></td>
                             <td class="text-center"><?= $row->avg_safety !== null ? number_format((float)$row->avg_safety,2) : '—' ?></td>
-                            <td class="text-center"><?= $row->avg_courtesy !== null ? number_format((float)$row->avg_courtesy,2) : '—' ?></td>
-                            <td class="text-center"><?= $row->avg_driving !== null ? number_format((float)$row->avg_driving,2) : '—' ?></td>
-                            <td class="text-center"><?= $row->avg_vehicle !== null ? number_format((float)$row->avg_vehicle,2) : '—' ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

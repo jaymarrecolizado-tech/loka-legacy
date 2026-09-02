@@ -107,8 +107,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $allowedStations = getActiveGasStations();
     // Allow editing a voucher that already has an inactive station
-    if ($isEdit && $d && $d->gas_station && !in_array($d->gas_station, $allowedStations, true)) {
-        $allowedStations[] = $d->gas_station;
+    if ($isEdit && $voucher && $voucher->gas_station && !in_array($voucher->gas_station, $allowedStations, true)) {
+        $allowedStations[] = $voucher->gas_station;
     }
 
     // Validation

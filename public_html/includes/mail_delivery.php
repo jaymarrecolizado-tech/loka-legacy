@@ -27,7 +27,12 @@ function emailDeliveryMode(): string
         return $env;
     }
 
-    // Default: immediate (cron-less VPS / local testing)
+    // Default depends on env: production → queued (cron required, fast pages);
+    // development/localhost → immediate (direct send, no cron needed).
+    $appEnv = strtolower(trim((string) (getenv('APP_ENV') ?: ($_ENV['APP_ENV'] ?? ''))));
+    if ($appEnv === 'production') {
+        return EMAIL_MODE_QUEUED;
+    }
     return EMAIL_MODE_IMMEDIATE;
 }
 

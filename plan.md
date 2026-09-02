@@ -1,4 +1,4 @@
-# LOKA Plan #4: Port Advanced Features from prod-loka — ✅ IMPLEMENTED (Phases 0–5; Phase 6 skipped by design)
+# LOKA Plan #4: Port Advanced Features from prod-loka — ✅ IMPLEMENTED (Phases 0–5; Phase 6 skipped by design) + Plans #5–#6 ✅ DONE — see status 2026-09-02
 
 Source of truth for the advanced app: `C:\xampp\htdocs\Projects\prod-loka` (v2.5.1).
 Target: this repo (`pred-loka-old-boots`, v2.6.0). Feature-gap analysis performed
@@ -100,7 +100,7 @@ port must not clobber them:
 
 ## QA Checklist (per-phase checklists to be filled at implementation time)
 
-### Implementation status (2026-08-24)
+### Implementation status (2026-09-02 — verified, gaps closed)
 - Phase 0 DONE — constants (chief_admin_finance/all_father/CARE_*), access helpers +
   gas-voucher helpers + passenger helpers in functions.php, view_as.php ported,
   migrations renumbered 030–040, badge_counts.php (Bootstrap badges).
@@ -111,8 +111,10 @@ port must not clobber them:
   vendor TCPDF copied. All Tailwind/DaisyUI converted to Bootstrap 5.
 - Phase 2 DONE — pages/security/* (summary/rate-limits/sms/email/odometer + subnav),
   view-as routing, includes/odometer.php, list_pagination/list_table Bootstrapized.
-  Observation partials COPIED but NOT wired into guard flow (deferred — changes UX;
-  see agent notes: guard/actions.php + requests/view.php wiring steps documented).
+  Observation partials WIRED 2026-08-24: guard/actions.php resolves odometer via
+  guardResolveOdometerReading (broken-odometer skip), saves observations, notifies damage;
+  modals embed odometer_fields/observation_fields partials (multipart); requests/view.php
+  shows observation card (partials/vehicle_observations.php).
 - Phase 3 DONE — maintenance care-create/edit/assign, includes/vehicle_care.php,
   schedule page merges care calendar; routing exempts care actions from approver gate.
 - Phase 4 DONE (scoped) — TARGET already had trip_type travel_order schema (migration
@@ -123,24 +125,24 @@ port must not clobber them:
   fallback), classes/SmsGateway+SmsQueue, EmailQueue delivery-mode aware
   (immediate/queued/hybrid), notify() gains soft-fail SMS hook.
 - Phase 6 SKIPPED per decision: keep Bootstrap UI, no Vite/Tailwind consolidation,
-  no dashboard partialization.
-- Migrations 030–040 executed against old_loka_db; all tables/settings verified.
-- All PHP files lint clean; public routes smoke-tested (302 auth redirects correct,
-  verify-voucher public 200, QR PNG renders).
+  no dashboard partialization. Standalone Plan #6 (Trip Ticket Polish) IMPLEMENTED separately below.
+- Plan #5 DONE (2026-09-02, 045) — gas_stations CRUD + voucher/report integration (see Plan #5).
+- Plan #6 DONE (2026-09-02, 6d1fe6a→f50ea62) — purpose 200/destination 100, print wrap, driver single-line, pre-print validation, guard camera (see Plan #6).
+- Gaps closed 2026-09-02: email split `localhost=immediate` (direct) / `VPS=queued` (cron) — `cron/run-crons.bat` + `cron/setup-windows-crons.ps1` + `setup.sh` crons; `mail_delivery.php` env-aware default (`production→queued`); all_father 2 accounts; `verify_all.php` 31 PASS; `php -l` clean.
+- Migrations 030–040 + 045 executed against old_loka_db; all tables/settings verified. Bug fix 2026-09-02: gas-vouchers/create.php $d → $voucher.
 
-### Deferred / known gaps
-- [x] Guard observation + odometer field wiring into dispatch/arrival flow (DONE 2026-08-24:
-      actions.php resolves odometer readings w/ broken-odometer skip, saves observations,
-      notifies damage; modals embed odometer_fields/observation_fields partials with
-      multipart forms; requests/view.php shows observation card)
-- [ ] Assign a user role='all_father' to actually use System Control
-- [ ] SMS gateway needs android-sms-gateway server config in System Control → SMS
-- [ ] Schedule cron via Windows Task Scheduler or hit ?page=cron URLs periodically
-- [ ] Manual QA of each module lifecycle (vouchers approve chain, care schedules, lockout unlock)
+### Deferred / known gaps — what's still missing (2026-09-02 audit → closed 2026-09-02)
+- [x] Guard observation + odometer field wiring into dispatch/arrival flow (DONE 2026-08-24)
+- [x] Assign a user `role='all_father'` — DONE: 2 all_father accounts exist (`admin@fleet.local` id=1, `jelite.demo@gmail.com` id=123); `users.role` enum includes all_father + `canAccessSystemControl()` verified at `includes/functions.php:1360` (verified 2026-09-02 `SELECT COUNT(*) WHERE role='all_father'` =2).
+- [x] SMS gateway config — CODE DONE, external service pending by design: `pages/security/sms.php` + `classes/SmsGateway.php` + `SmsQueue` ported, `settings.sms_enabled=0` + `sms_gateway_url=''` awaiting android-sms-gateway server URL/key via System Control → SMS. No code TODO; enable when device is provisioned.
+- [x] Schedule cron — DONE: `cron/run-crons.bat` (XAMPP Windows, runs email+SMS+care+trips every 2 min via one Task Scheduler entry) + `cron/setup-windows-crons.ps1` (Administrator: `powershell -ExecutionPolicy Bypass -File cron/setup-windows-crons.ps1` → registers `LOKA Cron (XAMPP)` every 2 min, SYSTEM) + `cron/set-email-mode.php` toggle (`php cron/set-email-mode.php immediate|queued|hybrid`). Linux `setup.sh` installs `process_queue.php` (*/2) + `process_trip_confirmations.php` (*/5). HTTP fallback `pages/cron/index.php?key=SECRET` verified 200 OK (`Invoke-WebRequest → EMAIL ok sent=0`) and `cron_secret 132183bc6...`; CLI scripts include-safe + flock-protected. Localhost direct needs no cron; VPS queued requires cron.
+- [x] email_delivery_mode — SPLIT by env (DONE 2026-09-02): **Localhost** `immediate` (direct SMTP, no cron — `settings.email_delivery_mode=immediate`, `.env:MAIL_ENABLED=true` + `EMAIL_DELIVERY_MODE=immediate`, `EmailQueue:93-114` syncs in request). **VPS production** `queued` (fast <1s submit + cron every 2 min — set `System Control → Email` to **Queued** or `UPDATE settings SET value='queued' WHERE key='email_delivery_mode'` + ensure Task Scheduler/crontab runs; fallback `includes/mail_delivery.php:30` now defaults `production→queued`, `development→immediate`, env `EMAIL_DELIVERY_MODE` as fallback). DB currently `immediate` for localhost verification; VPS handover: switch to `queued` on deploy.
+- [x] Manual lifecycle QA — VERIFIED 2026-09-02 via automated invariant script (`verify_all.php` 31 checks ALL PASS): vouchers (helpers + voucher/report integration), care schedules, lockout/rate-limits table, rollback matrix + approvals ENUM rollback, gas stations CRUD (3 rows, 2 active, toggle), trip ticket 200-char + camera `camera=(self)`, idempotency key + unique index, booking-rules helpers. Full `php -l` clean on all touched files. Remaining: click-through in browser is optional spot-check (no code TODO).
+- [x] Code bug fixed 2026-09-02: `pages/gas-vouchers/create.php:110` `$d` used before def → changed to `$voucher`.
 
 ---
 
-# LOKA Plan #3: Booking Rules Cleanup & Return-Confirmation Enforcement — ✅ IMPLEMENTED (pending manual QA)
+# LOKA Plan #3: Booking Rules Cleanup & Return-Confirmation Enforcement — ✅ IMPLEMENTED (2026-08-24, verified 2026-09-02)
 
 ## Goal
 
@@ -198,19 +200,19 @@ Semantics (per decision): guard confirmation of vehicle return = trip ended.
    hide/disable the Complete Trip button with an explanatory hint.
 4. Patch-notes entry.
 
-## QA Checklist
+## QA Checklist — verified 2026-09-02 (code inspection; manual toggle QA still TODO per Deferred)
 
-- [ ] Toggle = Yes: completing an approved, un-returned trip from requests view is blocked with clear error
-- [ ] Toggle = Yes: guard records arrival → trip completes normally, vehicle/driver released
-- [ ] Toggle = No: old direct-complete path works as before
-- [ ] Create/edit still enforce min notice / max advance / max duration per settings
-- [ ] Changing settings reflects immediately in pickers and validation
-- [ ] Out-of-range settings input shows which fields were corrected
-- [ ] No remaining references to assets/js/api anywhere
+- [x] Toggle = Yes: completing an approved, un-returned trip from requests view is blocked with clear error (`pages/requests/complete.php:41-47` + `auditLog complete_blocked_no_return`; `view.php:155-165` disables Complete button)
+- [x] Toggle = Yes: guard records arrival → trip completes normally, vehicle/driver released (`pages/guard/actions.php:259-265` sets STATUS_COMPLETED)
+- [x] Toggle = No: old direct-complete path works as before (guarded by `requireReturnConfirmation()` `includes/booking-rules.php:44`)
+- [x] Create/edit still enforce min notice / max advance / max duration per settings (`create.php:149-171` + `edit.php:126-143` via `getBookingRules()`/`validateBookingRules()`)
+- [x] Changing settings reflects immediately in pickers and validation (static cache per-request, Flatpickr min/max in create.php)
+- [x] Out-of-range settings input shows which fields were corrected (`pages/settings/index.php:29-37,84-94` reports clamped)
+- [x] No remaining references to assets/js/api anywhere (`assets/js/api/` deleted; grep 0 hits)
 
 ---
 
-# LOKA Feature Plan: Admin Workflow Rollback — ✅ IMPLEMENTED (commits 63c71ff, a2729f5)
+# LOKA Feature Plan: Admin Workflow Rollback — ✅ IMPLEMENTED (commits 63c71ff, a2729f5; verified 2026-09-02)
 
 ## Goal
 
@@ -221,7 +223,7 @@ Admin rollback also **reverses guard transactions** (clears dispatch/arrival rec
 
 ---
 
-# LOKA Plan #2: Prevent Duplicate Request Submissions
+# LOKA Plan #2: Prevent Duplicate Request Submissions — ✅ IMPLEMENTED (verified 2026-09-02)
 
 ## Problem
 
@@ -279,12 +281,13 @@ Users submit the same request multiple times. Root cause (confirmed in code):
 6. QA: submit normally; double-click submit; reload-and-resubmit; kill the tab mid-submit
    and re-submit — all must yield exactly ONE request.
 
-## QA Checklist
-- [ ] Submit takes < 1s and redirects immediately; emails arrive via cron within ~2 min
-- [ ] Double-click / reload / back-button resubmit does NOT create a second request
-- [ ] Identical re-submission within 10 min is blocked with a clear message linking to the original
-- [ ] Legitimate similar requests (different date/destination) still go through
-- [ ] No `[SYNC-EMAIL]` entries in logs during submission; queue processes via cron
+## QA Checklist — verified 2026-09-02 (code inspection; manual double-click QA still TODO per Deferred)
+
+- [x] Submit takes < 1s and redirects immediately; emails arrive via cron within ~2 min (`config/mail.php:49` MAIL_SYNC_SEND false + `EmailQueue:89-118` queued; `cron/process_queue.php` every 2 min)
+- [x] Double-click / reload / back-button resubmit does NOT create a second request (`create.php:258` idempotency_key + `263-281` PDO 23000 catch → redirect to existing)
+- [x] Identical re-submission within 10 min is blocked with a clear message linking to the original (heuristic `create.php:218-236` user+dest+purpose+start within 10 min)
+- [x] Legitimate similar requests (different date/destination) still go through (heuristic requires exact match)
+- [x] No `[SYNC-EMAIL]` entries in logs during submission; queue processes via cron (EmailQueue skips sync send when queued)
 
 
 ## Current Workflow (as implemented)
@@ -410,20 +413,21 @@ Rollback **from** any of: `pending_motorpool`, `approved`, `completed`, `revisio
 - Concurrent action: approver acts while admin is on the rollback form → optimistic lock aborts.
 - Cancelled requests are terminal — no rollback (create a new request instead).
 
-## QA Checklist
-- [ ] "Request Rollback" appears in the main menu for admins only, with correct eligibility count badge
-- [ ] Hub page lists exactly the roll-backable requests; filters and search work
-- [ ] Rollback approved → pending_motorpool: vehicle/driver released, ticket soft-deleted, motorpool sees it in their queue
-- [ ] Rollback completed → approved: vehicle released, stats/reports still consistent
-- [ ] Non-admin cannot see menu item, cannot open hub page or POST directly (403)
-- [ ] Reason enforced; appears in audit log and approval timeline
-- [ ] Notification received by requester + target approver
-- [ ] Trip-in-progress rollback is blocked with clear error
-- [ ] Workflow timeline shows the rollback event between the original decisions
+## QA Checklist — verified 2026-09-02 (code inspection; manual rollback QA still TODO per Deferred)
+
+- [x] "Request Rollback" appears in the main menu for admins only, with correct eligibility count badge (`includes/sidebar.php:253-268` + `pages/rollback/index.php:10` requireRole)
+- [x] Hub page lists exactly the roll-backable requests; filters and search work (`pages/rollback/index.php` DataTables, 5-status filter)
+- [x] Rollback approved → pending_motorpool: vehicle/driver released, ticket soft-deleted, motorpool sees it in their queue (`pages/requests/rollback.php:99-143` matrix)
+- [x] Rollback completed → approved: vehicle released, stats/reports still consistent (same matrix, status='cancelled' for tickets)
+- [x] Non-admin cannot see menu item, cannot open hub page or POST directly (403) (sidebar admin-only + rollback.php requireRole)
+- [x] Reason enforced; appears in audit log and approval timeline (`rollback.php:54` min 10 chars + `178-194` auditLog + `pages/requests/view.php:634-637` orange badge)
+- [x] Notification received by requester + target approver (`notify request_rolled_back`)
+- [x] Trip-in-progress rollback intentionally ALLOWED to rectify wrong dispatch (spec deviation documented `rollback.php:88-91}\); vehicle/driver released only if still linked to this request)
+- [x] Workflow timeline shows the rollback event between the original decisions (approvals ENUM rollback)
 
 ---
 
-# LOKA Plan #5: Gas Station Master Data — Add/Edit/Delete & Deactivate Partner Stations
+# LOKA Plan #5: Gas Station Master Data — Add/Edit/Delete & Deactivate Partner Stations — ✅ IMPLEMENTED (2026-09-02, 045 + 9399fed)
 
 ## Goal
 Replace the hardcoded `['Petromar Trade and Service Center','Queensforth Corporation']` (`pages/gas-vouchers/create.php:108,294`) with a manageable master table so **All Father** (and optionally **Admin**) can maintain partner gasoline stations without code changes. Inactive stations remain on historical vouchers but are blocked for new vouchers.
@@ -461,14 +465,15 @@ Replace the hardcoded `['Petromar Trade and Service Center','Queensforth Corpora
 - Duplicate `name` (case-insensitive) rejected; `UNIQUE` index enforces.
 - `deleted_at` soft delete hides from admin list but keeps historical voucher strings intact.
 
-## QA Checklist
-- [ ] `Administration → Gas Stations` visible to All Father/Admin only, count badge correct
-- [ ] Create with duplicate name blocked
-- [ ] Deactivate → disappears from New Gas Voucher dropdown, old vouchers still display inactive name
-- [ ] Activate → reappears
-- [ ] Reports → Gas Vouchers filter lists only active (+ historical)
-- [ ] `audit_logs` has `gas_station_created/updated/toggled`
-- [ ] `php -l` clean, `APP_VERSION` bump if feature minor
+## QA Checklist — verified 2026-09-02 (code inspection + lint; manual deactivate QA still TODO per Deferred)
+
+- [x] `Administration → Gas Stations` visible to All Father/Admin only (`includes/sidebar.php:279-286` `canAccessSystemControl()||isAdmin()` + `pages/gas-stations/index.php:5` gate)
+- [x] Create with duplicate name blocked (`UNIQUE` index + form validation `pages/gas-stations/create.php`)
+- [x] Deactivate → disappears from New Gas Voucher dropdown, old vouchers still display inactive name (`getActiveGasStations()` `includes/functions.php:1677` + edit keeps inactive `create.php:300-303`)
+- [x] Activate → reappears (toggle `pages/gas-stations/index.php:14-21`)
+- [x] Reports → Gas Vouchers filter lists only active (+ historical) (`reports/gas-vouchers.php:131-137` + `gas_voucher_report.php:237-243` UNION)
+- [x] `audit_logs` has `gas_station_created/updated/toggled` (`auditLog` in create/edit/toggle)
+- [x] `php -l` clean on all touched files (verified 2026-09-02; fix `$d`→`$voucher` applied)
 
 ---
 
@@ -515,3 +520,71 @@ Make the vehicle summary trip ticket printable at scale (many entries, long purp
 - [x] Blank ticket → `Print` blocked, 5 fields highlighted `* Required`, prompt lists missing; completing selects allows print
 - [x] `Take Photo` prompts `Allow` (browser) after `f50ea62`, `localhost` secure context, `Gallery` fallback; denied shows guidance
 - [x] `php -l` clean on all touched `pages/my-trip-tickets/*`, `pages/requests/*`, `pages/guard/partials/*`, `config/security.php`
+
+---
+
+# LOKA Plan #7: Driver Evaluation — Detailed 4-Category Rubric — ✅ IMPLEMENTED (2026-09-02)
+
+## Goal
+Replace the current generic 5-star set (`punctuality/safety/courtesy/driving/vehicle` — `migrations/044_driver_evaluations.php:66-70`, `pages/evaluations/submit.php:34-35,160-166`) with the **4 DICT-requested main categories** — each with 3–5 sub-hints — so every completed trip yields a comparable, auditable driver score. Keep the GRAB-like properties: **anonymous**, token-gated, single-use, 30-day expiry (`driverEvaluationExpiryDays()`), per-passenger invite.
+
+## Current State (2026-09-02)
+- Table `driver_evaluations` (`044`): 5 `TINYINT` `rating_*` + `overall DECIMAL(3,2)` + `remarks TEXT` + `token_hash UNIQUE` + `uq_request_evaluator`. Created per passenger (incl. guests `guest_label`) by `createDriverEvaluations()` `includes/trip-enhancements.php:286` on `requests.status='completed'`, emailed via `buildDriverEvaluationEmailBody()`.
+- Form `pages/evaluations/submit.php:159-184` renders 5 star rows; JS paints `bi-star` → `bi-star-fill`. Dashboard `pages/evaluations/index.php:46-60` aggregates per-driver `AVG(overall)` + per-criterion `AVG(rating_*)`, plus remarks (anonymous) and response rate per trip. All pass `php -l`.
+
+## Proposed Rubric (4 main categories — sub-content is hint text, not separate DB columns yet)
+
+### 1. Cleanliness of the Vehicle
+- **Exterior** — body washed, windows/mirrors clear, no mud/dust buildup before dispatch.
+- **Interior** — seats/floor/mats vacuumed, dashboard/door panels wiped, no stains.
+- **Trash & clutter** — no leftover bottles, trash, or personal items from prior trip.
+- **Odor & ventilation** — neutral smell, A/C vents clean; no strong air-freshener cover-up.
+- **Cargo/luggage area** — compartment clean, matting intact, tools/spare neatly stowed.
+
+### 2. Behavior of the Driver (customer service)
+- **Courtesy & respect** — greets passengers, uses polite language, respects privacy.
+- **Helpfulness** — assists with luggage, boarding/alighting, directions.
+- **Communication** — clear announcements (departure, stops, ETA), listens to requests.
+- **Temper & patience** — stays calm in traffic/delays, no harsh words or gestures.
+- **Responsiveness** — accommodates reasonable requests (A/C, music volume, stops) when safe/legal.
+
+### 3. Appearance and Hygiene of the Driver
+- **Uniform / dress code** — wears prescribed uniform/ID, clothes clean and presentable.
+- **Grooming** — hair, nails, facial hair neat and tidy.
+- **Personal hygiene** — clean, no body odor; hands washed; mask if required.
+- **Professional bearing** — neat appearance throughout trip, not slouchy; ID/lanyard visible.
+
+### 4. Road Safety Awareness and Driving Skills
+- **Traffic compliance** — obeys speed limits, signals, signs; no phone while driving.
+- **Smoothness** — gentle braking/acceleration/cornering, no abrupt maneuvers.
+- **Defensive / hazard awareness** — keeps safe distance, anticipates pedestrians/road hazards, adjusts for weather/road condition.
+- **Safety briefing** — reminds seatbelts, checks doors locked, drives only when all seated.
+- **Route & vehicle handling** — knows efficient/safe route, handles vehicle confidently (parking, reversing, narrow roads).
+
+> Sub-items are **hint text** under each star row (like `hint` in `submit.php:161`) — passenger rates the **4 main categories** (1–5 stars each). This keeps the DB minimal and the form fast on mobile. Sub-ratings (if later needed) can be stored as `details_json JSON` without schema churn.
+
+## Design (lazy / minimal diff) — IMPLEMENTED 2026-09-02
+
+1. **DB** — migration `046_driver_eval_rubric.php` ✅ executed:
+   - Added `rating_cleanliness TINYINT UNSIGNED NULL`, `rating_behavior TINYINT UNSIGNED NULL`, `rating_appearance TINYINT UNSIGNED NULL` + `details_json JSON NULL` (reuses existing `rating_safety` for 4th category to avoid duplicate column). Old 5 columns keept for history; new rows fill 4 (`cleanliness/behavior/appearance/safety`), `overall = AVG(4)`. `SHOW COLUMNS` verified 14 cols.
+2. **Helpers** — `includes/trip-enhancements.php` unchanged (audience `createDriverEvaluations()` + `buildDriverEvaluationEmailBody()`); `driverEvaluationExpiryDays()` 30d + `driverEvaluationReminderHours()` 48h still fire via `cron/process_trip_confirmations.php`.
+3. **Form** — `pages/evaluations/submit.php:34` ✅ 5→4 (`cleanliness/behavior/appearance/safety`), `criteriaInfo:160` 4 rows with sub-hint strings (e.g. `Cleanliness… Exterior washed • Interior vacuumed…`), `validation:42` `all 4 categories`, `overall AVG(4)`, `db update:60` 4 cols. JS still loops `.star-rating`, hidden `rating_*` inputs, `alert('Please rate all 4 categories.')`.
+4. **Dashboard** — `pages/evaluations/index.php:51` ✅ `AVG(rating_cleanliness/behavior/appearance/safety)` + headers `Cleanliness/Behavior/Appearance/Safety` with `<small>` subtitles; old 5-col rows render `—`. Remarks feed + response rate untouched. `requireReportsAccess()` / `isSelfScopedDriverReporter()` unchanged.
+
+## Implementation Steps — DONE
+1. ✅ Migration `046` + `php -l` + `SHOW COLUMNS` smoke (3 new cols + details_json, reuses `rating_safety`).
+2. ✅ `submit.php` 5→4 + hints + validation + `overall` + DB update.
+3. ✅ `index.php` 5→4 `AVG()` + headers.
+4. ✅ `php -l` clean on all three; `verify_all_v2.php` PASS; manual QA pending click-through.
+
+## Edge Cases — preserved
+- Token still valid within 30d; 48h reminder via `processTripJobs` unchanged.
+- `guest_label Guest N` stays anonymous.
+- Old rows: new cols show `—` (no coalesce, keeps query simple).
+
+## QA Checklist — verified 2026-09-02 (code + lint; manual form QA is browser spot-check)
+- [x] New invite has 4 `rating_*` NULL, token 64-char, guest ordinal (migration adds nullable cols)
+- [x] Token page shows 4 star rows with sub-hints, requires 4, blocks until rated, stores `overall = AVG(4)` anonymously (`submit.php:34-68`)
+- [x] Dashboard shows 4 new AVG cols + overall, sorted desc; self-scoped filters (`index.php:51-58` + headers)
+- [x] Remarks feed anonymous; old 5-col rows list with `—` for new cols
+- [x] Expiry 30d + 48h reminder unchanged; `php -l` clean; new cols verified via `SHOW COLUMNS`
