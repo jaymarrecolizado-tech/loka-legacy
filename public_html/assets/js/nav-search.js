@@ -40,9 +40,15 @@
     const APP_BASE = (window.LOKA_APP_URL || '').replace(/\/$/, '');
     function normalizeHref(href){
         if(!href) return href;
+        if(href.startsWith('#')) return href;
+        if(href === '/dashboard' || href === '/dashboard/' || href === 'http://localhost/dashboard' || href === 'http://localhost/dashboard/') {
+            return APP_BASE + '/?page=dashboard';
+        }
         if(href.startsWith('http')) return href;
-        if(href.startsWith('/?page=')) return APP_BASE + href;
-        return href;
+        // Fix any relative path (/?page=..., /dashboard/, etc.) by prepending APP_BASE
+        if(href.startsWith('/')) return APP_BASE + href;
+        if(href.startsWith('?')) return APP_BASE + '/' + href;
+        return APP_BASE + '/' + href;
     }
     function getFrequentItems(all){
         const m = loadFrequent();
@@ -70,14 +76,16 @@
         const q=query.toLowerCase().trim(), toks=q.split(/\s+/);
         const label=item.label.toLowerCase(), kw=(item.keywords||'').toLowerCase(), sec=item.section.toLowerCase();
         let s=0;
+        if(label === q) s += 50;
+        if(label.startsWith(q)) s += 25;
         toks.forEach(tok=>{
+            if(label === tok) s+=20;
             if(label.includes(tok)) s+=10;
             if(kw.includes(tok)) s+=6;
             if(sec.includes(tok)) s+=2;
             if(label.startsWith(tok)) s+=5;
             if(tok.length>=2 && label.split(/\s+/).some(w=>w.startsWith(tok))) s+=3;
         });
-        if(label.startsWith(q)) s+=8;
         if(isPinned(item.href)) s+=3;
         return s;
     }
@@ -94,7 +102,8 @@
             const id=mNum[1];
             out.push({ label:`Go to Request #${id}`, href:APP_BASE + `/?page=requests&action=view&id=${id}`, icon:'bi-hash', section:'Quick Jump', keywords:`request ${id}`, quick:true });
         }
-        if(/^[A-Z0-9\- ]{3,10}$/i.test(q) && !/^\d+$/.test(q) && q.length>=3){
+        // Only trigger vehicle plate search if query has BOTH letters and digits (e.g. ABC 1234, ABC-123, 1234AB)
+        if(/^(?=[A-Z0-9\- ]{3,10}$)(?=.*[A-Z])(?=.*\d).*$/i.test(q)){
             const plate=q.toUpperCase().replace(/\s+/g,' ').trim();
             out.push({ label:`Search Vehicle: ${plate}`, href:APP_BASE + `/?page=vehicles&search=${encodeURIComponent(plate)}`, icon:'bi-car-front', section:'Quick Jump', keywords:`vehicle plate ${plate}`, quick:true });
         }
@@ -117,7 +126,7 @@
         if(liveAbort) liveAbort.abort();
         liveAbort = new AbortController();
         try {
-            const url = window.location.pathname + '?page=api&action=global_search&q=' + encodeURIComponent(q);
+            const url = APP_BASE + '/?page=api&action=global_search&q=' + encodeURIComponent(q);
             const res = await fetch(url, { signal: liveAbort.signal, headers: { 'X-Requested-With':'XMLHttpRequest' } });
             const data = await res.json();
             if(seq !== liveSeq) return [];
@@ -134,8 +143,8 @@
         const hlSection=highlight(item.section, query);
         const badge=item.badge && item.badge>0 ? `<span class="badge bg-warning text-dark ms-1">${item.badge}</span>` : '';
         const quickBadge=item.quick ? `<span class="badge bg-info ms-1">Jump</span>` : '';
-        const liveBadge=item.section && ['Request','Vehicle','Driver','User'].includes(item.section) && !item.quick ? `<span class="badge bg-success bg-opacity-10 text-success border ms-1">Actual</span>` : '';
-        const pinBtn=showPinBtn && !item.quick && item.section!=='Request' && item.section!=='Vehicle' && item.section!=='Driver' && item.section!=='User' ? `<button type="button" class="btn btn-sm btn-link p-0 ms-1 pin-btn ${pinned?'text-warning':'text-muted'}" title="${pinned?'Unpin':'Pin to top'}" data-href="${escapeHtml(item.href)}"><i class="bi ${pinned?'bi-star-fill':'bi-star'}"></i></button>` : (showPinBtn && isPinned(item.href) ? `<button type="button" class="btn btn-sm btn-link p-0 ms-1 pin-btn text-warning" title="Unpin" data-href="${escapeHtml(item.href)}"><i class="bi bi-star-fill"></i></button>` : '');
+        const liveBadge=item.section && ['Request','Vehicle','Driver','User','Gas Station'].includes(item.section) && !item.quick ? `<span class="badge bg-success bg-opacity-10 text-success border ms-1">Actual</span>` : '';
+        const pinBtn=showPinBtn && !item.quick && !['Request','Vehicle','Driver','User','Gas Station'].includes(item.section) ? `<button type="button" class="btn btn-sm btn-link p-0 ms-1 pin-btn ${pinned?'text-warning':'text-muted'}" title="${pinned?'Unpin':'Pin to top'}" data-href="${escapeHtml(item.href)}"><i class="bi ${pinned?'bi-star-fill':'bi-star'}"></i></button>` : (showPinBtn && isPinned(item.href) ? `<button type="button" class="btn btn-sm btn-link p-0 ms-1 pin-btn text-warning" title="Unpin" data-href="${escapeHtml(item.href)}"><i class="bi bi-star-fill"></i></button>` : '');
         a.className='nav-search-item d-flex align-items-center gap-2 px-3 py-2 text-decoration-none';
         a.href=item.href;
         a.innerHTML=`<i class="bi ${item.icon} ${item.quick?'text-info':'text-primary'}"></i>

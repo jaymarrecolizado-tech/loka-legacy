@@ -102,9 +102,12 @@ function getNavSearchItems(): array
     }
 
     // Administration
-    if (isMotorpool()) {
+    if (isMotorpool() || isAdmin()) {
         $add('Users', '/?page=users', 'bi-people', 'Administration', 'users accounts employees');
         $add('Departments', '/?page=departments', 'bi-building', 'Administration', 'departments organization');
+    }
+    if (isAdmin() || canAccessSystemControl()) {
+        $add('Gas Stations', '/?page=gas-stations', 'bi-fuel-pump-fill', 'Administration', 'gas stations fuel pump stations partners vendors');
     }
     if (isAdmin()) {
         $add('Audit Logs', '/?page=audit', 'bi-journal-text', 'Administration', 'audit logs history');

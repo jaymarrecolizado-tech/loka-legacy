@@ -691,4 +691,12 @@ require_once INCLUDES_PATH . '/header.php';
 }
 </style>
 
+<?php if (get('auto_print') === '1'): ?>
+<script>
+window.addEventListener('load', function() {
+    setTimeout(function() { window.print(); }, 600);
+});
+</script>
+<?php endif; ?>
+
 <?php require_once INCLUDES_PATH . '/footer.php'; ?>

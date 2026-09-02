@@ -89,8 +89,8 @@ if (isApprover()) {
     }
 }
 
-// 4. Users (motorpool+)
-if (isMotorpool()) {
+// 4. Users (motorpool+ / admin)
+if (isMotorpool() || isAdmin()) {
     $rows = db()->fetchAll("SELECT id, name, email FROM users WHERE deleted_at IS NULL AND (name LIKE ? OR email LIKE ?) ORDER BY name LIMIT {$limitPerType}", [$like,$like]);
     foreach ($rows as $u) {
         $items[] = [
@@ -99,6 +99,20 @@ if (isMotorpool()) {
             'icon' => 'bi-people',
             'section' => 'User',
             'keywords' => 'user ' . $u->name,
+        ];
+    }
+}
+
+// 5. Gas Stations (admin / system control)
+if (canAccessSystemControl() || isAdmin()) {
+    $rows = db()->fetchAll("SELECT id, name, location FROM gas_stations WHERE deleted_at IS NULL AND (name LIKE ? OR location LIKE ?) ORDER BY name LIMIT {$limitPerType}", [$like,$like]);
+    foreach ($rows as $gs) {
+        $items[] = [
+            'label' => $gs->name . ($gs->location ? " — {$gs->location}" : ''),
+            'href' => APP_URL . '/?page=gas-stations&action=edit&id=' . $gs->id,
+            'icon' => 'bi-fuel-pump-fill',
+            'section' => 'Gas Station',
+            'keywords' => 'gas station ' . $gs->name,
         ];
     }
 }

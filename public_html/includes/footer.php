@@ -45,11 +45,14 @@
         const uid=window.LOKA_USER_ID||'0';
         ['loka_nav_recent_','loka_nav_frequent_','loka_nav_pinned_'].forEach(p=>{
             const k=p+uid; const raw=localStorage.getItem(k); if(!raw) return;
-            if(raw.includes('"href":"/?page=')){ // has old relative entries
+            // Remove any entry that has a bare relative href (/?page= or /dashboard/ style) without a host
+            if(raw.includes('"href":"/?page=') || raw.includes('"href":"/dashboard') || (raw.includes('"href":"/')&&!raw.includes('"href":"http'))){
                 localStorage.removeItem(k);
             }
         });
-        if(localStorage.getItem('loka_nav_queries_'+uid)?.includes('/dashboard/')) localStorage.removeItem('loka_nav_queries_'+uid);
+        const qk='loka_nav_queries_'+uid;
+        const qraw=localStorage.getItem(qk);
+        if(qraw?.includes('/dashboard/') || qraw?.includes('/?page=')) localStorage.removeItem(qk);
     }catch(e){}</script>
     
     <?php if (isset($pageScripts)): ?>

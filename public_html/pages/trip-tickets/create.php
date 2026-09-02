@@ -116,6 +116,31 @@ $passengers = db()->fetchColumn(
     [$requestId]
 );
 
+// Fetch drivers list for assignment
+$driversList = db()->fetchAll(
+    "SELECT d.id, u.name, d.license_number
+     FROM drivers d
+     JOIN users u ON d.user_id = u.id
+     WHERE d.deleted_at IS NULL AND u.deleted_at IS NULL AND u.status = 'active'
+     ORDER BY u.name ASC"
+);
+
+// Fetch Motorpool Heads (signatory #1)
+$motorpoolHeads = db()->fetchAll(
+    "SELECT id, name FROM users
+     WHERE role = ? AND deleted_at IS NULL AND status = 'active'
+     ORDER BY name",
+    [ROLE_MOTORPOOL]
+);
+
+// Fetch Chief Admin & Finance (signatory #2)
+$chiefFinanceUsers = db()->fetchAll(
+    "SELECT id, name FROM users
+     WHERE role IN (?, ?) AND deleted_at IS NULL AND status = 'active'
+     ORDER BY name",
+    [ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE]
+);
+
 // Pre-select vehicle plate if available
 $plateNumber = '';
 if ($request->plate_number) {
@@ -147,6 +172,9 @@ $resolvedValue = false;
 $resolutionNotesValue = '';
 $guardNotesValue = '';
 $tripTypeOtherValue = '';
+$assignedDriverId = $request->driver_id ? (int)$request->driver_id : 0;
+$signatoryMotorpoolId = 0;
+$signatoryChiefFinanceId = 0;
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -232,7 +260,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $resolutionNotes = $resolutionNotesValue;
     $guardNotesValue = postSafe('guard_notes', '', 1000);
     $guardNotes = $guardNotesValue;
-    
+
+    // Driver assignment & signatories
+    $assignedDriverId = (int) post('assigned_driver_id', 0);
+    $signatoryMotorpoolId = (int) post('signatory_motorpool_id', 0);
+    $signatoryChiefFinanceId = (int) post('signatory_chief_finance_id', 0);
+
     // Validation
     if (!$newStartDate) {
         $errors[] = 'Start date is required';
@@ -249,6 +282,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($tripType === 'other' && empty($tripTypeOther)) {
         $errors[] = 'Please specify the trip type when "Other" is selected.';
     }
+    if (!$assignedDriverId) {
+        $errors[] = 'Please select a driver for this trip ticket.';
+    } else {
+        $driverValid = db()->fetchColumn(
+            "SELECT d.id FROM drivers d JOIN users u ON d.user_id = u.id
+             WHERE d.id = ? AND d.deleted_at IS NULL AND u.deleted_at IS NULL AND u.status = 'active'",
+            [$assignedDriverId]
+        );
+        if (!$driverValid) {
+            $errors[] = 'The selected driver is invalid or inactive.';
+        }
+    }
+    if (!$signatoryMotorpoolId) {
+        $errors[] = 'Please select a Motorpool Head signatory.';
+    } else {
+        $mpValid = db()->fetchColumn(
+            "SELECT id FROM users WHERE id = ? AND role = ? AND deleted_at IS NULL AND status = 'active'",
+            [$signatoryMotorpoolId, ROLE_MOTORPOOL]
+        );
+        if (!$mpValid) {
+            $errors[] = 'The selected Motorpool Head signatory is invalid.';
+        }
+    }
+    if (!$signatoryChiefFinanceId) {
+        $errors[] = 'Please select a Chief Admin & Finance signatory.';
+    } else {
+        $cfValid = db()->fetchColumn(
+            "SELECT id FROM users WHERE id = ? AND role IN (?, ?) AND deleted_at IS NULL AND status = 'active'",
+            [$signatoryChiefFinanceId, ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE]
+        );
+        if (!$cfValid) {
+            $errors[] = 'The selected Chief Admin & Finance signatory is invalid.';
+        }
+    }
 
     if (empty($errors)) {
         try {
@@ -257,7 +324,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Insert trip ticket
             $ticketId = db()->insert('trip_tickets', [
                 'request_id' => $requestId,
-                'driver_id' => $request->driver_id,
+                'driver_id' => $assignedDriverId,
+                'signatory_motorpool_id' => $signatoryMotorpoolId,
+                'signatory_chief_finance_id' => $signatoryChiefFinanceId,
                 'trip_type' => $tripType,
                 'trip_type_other' => $tripType === 'other' ? $tripTypeOther : null,
                 'start_date' => date('Y-m-d H:i:s', strtotime($newStartDate)),
@@ -304,14 +373,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]
             );
             
-            db()->commit();
-
             $redirectPage = isDriver() ? 'my-trip-tickets' : 'trip-tickets';
-            redirectWith(
-                '/?page=' . $redirectPage,
-                'success',
-                'Trip ticket created successfully! You can now review and submit it.'
-            );
+            $formAction   = post('form_action', 'save');
+            if ($formAction === 'save_print') {
+                redirectWith(
+                    '/?page=trip-tickets&action=view&id=' . $ticketId . '&auto_print=1',
+                    'success',
+                    'Trip ticket created. Opening print view...'
+                );
+            } else {
+                redirectWith(
+                    '/?page=' . $redirectPage,
+                    'success',
+                    'Trip ticket created successfully! You can now review and submit it.'
+                );
+            }
             
         } catch (Exception $e) {
             db()->rollback();
@@ -458,9 +534,70 @@ require_once INCLUDES_PATH . '/header.php';
                 </div>
             <?php endif; ?>
 
-            <form method="POST" enctype="multipart/form-data" class="needs-validation">
+            <form method="POST" enctype="multipart/form-data" class="needs-validation" id="ticketForm">
                 <?= csrfField() ?>
-                
+
+                <!-- Driver Assignment & Signatories (Required before Save / Print) -->
+                <div class="card border-primary mb-3" id="signatoryCard">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0">
+                            <i class="bi bi-person-check me-2"></i>
+                            Driver Assignment &amp; Signatories
+                            <span class="text-warning ms-2">* Required</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info py-2 small mb-3">
+                            <i class="bi bi-info-circle me-1"></i>
+                            All fields below are required. The selected driver will be recorded as the assigned driver, and the chosen signatories will appear on the printed trip ticket.
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-4 gv-field">
+                                <label for="assigned_driver_id" class="req">
+                                    <i class="bi bi-person-badge me-1"></i>Driver Assigned <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select" name="assigned_driver_id" id="assigned_driver_id" required>
+                                    <option value="">-- Select Driver --</option>
+                                    <?php foreach ($driversList as $drv): ?>
+                                    <option value="<?= (int)$drv->id ?>" <?= $assignedDriverId === (int)$drv->id ? 'selected' : '' ?>>
+                                        <?= e($drv->name) ?><?= $drv->license_number ? ' (' . e($drv->license_number) . ')' : '' ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="gv-hint" data-for="assigned_driver_id">Select the driver for this trip ticket.</div>
+                            </div>
+                            <div class="col-md-4 gv-field">
+                                <label for="signatory_motorpool_id" class="req">
+                                    <i class="bi bi-person-gear me-1"></i>Motorpool Head <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select" name="signatory_motorpool_id" id="signatory_motorpool_id" required>
+                                    <option value="">-- Select Signatory --</option>
+                                    <?php foreach ($motorpoolHeads as $mp): ?>
+                                    <option value="<?= (int)$mp->id ?>" <?= $signatoryMotorpoolId === (int)$mp->id ? 'selected' : '' ?>>
+                                        <?= e($mp->name) ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="gv-hint" data-for="signatory_motorpool_id">Verification &amp; approval signatory.</div>
+                            </div>
+                            <div class="col-md-4 gv-field">
+                                <label for="signatory_chief_finance_id" class="req">
+                                    <i class="bi bi-cash-coin me-1"></i>Chief Admin &amp; Finance <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select" name="signatory_chief_finance_id" id="signatory_chief_finance_id" required>
+                                    <option value="">-- Select Signatory --</option>
+                                    <?php foreach ($chiefFinanceUsers as $cf): ?>
+                                    <option value="<?= (int)$cf->id ?>" <?= $signatoryChiefFinanceId === (int)$cf->id ? 'selected' : '' ?>>
+                                        <?= e($cf->name) ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="gv-hint" data-for="signatory_chief_finance_id">Final approval signatory.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Trip Type & Purpose -->
                 <div class="row mb-3">
                     <div class="col-md-6">
@@ -633,15 +770,21 @@ require_once INCLUDES_PATH . '/header.php';
                 </div>
 
                 <!-- Action Buttons -->
-                <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <a href="?page=<?= isDriver() ? 'my-trips' : 'guard' ?>" class="btn btn-outline-secondary">
                         <i class="bi bi-x-circle me-1"></i>
                         Cancel
                     </a>
-                    <button type="submit" class="btn btn-success">
-                        <i class="bi bi-check-circle me-1"></i>
-                        Create Trip Ticket
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="submit" name="form_action" value="save" class="btn btn-success" id="btnSave">
+                            <i class="bi bi-check-circle me-1"></i>
+                            Save Trip Ticket
+                        </button>
+                        <button type="submit" name="form_action" value="save_print" class="btn btn-primary" id="btnSavePrint">
+                            <i class="bi bi-printer me-1"></i>
+                            Save &amp; Print
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Info Box -->
@@ -680,20 +823,118 @@ function toggleTripTypeOther() {
     }
 }
 
-// Initialize on page load
+const SIGNATORY_FIELDS = [
+    { id: 'assigned_driver_id',           label: 'Driver Assigned' },
+    { id: 'signatory_motorpool_id',       label: 'Motorpool Head Signatory' },
+    { id: 'signatory_chief_finance_id',   label: 'Chief Admin & Finance Signatory' }
+];
+
+function clearSignatoryErrors() {
+    SIGNATORY_FIELDS.forEach(f => {
+        const el = document.getElementById(f.id);
+        if (el) el.classList.remove('is-invalid');
+        const hint = document.querySelector('.gv-hint[data-for="' + f.id + '"]');
+        if (hint) {
+            hint.classList.remove('text-danger', 'fw-semibold');
+            hint.textContent = hint.getAttribute('data-original') || hint.textContent;
+        }
+    });
+}
+
+function validateSignatories() {
+    const missing = [];
+    SIGNATORY_FIELDS.forEach(f => {
+        const el = document.getElementById(f.id);
+        const hint = document.querySelector('.gv-hint[data-for="' + f.id + '"]');
+        if (hint && !hint.getAttribute('data-original')) {
+            hint.setAttribute('data-original', hint.textContent);
+        }
+        if (!el || !el.value) {
+            if (el) el.classList.add('is-invalid');
+            if (hint) {
+                hint.classList.add('text-danger', 'fw-semibold');
+                hint.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i>Required — please select a value.';
+            }
+            missing.push(f.label);
+        }
+    });
+    return missing;
+}
+
+function promptMissing(missing, clickedBtn) {
+    const list = missing.map(m => '• ' + m).join('\n');
+    const msg = 'Please complete the following required field(s) before ' +
+                (clickedBtn === 'btnSavePrint' ? 'printing' : 'saving') + ':\n\n' + list;
+    alert(msg);
+    const card = document.getElementById('signatoryCard');
+    if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.classList.add('border-danger');
+        setTimeout(() => card.classList.remove('border-danger'), 2500);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     toggleIssuesFields();
     toggleTripTypeOther();
+
+    const form     = document.getElementById('ticketForm');
+    const btnSave  = document.getElementById('btnSave');
+    const btnPrint = document.getElementById('btnSavePrint');
+
+    if (!form) return;
+
+    SIGNATORY_FIELDS.forEach(f => {
+        const el = document.getElementById(f.id);
+        if (el) {
+            el.addEventListener('change', function() {
+                if (el.value) {
+                    el.classList.remove('is-invalid');
+                    const hint = document.querySelector('.gv-hint[data-for="' + f.id + '"]');
+                    if (hint) {
+                        hint.classList.remove('text-danger', 'fw-semibold');
+                        hint.textContent = hint.getAttribute('data-original') || hint.textContent;
+                    }
+                }
+            });
+        }
+    });
+
+    form.addEventListener('submit', function(e) {
+        const submitter = e.submitter || document.activeElement;
+        const clickedBtn = submitter && submitter.id === 'btnSavePrint' ? 'btnSavePrint' : 'btnSave';
+        const missing = validateSignatories();
+        if (missing.length > 0) {
+            e.preventDefault();
+            promptMissing(missing, clickedBtn);
+            return false;
+        }
+        clearSignatoryErrors();
+    });
 });
 </script>
 
 <style>
-.needs-validation input:invalid {
+.gv-field { margin-bottom: .25rem; }
+.gv-field label.req { font-weight: 600; }
+.gv-hint { font-size: .8rem; color: #6c757d; margin-top: .25rem; }
+.form-select.is-invalid,
+.form-control.is-invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 .2rem rgba(220,53,69,.15);
+}
+.needs-validation input:invalid,
+.needs-validation select:invalid {
     border-color: #dc3545;
 }
-
 .card-header.bg-primary {
     background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+}
+#signatoryCard {
+    transition: box-shadow .3s ease, border-color .3s ease;
+}
+#signatoryCard.border-danger {
+    box-shadow: 0 0 0 .25rem rgba(220,53,69,.25);
 }
 </style>
 
