@@ -13,7 +13,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     if(empty($errors)){
         try{
             db()->update('gas_stations',['name'=>$name,'address'=>$address?:null,'contact'=>$contact?:null,'status'=>$status,'updated_at'=>date(DATETIME_FORMAT)],'id=?',[$id]);
-            auditLog('gas_station_updated','gas_station',$id,$row->name,$name);
+            auditLog('gas_station_updated','gas_station',$id,['name'=>$row->name,'status'=>$row->status],['name'=>$name,'status'=>$status]);
             redirectWith('/?page=gas-stations','success','Station updated.');
         }catch(Exception $e){
             if(strpos($e->getMessage(),'Duplicate')!==false) $errors[]='Duplicate name.';
