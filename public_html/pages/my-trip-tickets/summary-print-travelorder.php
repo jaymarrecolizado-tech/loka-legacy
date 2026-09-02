@@ -572,6 +572,13 @@ if ($__verifyUrl) {
             border: 1px solid var(--border);
         }
 
+        .is-invalid {
+            border-color: #dc3545 !important;
+            box-shadow: 0 0 0 2px rgba(220,53,69,.2) !important;
+            background: #fff5f5 !important;
+        }
+        .field-error { color: #dc3545; font-size: 8px; font-weight: 700; margin-top: 2px; text-align: center; }
+
         /* Vehicle/Destination Info Box */
         .info-box {
             background: var(--stripe);
@@ -616,7 +623,7 @@ if ($__verifyUrl) {
         <a href="<?= APP_URL ?>/" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><span>🏠</span> Home</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">← Back to My Trip Tickets</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets&action=generate-summary" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">↩ Generate</a>
-        <button class="btn btn-print" onclick="window.print()">🖨 Print / Save PDF</button>
+        <button class="btn btn-print" onclick="if(validateTicket()) window.print()">🖨 Print / Save PDF</button>
         <button class="btn btn-reset" onclick="resetForm()">↺ Reset Form</button>
     </div>
     <?php if ($__verifyUrl): ?>
@@ -856,14 +863,14 @@ if ($__verifyUrl) {
         <!-- Signature Blocks -->
         <div class="sigs">
             <div class="sig">
-                <div class="sig-role">Prepared & Certified by</div>
+                <div class="sig-role">Prepared & Certified by <span style="color:#dc3545;">*</span></div>
                 <div style="height: 22px;"></div>
                 <div class="sig-line"></div>
                 <input type="text" class="sig-input" id="sigDriver" value="<?= e($generatorName) ?>" placeholder="Driver/Officer Name">
                 <div class="sig-title">Driver / Field Officer</div>
             </div>
             <div class="sig">
-                <div class="sig-role">Verified by</div>
+                <div class="sig-role">Verified by <span style="color:#dc3545;">*</span></div>
                 <div style="height: 22px;"></div>
                 <div class="sig-line"></div>
                 <select class="sig-input" id="sigReviewer2" style="background: transparent; text-transform: uppercase;">
@@ -879,7 +886,7 @@ if ($__verifyUrl) {
                 <div class="sig-title">Motorpool Unit Representative</div>
             </div>
             <div class="sig">
-                <div class="sig-role">Approved by</div>
+                <div class="sig-role">Approved by <span style="color:#dc3545;">*</span></div>
                 <div style="height: 22px;"></div>
                 <div class="sig-line"></div>
                 <select class="sig-input" id="sigApprover2" style="background: transparent; text-transform: uppercase;" onchange="updateApproverTitle2()">
@@ -925,6 +932,16 @@ if ($__verifyUrl) {
             const role=opt?opt.dataset.role:''; el.textContent=(role==='chief_admin_finance')?'Admin and Finance Division Chief':'OIC, Admin and Finance Division Chief';
         }
         window.addEventListener('load',updateApproverTitle2);
+        function validateTicket(){
+            const req=[document.getElementById('sigDriver'), document.getElementById('sigReviewer2'), document.getElementById('sigApprover2')].filter(Boolean);
+            let first=null, cnt=0;
+            req.forEach(el=>{el.classList.remove('is-invalid'); el.style.borderColor=''; const e=el.parentElement.querySelector('.field-error'); if(e) e.remove();});
+            req.forEach(el=>{
+                if(!el.value.trim()){ cnt++; el.classList.add('is-invalid'); el.style.borderColor='#dc3545'; const m=document.createElement('div'); m.className='field-error'; m.textContent='* Required'; el.parentElement.appendChild(m); if(!first) first=el; }
+            });
+            if(cnt>0){ alert('Please complete all required fields marked with * before printing.\nMissing: '+cnt+'\n• Prepared By\n• Verified By (Motorpool)\n• Approved (Admin & Finance)'); if(first){first.scrollIntoView({behavior:'smooth',block:'center'}); first.focus();} return false; }
+            return true;
+        }
         function resetForm() {
             if (!confirm('Reset all form entries?')) return;
             const keepIds = ['driverName', 'plateDisplay', 'odoStart', 'odoEnd', 'distTraveled', 'fuelConsumed', 'fuelCost', 'sigDriver'];
@@ -949,8 +966,12 @@ if ($__verifyUrl) {
                 }
             }
 
-            odoStart.addEventListener('input', calcDistance);
-            odoEnd.addEventListener('input', calcDistance);
+            if(odoStart) odoStart.addEventListener('input', calcDistance);
+            if(odoEnd) odoEnd.addEventListener('input', calcDistance);
+            document.querySelectorAll('#sigDriver, #sigReviewer2, #sigApprover2').forEach(el=>{
+                el.addEventListener('change', function(){ this.classList.remove('is-invalid'); this.style.borderColor=''; const e=this.parentElement.querySelector('.field-error'); if(e) e.remove(); });
+                el.addEventListener('input', function(){ this.classList.remove('is-invalid'); this.style.borderColor=''; const e=this.parentElement.querySelector('.field-error'); if(e) e.remove(); });
+            });
         });
     </script>
 </body>

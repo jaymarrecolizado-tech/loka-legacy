@@ -766,6 +766,15 @@ if ($__verifyUrl) {
             text-transform: uppercase;
         }
 
+        .is-invalid {
+            border-color: #dc3545 !important;
+            box-shadow: 0 0 0 2px rgba(220,53,69,.2) !important;
+            background: #fff5f5 !important;
+        }
+
+        .req-star { color: #dc3545; font-weight: 700; }
+        .field-error { color: #dc3545; font-size: 8px; font-weight: 700; margin-top: 2px; text-align: center; }
+
         /* FOOTER */
         .ftr {
             display: flex;
@@ -808,7 +817,7 @@ if ($__verifyUrl) {
         <a href="<?= APP_URL ?>/" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><span>🏠</span> Home</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">← Back to My Trip Tickets</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets&action=generate-summary" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">↩ Generate</a>
-        <button class="btn btn-print" onclick="window.print()">🖨 Print / Save PDF</button>
+        <button class="btn btn-print" onclick="if(validateTicket()) window.print()">🖨 Print / Save PDF</button>
         <button class="btn btn-reset" onclick="resetForm()">↺ Clear Form</button>
     </div>
     <?php if ($__verifyUrl): ?>
@@ -872,7 +881,7 @@ if ($__verifyUrl) {
         </div>
         <div class="irow">
             <div class="if f2">
-                <span class="lbl">Driver Assigned</span>
+                <span class="lbl">Driver Assigned <span style="color:#dc3545;">*</span></span>
                 <select id="driver">
                     <option value="">Select Driver...</option>
                     <?php foreach ($drivers as $drv): ?>
@@ -1066,10 +1075,10 @@ if ($__verifyUrl) {
         <div class="sec">Signatories</div>
         <div class="sigs">
             <div class="sig">
-                <div class="sig-role">Attested By</div>
+                <div class="sig-role">Attested By <span style="color:#dc3545;">*</span></div>
                 <div style="height:20px;"></div>
                 <div class="sig-line"></div>
-                <select class="sig-select">
+                <select class="sig-select" id="sigAttestor">
                     <option value="">Select Attestor...</option>
                     <?php foreach ($guards as $guard): ?>
                         <option value="<?= e($guard->name) ?>"><?= strtoupper(e($guard->name)) ?></option>
@@ -1078,10 +1087,10 @@ if ($__verifyUrl) {
                 <div class="sig-title">Guard on Duty</div>
             </div>
             <div class="sig">
-                <div class="sig-role">Prepared by</div>
+                <div class="sig-role">Prepared by <span style="color:#dc3545;">*</span></div>
                 <div style="height:20px;"></div>
                 <div class="sig-line"></div>
-                <select class="sig-select">
+                <select class="sig-select" id="sigPrepared">
                     <option value="">Select Driver...</option>
                     <?php foreach ($drivers as $driver): ?>
                         <option value="<?= e($driver->name) ?>" <?= $driver->name === $generatorName ? 'selected' : '' ?>><?= strtoupper(e($driver->name)) ?></option>
@@ -1090,7 +1099,7 @@ if ($__verifyUrl) {
                 <div class="sig-title">User / Driver Assign</div>
             </div>
             <div class="sig">
-                <div class="sig-role">Reviewed by</div>
+                <div class="sig-role">Reviewed by <span style="color:#dc3545;">*</span></div>
                 <div style="height:20px;"></div>
                 <div class="sig-line"></div>
                 <select class="sig-select" id="sigReviewer">
@@ -1108,7 +1117,7 @@ if ($__verifyUrl) {
                 <div class="sig-title">Motorpool Unit</div>
             </div>
             <div class="sig">
-                <div class="sig-role">Approved</div>
+                <div class="sig-role">Approved <span style="color:#dc3545;">*</span></div>
                 <div style="height:20px;"></div>
                 <div class="sig-line"></div>
                 <select class="sig-select" id="sigApprover" onchange="updateApproverTitle()">
@@ -1179,12 +1188,45 @@ if ($__verifyUrl) {
         }
         window.addEventListener('load', updateApproverTitle);
 
+        function validateTicket(){
+            const required = [
+                document.getElementById('driver'),
+                document.getElementById('sigAttestor'),
+                document.getElementById('sigPrepared'),
+                document.getElementById('sigReviewer'),
+                document.getElementById('sigApprover')
+            ].filter(Boolean);
+            let firstInvalid=null, count=0;
+            // clear prior
+            required.forEach(el=>{el.classList.remove('is-invalid'); el.style.borderColor=''; const err=el.parentElement.querySelector('.field-error'); if(err) err.remove();});
+            required.forEach(el=>{
+                if(!el.value){
+                    count++;
+                    el.classList.add('is-invalid');
+                    el.style.borderColor='#dc3545';
+                    const msg=document.createElement('div');
+                    msg.className='field-error';
+                    msg.textContent='* Required';
+                    el.parentElement.appendChild(msg);
+                    if(!firstInvalid) firstInvalid=el;
+                }
+            });
+            if(count>0){
+                alert('Please complete all required fields marked with * before printing.\nMissing: '+count+' field(s).\n• Driver Assigned\n• Attested By (Guard)\n• Prepared By (Driver)\n• Reviewed By (Motorpool)\n• Approved (Admin & Finance)');
+                if(firstInvalid){firstInvalid.scrollIntoView({behavior:'smooth',block:'center'}); firstInvalid.focus();}
+                return false;
+            }
+            return true;
+        }
+
         function resetForm() {
             if (!confirm('Clear all entered data?')) return;
             const keep = ['plate', 'model', 'fuel', 'location', 'tripno', 'dateFrom', 'dateTo', 'datePrepared'];
             document.querySelectorAll('input, textarea').forEach(el => {
                 if (!keep.includes(el.id)) el.value = '';
             });
+            document.querySelectorAll('.is-invalid').forEach(el=>{el.classList.remove('is-invalid'); el.style.borderColor='';});
+            document.querySelectorAll('.field-error').forEach(el=>el.remove());
             calcTotals();
         }
 
@@ -1208,6 +1250,17 @@ if ($__verifyUrl) {
         window.addEventListener('beforeprint', function() {
             // CSS @bottom-right will handle page numbering automatically
             // The .page-number span in footer is hidden during print
+        });
+
+        window.addEventListener('load', function(){
+            document.querySelectorAll('#driver, .sig-select').forEach(el=>{
+                el.addEventListener('change', function(){
+                    this.classList.remove('is-invalid');
+                    this.style.borderColor='';
+                    const err=this.parentElement.querySelector('.field-error');
+                    if(err) err.remove();
+                });
+            });
         });
     </script>
 </body>
