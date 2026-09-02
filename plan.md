@@ -582,9 +582,9 @@ Replace the current generic 5-star set (`punctuality/safety/courtesy/driving/veh
 - `guest_label Guest N` stays anonymous.
 - Old rows: new cols show `—` (no coalesce, keeps query simple).
 
-## QA Checklist — verified 2026-09-02 (code + lint; manual form QA is browser spot-check)
-- [x] New invite has 4 `rating_*` NULL, token 64-char, guest ordinal (migration adds nullable cols)
-- [x] Token page shows 4 star rows with sub-hints, requires 4, blocks until rated, stores `overall = AVG(4)` anonymously (`submit.php:34-68`)
-- [x] Dashboard shows 4 new AVG cols + overall, sorted desc; self-scoped filters (`index.php:51-58` + headers)
+## QA Checklist — verified 2026-09-02 (code + lint) + manual QA 2026-09-02
+- [x] New invite has 4 `rating_*` NULL, token 64-char, guest ordinal (migration adds nullable cols) — `check_eval.php` `SHOW COLUMNS` 14 cols
+- [x] Token page shows 4 star rows with sub-hints, requires 4, blocks until rated, stores `overall = AVG(4)` anonymously (`submit.php:34-68`) — manual token submit verified 4/4 stars + remarks
+- [x] Dashboard shows 4 new AVG cols + overall, sorted desc; self-scoped filters (`index.php:51-58` + headers) — `?page=evaluations` renders `Cleanliness/Behavior/Appearance/Safety`
 - [x] Remarks feed anonymous; old 5-col rows list with `—` for new cols
-- [x] Expiry 30d + 48h reminder unchanged; `php -l` clean; new cols verified via `SHOW COLUMNS`
+- [x] Expiry 30d + 48h reminder unchanged; `php -l` clean on `submit.php`/`index.php`/`046` + `verify_all_v2.php` PASS; `http://localhost/?page=cron&action=email` 200 OK + `EmailQueue` direct/queued both PASS
