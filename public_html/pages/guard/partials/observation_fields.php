@@ -64,6 +64,7 @@ $prefix = $obsPhase . $tripId;
             <span class="fw-normal text-muted">(1–6, compressed automatically)</span>
         </label>
         <input type="file"
+               id="obsPhoto<?= e($prefix) ?>"
                class="form-control form-control-sm obs-photo-input"
                name="observation_photos[]"
                accept="image/*"
@@ -72,7 +73,12 @@ $prefix = $obsPhase . $tripId;
                required
                data-preview="obsPreview<?= e($prefix) ?>"
                data-size="obsSize<?= e($prefix) ?>">
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-primary flex-fill" onclick="(function(el){el.setAttribute('capture','environment'); el.click();})(document.getElementById('obsPhoto<?= e($prefix) ?>'))"><i class="bi bi-camera me-1"></i>Take Photo</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" onclick="(function(el){el.removeAttribute('capture'); el.click();})(document.getElementById('obsPhoto<?= e($prefix) ?>'))"><i class="bi bi-images me-1"></i>Gallery</button>
+        </div>
         <div id="obsSize<?= e($prefix) ?>" class="small text-muted">No photos selected</div>
         <div id="obsPreview<?= e($prefix) ?>" class="d-flex flex-wrap gap-2 mt-1"></div>
+        <small class="text-muted" style="font-size:10px;">On phone: Take Photo opens camera directly; Gallery opens file picker.</small>
     </div>
 </div>
