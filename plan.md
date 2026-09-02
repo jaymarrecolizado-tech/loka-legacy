@@ -420,3 +420,52 @@ Rollback **from** any of: `pending_motorpool`, `approved`, `completed`, `revisio
 - [ ] Notification received by requester + target approver
 - [ ] Trip-in-progress rollback is blocked with clear error
 - [ ] Workflow timeline shows the rollback event between the original decisions
+
+---
+
+# LOKA Plan #5: Gas Station Master Data — Add/Edit/Delete & Deactivate Partner Stations
+
+## Goal
+Replace the hardcoded `['Petromar Trade and Service Center','Queensforth Corporation']` (`pages/gas-vouchers/create.php:108,294`) with a manageable master table so **All Father** (and optionally **Admin**) can maintain partner gasoline stations without code changes. Inactive stations remain on historical vouchers but are blocked for new vouchers.
+
+## Current State (2026-09-02)
+- `gas_vouchers.gas_station VARCHAR(150)` (`migrations/038_add_gas_station_to_vouchers.php:54`) stores free-text name; validation is a hard-coded array, `<select>` in `create.php:294` and filter in `reports/gas-vouchers.php:132`/`gas_voucher_report.php:238`.
+- No CRUD UI; requires code edit to add a station. No status/deactivate concept.
+
+## Design
+1. **Table `gas_stations`** (migration `045_create_gas_stations.php`): `id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY`, `name VARCHAR(150) UNIQUE`, `address VARCHAR(255) NULL`, `contact VARCHAR(100) NULL`, `status ENUM('active','inactive') DEFAULT 'active'`, `created_at DATETIME`, `updated_at DATETIME`, `deleted_at DATETIME NULL`, index `uq_name`.
+   Seed the two existing stations as `active`.
+2. **Helpers** (`includes/functions.php`): `getActiveGasStations(): array`, `getAllGasStations(): array`, `isGasStationActive(string): bool`. Replaces hard-coded `$allowedStations`/`$stations`.
+3. **Pages `pages/gas-stations/`** (Bootstrap 5, `requireAllFather()` — allow `isAdmin()` if desired):
+   - `index.php` — DataTables (Name, Address, Contact, Status badge `active=success/inactive=secondary`, Created), row actions Edit/Toggle, header button Create.
+   - `create.php`/`edit.php` — form `name*` unique, `address/contact` optional, `status` select, audit `auditLog('gas_station_created/updated')`, CSRF.
+   - `toggle.php` or POST on `index.php` — `deactivate` sets `status='inactive'` (soft), `activate` re-enables; `delete` is soft `deleted_at=NOW()` only if zero linked vouchers, else block and suggest deactivate. Allfather only.
+4. **Voucher integration**
+   - `pages/gas-vouchers/create.php:108,294` — load `getActiveGasStations()`, validate `in_array($gasStation, active)`. On edit, if original value is inactive keep it selected but show `(inactive)` warning.
+   - `includes/gas_voucher_report.php:238` + `reports/gas-vouchers.php:132` — distinct stations from `gas_stations` where `status='active'` (plus any value present in historical data for filter completeness).
+   - `pages/gas-vouchers/print.php:423` and `public/verify-voucher.php:103` already read the stored string; no change needed.
+5. **Navigation**
+   - Sidebar `includes/sidebar.php:198` under `Administration` (or `System Control → Gas Stations` `pages/security/partials/subnav.php:12`) item `Gas Stations` `bi-fuel-pump` visible to `canAccessSystemControl() || isAdmin()`, badge count `active` if desired.
+   - Routes `index.php` `case 'gas-stations'` with actions `create/edit/toggle`.
+6. **Porting rule** — matches vehicle_types CRUD pattern (`pages/vehicle_types/`), reuses `list_pagination.php` where server-paginated.
+
+## Implementation Steps
+1. Migration `045_create_gas_stations.php` + seed + run `php migrations/045_create_gas_stations.php` and verify `SHOW TABLES LIKE 'gas_stations'`, `SELECT * FROM gas_stations`.
+2. Helpers in `includes/functions.php` + include via `config/bootstrap.php` (already loads functions).
+3. CRUD pages `pages/gas-stations/*` + routing `index.php` + sidebar/subnav.
+4. Refactor `pages/gas-vouchers/create.php` and report filters to use helpers; remove hard-coded arrays.
+5. `php -l` on all touched files, manual QA: create station, deactivate (disappears from New Voucher), reactivate, historical voucher still shows old inactive name.
+
+## Edge Cases
+- Deactivating a station with 100+ linked vouchers is allowed (historical integrity); only new voucher creation is blocked.
+- Duplicate `name` (case-insensitive) rejected; `UNIQUE` index enforces.
+- `deleted_at` soft delete hides from admin list but keeps historical voucher strings intact.
+
+## QA Checklist
+- [ ] `Administration → Gas Stations` visible to All Father/Admin only, count badge correct
+- [ ] Create with duplicate name blocked
+- [ ] Deactivate → disappears from New Gas Voucher dropdown, old vouchers still display inactive name
+- [ ] Activate → reappears
+- [ ] Reports → Gas Vouchers filter lists only active (+ historical)
+- [ ] `audit_logs` has `gas_station_created/updated/toggled`
+- [ ] `php -l` clean, `APP_VERSION` bump if feature minor
