@@ -1672,3 +1672,27 @@ function tripTicketVerifyHashValid(string $ticketNo, string $hash): bool
     $short = substr($full, 0, 16);
     return hash_equals($short, $hash) || hash_equals($full, $hash);
 }
+
+// ---- Gas Stations master ----
+function getActiveGasStations(): array
+{
+    try {
+        return array_column(db()->fetchAll("SELECT name FROM gas_stations WHERE status='active' AND deleted_at IS NULL ORDER BY name"), 'name');
+    } catch (Throwable $e) { return ['Petromar Trade and Service Center','Queensforth Corporation']; }
+}
+
+function getAllGasStations(bool $includeInactive = true): array
+{
+    try {
+        $sql = $includeInactive ? "SELECT * FROM gas_stations WHERE deleted_at IS NULL ORDER BY status='active' DESC, name" : "SELECT * FROM gas_stations WHERE status='active' AND deleted_at IS NULL ORDER BY name";
+        return db()->fetchAll($sql);
+    } catch (Throwable $e) { return []; }
+}
+
+function gasStationExists(string $name): bool
+{
+    $name = trim($name);
+    if ($name === '') return false;
+    $active = getActiveGasStations();
+    return in_array($name, $active, true);
+}

@@ -237,7 +237,9 @@ function gasVoucherReportFilterOptions(): array
     $stations = db()->fetchAll(
         "SELECT DISTINCT gas_station AS v FROM gas_vouchers
          WHERE deleted_at IS NULL AND gas_station IS NOT NULL AND gas_station <> ''
-         ORDER BY gas_station ASC LIMIT 50"
+         UNION
+         SELECT name AS v FROM gas_stations WHERE deleted_at IS NULL
+         ORDER BY v ASC LIMIT 100"
     );
     $departments = db()->fetchAll(
         "SELECT id, name FROM departments WHERE deleted_at IS NULL ORDER BY name ASC"

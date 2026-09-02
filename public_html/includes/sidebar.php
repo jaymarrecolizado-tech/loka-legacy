@@ -276,6 +276,15 @@
             </li>
             <?php endif; ?>
 
+            <?php if (canAccessSystemControl() || isAdmin()): ?>
+            <li class="nav-item">
+                <a class="nav-link <?= activeMenu('gas-stations') ?>" href="<?= APP_URL ?>/?page=gas-stations">
+                    <i class="bi bi-fuel-pump-fill"></i>
+                    <span>Gas Stations</span>
+                </a>
+            </li>
+            <?php endif; ?>
+
             <?php if (canAccessSystemControl()): ?>
             <li class="nav-header">System Control</li>
 

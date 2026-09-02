@@ -105,12 +105,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $requestedReviewerId = (int) post('requested_reviewer_id', 0) ?: null;
     $requestedApproverId = (int) post('requested_approver_id', 0) ?: null;
 
-    $allowedStations = ['Petromar Trade and Service Center', 'Queensforth Corporation'];
+    $allowedStations = getActiveGasStations();
+    // Allow editing a voucher that already has an inactive station
+    if ($isEdit && $d && $d->gas_station && !in_array($d->gas_station, $allowedStations, true)) {
+        $allowedStations[] = $d->gas_station;
+    }
 
     // Validation
     if (empty($driverName))   $errors[] = 'Driver name is required.';
     if (empty($vehiclePlate)) $errors[] = 'Vehicle plate number is required.';
-    if (empty($gasStation) || !in_array($gasStation, $allowedStations)) $errors[] = 'Please select a valid gas station.';
+    if (empty($gasStation) || !in_array($gasStation, $allowedStations, true)) $errors[] = 'Please select a valid gas station.';
     if (empty($fuelType) || !in_array($fuelType, ['Gasoline', 'Diesel'])) $errors[] = 'Invalid fuel type.';
     if ($quantityMode !== 'full' && $quantity <= 0) $errors[] = 'Quantity must be greater than 0.';
     if (empty($unit))         $errors[] = 'Unit is required.';
@@ -291,11 +295,15 @@ require_once INCLUDES_PATH . '/header.php';
                             <select name="gas_station" class="form-select w-100" required>
                                 <option value="">-- Select Gas Station --</option>
                                 <?php
-                                $stations = ['Petromar Trade and Service Center', 'Queensforth Corporation'];
+                                $stations = getActiveGasStations();
                                 $currentStation = $d?->gas_station ?? '';
+                                if ($currentStation !== '' && !in_array($currentStation, $stations, true)) {
+                                    // keep inactive value visible when editing
+                                    $stations[] = $currentStation;
+                                }
                                 foreach ($stations as $st):
                                 ?>
-                                <option value="<?= e($st) ?>" <?= $currentStation === $st ? 'selected' : '' ?>><?= e($st) ?></option>
+                                <option value="<?= e($st) ?>" <?= $currentStation === $st ? 'selected' : '' ?>><?= e($st) ?><?php if (!getActiveGasStations() || !in_array($st, getActiveGasStations(), true)) echo ' (inactive)'; ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <label class="form-label">

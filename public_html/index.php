@@ -470,6 +470,17 @@ switch ($page) {
         }
         break;
 
+    case 'gas-stations':
+        if (!canAccessSystemControl() && !isAdmin()) redirectWith('/?page=dashboard','danger','Access denied: All Father/Admin only.');
+        if ($action === 'create') {
+            require_once PAGES_PATH . '/gas-stations/create.php';
+        } elseif ($action === 'edit') {
+            require_once PAGES_PATH . '/gas-stations/edit.php';
+        } else {
+            require_once PAGES_PATH . '/gas-stations/index.php';
+        }
+        break;
+
     case 'profile':
         require_once PAGES_PATH . '/profile/index.php';
         break;
