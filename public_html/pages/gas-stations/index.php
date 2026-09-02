@@ -67,8 +67,8 @@ require_once INCLUDES_PATH . '/header.php';
                             <td>
                                 <div class="btn-group btn-group-sm">
                                     <a href="<?= APP_URL ?>/?page=gas-stations&action=edit&id=<?= (int)$s->id ?>" class="btn btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                                    <form method="POST" class="d-inline" onsubmit="return confirm('Toggle active/inactive for <?= e($s->name) ?>?')">
-                                        <?= csrfField() ?><input type="hidden" name="op" value="toggle"><input type="hidden" name="id" value="<?= (int)$s->id ?>"><button type="submit" class="btn btn-outline-warning"><i class="bi bi-toggle-on"></i></button>
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('<?= $s->status==='active' ? 'Deactivate' : 'Activate' ?> <?= e($s->name) ?>?')">
+                                        <?= csrfField() ?><input type="hidden" name="op" value="toggle"><input type="hidden" name="id" value="<?= (int)$s->id ?>"><button type="submit" class="btn btn-outline-<?= $s->status==='active'?'warning':'success' ?>" title="<?= $s->status==='active'?'Deactivate':'Activate' ?>"><i class="bi bi-toggle-<?= $s->status==='active'?'on':'off' ?>"></i></button>
                                     </form>
                                     <?php if ((int)$s->voucher_count===0): ?>
                                     <form method="POST" class="d-inline" onsubmit="return confirm('Delete <?= e($s->name) ?>?')">
