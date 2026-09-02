@@ -91,6 +91,7 @@ $prefix = $obsPhase . $tripId;
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body p-0 bg-black text-center">
+        <div class="small text-white-50 p-2 bg-dark">LOKA needs camera access to capture vehicle condition photos. Please click <strong>Allow</strong> when your browser asks for permission.</div>
         <video id="cameraVideo<?= e($prefix) ?>" autoplay playsinline style="width:100%; max-height:60vh; object-fit:cover; background:#000;"></video>
         <canvas id="cameraCanvas<?= e($prefix) ?>" style="display:none;"></canvas>
         <div id="cameraError<?= e($prefix) ?>" class="small text-danger p-2 d-none bg-white"></div>
@@ -124,13 +125,17 @@ $prefix = $obsPhase . $tripId;
       vid.srcObject=stream;
       return vid.play();
     }).catch(e=>{
+      const msg = (e && e.name==='NotAllowedError') ? 'Permission denied. Please click Allow when prompted, or enable Camera in browser site settings (lock icon → Allow) and try again.' : 'Camera unavailable: '+(e.message||e);
+      if (err){ err.textContent=msg; err.classList.remove('d-none'); }
+      if (e && e.name==='NotAllowedError') return;
       // try fallback to any camera
       navigator.mediaDevices.getUserMedia({video:true, audio:false}).then(stream=>{
         window._cameraStreams[p]=stream;
         vid.srcObject=stream;
         return vid.play();
       }).catch(e2=>{
-        if (err){ err.textContent='Camera access denied or unavailable: '+(e2.message||e2); err.classList.remove('d-none'); }
+        const msg2 = (e2 && e2.name==='NotAllowedError') ? 'Permission denied. Please allow Camera and try again.' : 'Camera access denied or unavailable: '+(e2.message||e2);
+        if (err){ err.textContent=msg2; err.classList.remove('d-none'); }
       });
     });
     const onHide = function(){
