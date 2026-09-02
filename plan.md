@@ -469,3 +469,49 @@ Replace the hardcoded `['Petromar Trade and Service Center','Queensforth Corpora
 - [ ] Reports → Gas Vouchers filter lists only active (+ historical)
 - [ ] `audit_logs` has `gas_station_created/updated/toggled`
 - [ ] `php -l` clean, `APP_VERSION` bump if feature minor
+
+---
+
+# LOKA Plan #6: Trip Ticket Polish — Purpose Limits, Print Robustness & Guard Camera
+
+## Goal — ✅ IMPLEMENTED (2026-09-02, commits 6d1fe6a → f50ea62)
+Make the vehicle summary trip ticket printable at scale (many entries, long purposes) without clipping, enforce sane input lengths, highlight drivers, and make guard photos capturable via camera with proper permission.
+
+## Issues Observed (2026-09-02 PDFs 2026-SAA 1141-0701/0501)
+- `purpose` free-text `~268` chars (`Gonzaga Day1-2 eLGU System Training ...`) clipped to `I b l`/`Ci`/`d l` in `summary-print.php:375` (`textarea` `overflow:hidden` `min-height:22px` + `page-break-inside:avoid` forced whole `trip` table to `Page 2`, leaving `Page 1` header-only gap; footer QR orphaned to `Page 5`).
+- No input length guard — long purposes degrade pagination.
+- Driver rows two-line `Glenard Martin F.` + `(DRIVER)` red below, far gap (`flex:1` pushed tag to cell edge) and centered, not single-line `Glenard Martin F.(DRIVER)` left-aligned as requested.
+- Pre-print could ship with `Driver Assigned` empty and `Attested/Prepared/Reviewed/Approved` unselected.
+- Guard “Take Photo” opened file picker (`capture` toggle via `<input type=file>`) not camera; console `Permissions-Policy: camera=()` `config/security.php:85` blocked `getUserMedia`, `Violation: camera is not allowed`.
+
+## Implementation
+
+### 1. Input Limits (200/100)
+- `pages/requests/create.php:173` + `pages/requests/edit.php:145` + `pages/trip-tickets/create.php:160` server `mb_strlen>200/100` reject with message, `maxlength 200/100` + live counter `0/200` `create.php:490` `edit.php:509` `trip-tickets/create.php:476` (`6d1fe6a`). Counters toggle `text-danger` `is-invalid` per dest (`destination-input` `100`).
+- Recommended `purpose 200` (`destination 100`) — median `~90`, 90th `~170`, max `268` fits 4 lines at `6.5px/44mm` within portrait `A4` and keeps `25`-row set `≤3` pages; `150` would cut flagship LGU text, `250` pushes to 5 pages.
+
+### 2. Print Wrap — Never Clip
+- `pages/my-trip-tickets/summary-print.php:428` + `travelorder:500` `@media print` `table page-break-inside:auto`, `tr avoid`, `.sec avoid+after:avoid`, `.tbl-wrap auto` (was `avoid` forcing gap), `textarea overflow:visible height:auto pre-wrap break-word`, `td height:auto top`, `.tbl-trip td:nth-child(8) input/textarea 6.5px` single-line shrink.
+- `verify-bar` hidden on print, footer `.ftr page-break-inside:avoid` + QR `38px` (was `84px` orphan).
+
+### 3. Driver Highlight — Single Line, Close, Red Only Tag
+- Passengers `Camel Caps` `mb_convert_case TITLE` `pages/my-trip-tickets/summary-print.php:948` + `travelorder:778` + `requests/print.php:505` + `trip-tickets/export-pdf.php:236` (bold `700`); `(DRIVER)` stays uppercase red.
+- `summary-print.php:956` + `travelorder:778` passenger cell `display:flex gap:0 centered → flex-start gap:0` then `gap:0 + margin-left:1px` → `Glenard Martin F.(DRIVER)` one line `95f7be2 → 27c6e06` `93d6322` left-aligned (`justify-content:flex-start text-align:left`).
+
+### 4. Pre-print Validation
+- `pages/my-trip-tickets/summary-print.php:883` `Driver Assigned <span style="color:#dc3545;">*</span>` + sig roles `Attested/Prepared/Reviewed/Approved *` red, `select#driver #sigAttestor #sigPrepared #sigReviewer #sigApprover` required.
+- `Print/Save PDF` `onclick="if(validateTicket()) window.print()"` `summary-print.php:1185` + `travelorder:626` — `validateTicket()` collects missing, adds `is-invalid #dc3545` + `* Required` `field-error`, `alert`, `scrollIntoView` first, blocks print; `change/input` clears. `resetForm` clears errors. (`0cf7f37`).
+
+### 5. Guard Camera — getUserMedia + Permission
+- `pages/guard/partials/observation_fields.php:66` (`e020c12` → `ebe2462` → `f50ea62`):
+  - UI `Take Photo` `bi-camera` now `openCamera(prefix)` → `navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})` live `video` in `cameraModal{prefix}` + `Capture & Use` `canvas.toBlob('image/jpeg',0.85)` → `File('camera_*.jpg')` appended via `DataTransfer` to `obsPhoto{prefix}` `observation_photos[]` (1–6), `Gallery` remains file picker.
+  - Modal text `LOKA needs camera access — click Allow`, error `NotAllowedError → Permission denied. Please click Allow ... site settings (lock icon → Allow)`.
+  - `config/security.php:85` `Permissions-Policy: camera=(self)` (was `camera=()` blocking).
+
+## QA
+- [x] `purpose` `200` + `destination` `100` server+UI enforced, counters live
+- [x] `200`-char purpose wraps to ~4 lines, no `Ci/d l` clip, pagination `Page 1` starts immediately, footer QR not orphaned
+- [x] `Driver/Passenger` left-aligned, `Name(DRIVER)` single line `6.5px+5.5px red`, gap `1px`
+- [x] Blank ticket → `Print` blocked, 5 fields highlighted `* Required`, prompt lists missing; completing selects allows print
+- [x] `Take Photo` prompts `Allow` (browser) after `f50ea62`, `localhost` secure context, `Gallery` fallback; denied shows guidance
+- [x] `php -l` clean on all touched `pages/my-trip-tickets/*`, `pages/requests/*`, `pages/guard/partials/*`, `config/security.php`
