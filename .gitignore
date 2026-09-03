@@ -6,6 +6,8 @@ logs/*
 !logs/.gitignore
 cache/*
 !cache/.gitignore
+public_html/uploads/
+uploads/
 
 # Database dumps / archives
 *.sql
@@ -18,6 +20,13 @@ assets/dist/.vite/
 # OS junk
 Thumbs.db
 .DS_Store
+
+# Local agent / IDE scratch (never commit)
+.cursor/
+graphify-out/
+agent-transcripts/
+*_import.bat
+_import.bat
 
 # Production package (generated - rebuild with robocopy, see PRODUCTION_GUIDE.md)
 prod/*

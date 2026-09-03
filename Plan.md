@@ -1,3 +1,25 @@
+# LOKA Fleet — Plan Index (single source of truth)
+
+**File:** `Plan.md` at repo root. Do **not** add new `public_html/docs/PLAN_*.md` files — append Plan #N here.
+
+| Plan | Title | Status |
+|------|-------|--------|
+| #1 | Admin Workflow Rollback | DONE (2026-09-02) |
+| #2 | Prevent Duplicate Request Submissions | DONE (2026-09-02) |
+| #3 | Booking Rules Cleanup & Return-Confirmation | DONE (2026-08-24) |
+| #4 | Port Advanced Features from prod-loka | DONE (Phases 0–5; Phase 6 skipped) |
+| #5 | Gas Station Master Data | DONE (2026-09-02) |
+| #6 | Trip Ticket Polish | DONE (2026-09-02) |
+| #7 | Driver Evaluation 4-Category Rubric | DONE (2026-09-02) |
+| #8 | Validation Hardening | DONE (2026-09-03) |
+| #9 | Production Deployment & Cron Handover | DONE (code ready; VPS cutover when scheduled) |
+| #10 | Manual QA & Backlog | DONE (documented 2026-09-03) |
+| #11 | Reports Follow-up Gaps | OPEN |
+
+**Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
+
+---
+
 # LOKA Plan #4: Port Advanced Features from prod-loka — ✅ IMPLEMENTED (Phases 0–5; Phase 6 skipped by design) + Plans #5–#10 ✅ DONE — see status 2026-09-03 (pushed 683b9f0)
 
 Source of truth for the advanced app: `C:\xampp\htdocs\Projects\prod-loka` (v2.5.1).
@@ -703,3 +725,29 @@ Cut over `pred-loka-old-boots` to Hostinger KVM 2 (`prod/public_html` package) w
 ## Guardrails (keep)
 - Never add new dep for what `stdlib`/existing `classes/*` does; `ponytail:` comment on any deliberate ceiling
 - Every phase ends with `php -l` + this plan's QA checklist before next
+
+---
+
+# LOKA Plan #11: Reports Follow-up Gaps — OPEN (2026-09-03)
+
+## Goal
+Finish leftover gaps from the Better LOKA Reports work. Core enrichment (mileage/fuel/dispatch, admin export fixes, `driver_history` / `vehicle_history` / `department_usage`) is already DONE. This plan is UI/export parity only.
+
+## Open checklist
+- [ ] Travel order on Vehicle History UI — add `has_travel_order` / `travel_order_number` to query + table ([vehicle-history.php](public_html/pages/reports/vehicle-history.php); already in CSV)
+- [ ] Travel order + OB slip on Trip Requests — add `has_travel_order`, `has_official_business_slip` to [trips.php](public_html/pages/reports/trips.php) UI; include OB in CSV/PDF exports
+- [ ] Revision stats card on Trip Requests — show `$stats->revision` (SQL already counts it)
+- [ ] Date-filter note — Trip Requests use `created_at`; Vehicle/Driver use `start_datetime`
+- [ ] Admin `department_usage` top vehicles column — [csv.php](public_html/pages/admin/exports/csv.php) + [pdf.php](public_html/pages/admin/exports/pdf.php)
+- [ ] Trip Requests pagination or clearer 500-row cap messaging (export limits unchanged)
+
+## Out of scope
+- New report types
+- Backend/frontend plan split
+- `.env` / production URL changes
+
+## Done previously (do not reopen)
+- Admin export bugfixes (maintenance columns, `audit_logs`, `last_login_at`, department head/count)
+- Mileage/fuel/dispatch enrichment on Vehicle History + Driver Report
+- Trip Requests dept/vehicle/driver filters, cancelled + km stats, PDF filter pass-through
+- Hub badges "CSV & PDF Export" + tooltips + populated `total_km`
