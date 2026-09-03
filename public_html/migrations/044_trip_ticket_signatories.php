@@ -22,11 +22,11 @@ if (file_exists($envFile)) {
             $name = trim($parts[0]);
             $value = trim($parts[1]);
             switch ($name) {
-                case 'DB_HOST':    $dbHost = $value; break;
-                case 'DB_NAME':    $dbName = $value; break;
-                case 'DB_USER':    $dbUser = $value; break;
-                case 'DB_PASSWORD':$dbPass = $value; break;
-                case 'DB_CHARSET': $dbCharset = $value; break;
+                case 'DB_HOST':    $dbHost = trim($value, " \t\"'"); break;
+                case 'DB_NAME': case 'DB_DATABASE': $dbName = trim($value, " \t\"'"); break;
+                case 'DB_USER': case 'DB_USERNAME': $dbUser = trim($value, " \t\"'"); break;
+                case 'DB_PASSWORD': case 'DB_PASS': $dbPass = trim($value, " \t\"'"); break;
+                case 'DB_CHARSET': $dbCharset = trim($value, " \t\"'"); break;
             }
         }
     }

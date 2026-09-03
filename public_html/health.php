@@ -6,13 +6,26 @@
 header('Content-Type: application/json');
 
 try {
+    // Load .env if not already (like config/database.php)
+    if (!isset($_ENV['DB_HOST']) || !isset($_ENV['DB_DATABASE'])) {
+        $envFile = __DIR__ . '/.env';
+        if (file_exists($envFile)) {
+            foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+                $line=trim($line); if($line===''||$line[0]==='#') continue;
+                if(strpos($line,'=')!==false){ [$k,$v]=explode('=',$line,2); $k=trim($k); $v=trim(trim($v)," \t\"'"); if(!isset($_ENV[$k])) $_ENV[$k]=$v; }
+            }
+        }
+    }
     // Check database connection
     $dbCheck = false;
     try {
+        $dbName = $_ENV['DB_DATABASE'] ?? $_ENV['DB_NAME'] ?? 'loka_fleet';
+        $dbUser = $_ENV['DB_USERNAME'] ?? $_ENV['DB_USER'] ?? 'root';
+        $dbPass = $_ENV['DB_PASSWORD'] ?? $_ENV['DB_PASS'] ?? '';
         $pdo = new PDO(
-            'mysql:host=' . ($_ENV['DB_HOST'] ?? 'localhost') . ';dbname=' . ($_ENV['DB_NAME'] ?? 'loka_fleet'),
-            $_ENV['DB_USER'] ?? 'root',
-            $_ENV['DB_PASSWORD'] ?? ''
+            'mysql:host=' . ($_ENV['DB_HOST'] ?? 'localhost') . ';dbname=' . $dbName,
+            $dbUser,
+            $dbPass
         );
         $dbCheck = $pdo->query('SELECT 1')->fetch();
     } catch (PDOException $e) {

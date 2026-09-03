@@ -1,4 +1,4 @@
-# LOKA Plan #4: Port Advanced Features from prod-loka — ✅ IMPLEMENTED (Phases 0–5; Phase 6 skipped by design) + Plans #5–#6 ✅ DONE — see status 2026-09-02
+# LOKA Plan #4: Port Advanced Features from prod-loka — ✅ IMPLEMENTED (Phases 0–5; Phase 6 skipped by design) + Plans #5–#8 ✅ DONE — see status 2026-09-03
 
 Source of truth for the advanced app: `C:\xampp\htdocs\Projects\prod-loka` (v2.5.1).
 Target: this repo (`pred-loka-old-boots`, v2.6.0). Feature-gap analysis performed
@@ -588,3 +588,118 @@ Replace the current generic 5-star set (`punctuality/safety/courtesy/driving/veh
 - [x] Dashboard shows 4 new AVG cols + overall, sorted desc; self-scoped filters (`index.php:51-58` + headers) — `?page=evaluations` renders `Cleanliness/Behavior/Appearance/Safety`
 - [x] Remarks feed anonymous; old 5-col rows list with `—` for new cols
 - [x] Expiry 30d + 48h reminder unchanged; `php -l` clean on `submit.php`/`index.php`/`046` + `verify_all_v2.php` PASS; `http://localhost/?page=cron&action=email` 200 OK + `EmailQueue` direct/queued both PASS
+
+---
+
+# LOKA Validation Sweep 2026-09-03 — All Features Verified
+
+**Scope:** Full codebase validation of Plans #2–#7 plus prod-loka port (Phases 0–5). No new features — evidence check before next phases.
+
+**Method:** `php -l` 1246 files + DB schema inspection (`old_loka_db`) + helper runtime (`getBookingRules`/`validateBookingRules`/`getActiveGasStations`) + idempotency constraint + HTTP (`/?page=login`, `health.php`, `?page=cron&action=*&key=SECRET`) + file/route/sidebar presence.
+
+**Result 2026-09-03:** **ALL PASS** — 114 feature checks + 29 final checks + cron 200s (see fixes in Plan #8). Settings `max_advance_booking_days=3` `min_advance_booking_hours=0` `max_trip_duration_hours=72` `require_return_confirmation=0` `email_delivery_mode=immediate` `cron_secret=132183bc…`.
+
+| Feature | Verdict | Evidence |
+|---|---|---|
+| Lint | PASS | 1246 files 0 `php -l` errors |
+| Migrations `.sql` + `.php` (27) | PASS (1 fixed) | `schema_migrations` 15 + `trip_tickets.signatory_*` missing → fixed `044_trip_ticket_signatories.php:22` alias handling |
+| Booking Rules | PASS | `getBookingRules()` 3d/0h/72h, `validateBookingRules()` blocks far-advance+too-long, `requireReturnConfirmation()=No` |
+| Idempotency / anti-duplicate | PASS | `requests.idempotency_key` + `uq_requests_idempotency` — live `INSERT` duplicate → `23000` rejected, `create.php` + `app.js` guard + `MAIL_SYNC_SEND=false` |
+| Request Rollback | PASS | `approvals.status` rollback, `requests.rollback_count`, matrix (workflow/trip_tickets/vehicle+driver/guard clear) + `auditLog`/`notify` + sidebar/route |
+| Gas Stations/Vouchers | PASS | `getActiveGasStations()` 2/3 (inactive `Queensforth` excluded), `create.php` uses helper, `gas_voucher_report.php` queries `gas_stations`, `print.php`/`verify-voucher.php` HMAC |
+| Vehicle Care | PASS | `vehicle_care_schedules/assignments`, 4 pages, `process_care_reminders.php`, routing |
+| Trip Tickets/Travel Order | PASS | `ticket_type/number/week_start/end/fuel_refill_data/travel_order_path/signatory_*`, 200/100 limits, print wrap, `validateTicket()` |
+| Guard/Camera/Odometer | PASS | `vehicle_observations/photos`, `vehicles.odometer_broken`, `guard/actions.php`, `observation_fields.php` `getUserMedia`+`DataTransfer`, `camera=(self)` |
+| Driver Evals 4-cat | PASS | `rating_cleanliness/behavior/appearance/safety/details_json`, `submit.php` 4 hints+validation, `index.php` `AVG()` 4, expiry 30d/48h, `processTripJobs` |
+| Messaging/Cron/Email | PASS | `email_delivery_mode=immediate` (localhost), `mail_delivery.php` production→queued, `EmailQueue`, `pages/cron/index.php` auth, `process_{queue,sms,care,trips}.php`, `run-crons.bat`; HTTP `email 200`, `sms disabled`, `care 0` |
+| Security/System Control | PASS | `rate_limits/security_logs`, 5 security pages, `all_father` 2, `view_as` route, `canAccessSystemControl()` |
+| Badge Framework | PASS | `user_badge_acks`, `badgeCountPending*`, `sidebarBadgeHtml` |
+| Reports/Exports | PASS | 6 report pages + `gas_voucher_report.php` + `export-pdf/csv` + TCPDF |
+| HTTP | PASS (1 fixed) | `/?page=login` 200, `health.php` 403→**200 healthy** after fix (see Plan #8) |
+
+**Gaps found → fixed in Plan #8.** One remaining non-blocking observation: `?page=cron&action=trips` HTTP timeout on 512-row DB (CLI `processTripJobs()` ok) — watch on VPS.
+
+---
+
+# LOKA Plan #8: Validation Hardening — Health, Cron & Migration Polish — ✅ FIXED (2026-09-03)
+
+## Goal
+Close the 3 small gaps found in the 2026-09-03 sweep so a fresh clone/prod deploy is clean without manual SQL.
+
+## Gaps Fixed
+1. **Trip ticket signatories missing** — `trip_tickets.signatory_motorpool_id` + `signatory_chief_finance_id` (from `044_trip_ticket_signatories.php`) not in DB → `old_loka_db` had `loka_fleet` hardcoded fallback + missing `DB_DATABASE` alias → `INSERT 23000` never exercisable for fresh installs. Fixed migration alias handling + applied `ALTER TABLE` (`public_html/migrations/044_trip_ticket_signatories.php:22`).
+2. **Health blocked + unhealthy** — `public_html/health.php:6` returned `403` (`.htaccess` only allowed `index.php`) + `503` (used `DB_NAME` not `DB_DATABASE`). Fixed `.htaccess:93` to `health.php` whitelist + `health.php:9` to load `.env` + fallback `DB_DATABASE→DB_NAME` (`prod/public_html/.htaccess` + `health.php` synced). Now `http://localhost/.../health.php` → `200 {"status":"healthy"}`.
+3. **Migration DB alias** — `044_trip_ticket_signatories.php` ignored `DB_DATABASE`/`DB_USERNAME` + quotes → fresh VPS with `DB_DATABASE=old_loka_db` would still hit `loka_fleet` `1049`. Patched to trim `"'` and handle aliases.
+
+## Files Changed (3)
+- `public_html/.htaccess:93` + `prod/public_html/.htaccess:93` — `health.php` allow
+- `public_html/health.php:9` (+ `prod`) — `.env` load + `DB_DATABASE` fallback
+- `public_html/migrations/044_trip_ticket_signatories.php:22` — alias+trim fix (applied live: `ALTER` 2 cols)
+
+## QA — verified 2026-09-03
+- [x] `php -l` 1246 files 0 errors
+- [x] `SHOW COLUMNS trip_tickets LIKE 'signatory_%'` → 2 rows
+- [x] `php migrations/044_trip_ticket_signatories.php` → `⚠ Column … already exists`
+- [x] `curl health.php` → `200 healthy` (was `403`)
+- [x] `?page=cron&action=email&key=132183bc…&limit=1` → `200 EMAIL ok`
+- [x] `run_feature_tests.php` 114 PASS 0 FAIL + `run_final_checks.php` 29 PASS (idempotency `23000` + gas toggle + badge)
+
+---
+
+# LOKA Plan #9: Production Deployment & Cron Handover — NEXT (VPS `lokafleet.dictr2.cloud`)
+
+## Goal
+Cut over `pred-loka-old-boots` to Hostinger KVM 2 (`prod/public_html` package) with queued email + reliable cron and no downtime for localhost dev.
+
+## Pre-flight (local)
+- [ ] `git status` clean except `uploads/` (ignored); `prod/` is built from `public_html` (excludes `.env/cache/logs/*.zip`) per `PRODUCTION_GUIDE.md:4`
+- [ ] `.env` localhost stays `APP_ENV=development` `APP_DEBUG=true` `EMAIL_DELIVERY_MODE=immediate` `MAIL_ENABLED=true`; VPS `.env` will be `production`/`false`/`queued`
+- [ ] `php -l` clean (already verified)
+
+## Deploy Steps (VPS)
+1. **Upload** `prod/public_html/` → `/home/dictr2-lokafleet/htdocs/lokafleet.dictr2.cloud/public_html/` (SFTP/`rsync -avz prod/public_html/ user@kvm2:<webroot>/`)
+2. **`.env`** `cp .env.example .env && nano .env` → `APP_ENV=production` `APP_DEBUG=false` `APP_URL=https://lokafleet.dictr2.cloud` `DB_*` `SMTP_*` `CRON_SECRET` (reuse `132183bc…` or rotate via `settings.cron_secret`) `chmod 600 .env`
+3. **DB** `CREATE DATABASE loka_fleet CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci` + import dump + `php migrate.php` (runs `schema_migrations` `.sql`; PHP migrations idempotent)
+4. **Perms** `find . -type d -exec chmod 755 {} \;` `find . -type f -exec chmod 644 {} \;` `chmod -R 775 logs cache` `chmod 600 .env`
+5. **Cron** — `setup.sh` installs `process_queue.php` `*/2` + `process_trip_confirmations.php` `*/5`; **Windows localhost** keeps `cron/run-crons.bat` + `cron/setup-windows-crons.ps1` (`LOKA Cron (XAMPP)` every 2 min SYSTEM) — do **not** double-install. Verify `tail -f logs/cron.log` → `Queue processor finished`
+6. **Email mode switch** VPS only: `System Control → Email → Queued` or `UPDATE settings SET value='queued' WHERE key='email_delivery_mode'` (fallback `mail_delivery.php:30` is `production→queued` by default; localhost remains `immediate`)
+7. **Apache/SSL** `a2enmod rewrite` `AllowOverride All` + hPanel/certbot TLS + force HTTPS uncomment in `.htaccess`
+
+## Post-deploy Checklist (VPS)
+- [ ] `https://lokafleet.dictr2.cloud` → login page; admin Dashboard renders
+- [ ] Submit test request → **<1s** redirect (no SMTP hang), appears in Requests; within ~2 min email arrives (`logs/cron.log` + `System Control → Email Queue`)
+- [ ] Double-click/reload resubmit → NO duplicate (`requests.idempotency_key` `23000`)
+- [ ] Reports → Trip Requests charts + CSV/PDF exports (no `?` mojibake)
+- [ ] `Admin → Request Rollback` badge; rollback test → audit + timeline `rollback` orange badge
+- [ ] `Administration → Gas Stations` toggle inactive → New Voucher dropdown hides it; historical voucher still shows name
+- [ ] `health.php` → `200 healthy` (LB); `/.env` `/config/` `/logs/error.log` → `403`
+- [ ] `APP_DEBUG=false` — errors to `logs/error.log`
+
+## Rollback Plan
+- Keep previous `public_html` tarball on VPS; `APP_DEBUG=true` only on staging copy; rotate `cron_secret` if exposed.
+
+---
+
+# LOKA Plan #10: Manual QA & Backlog — NEXT (click-through, then prioritize)
+
+## Manual QA Still TODO (from Deferred + 2026-09-03 sweep)
+- [ ] Gas voucher full lifecycle click-through (draft → pending_review → pending_approval → approved/rejected/cancelled + payment + QR `verify-voucher.php` + CSV/PDF exports)
+- [ ] Gas station CRUD deactivate/reactivate + historical voucher name display
+- [ ] Vehicle care calendar recurring + staff assign + cron reminder (wait 48h or force `processCareReminders()`)
+- [ ] Trip ticket `summary-print.php` with 200-char purpose (Gonzaga ~4 lines), 100-char destination, driver single-line `Name(DRIVER)` left-aligned, `Print` blocks until `Driver Assigned` + 4 signatories, footer QR not orphaned
+- [ ] Guard flow: `Take Photo` → browser `Allow` prompt (after `camera=(self)`), `Capture & Use` → `observation_photos[]` 1–6, `Gallery` fallback; denied shows site-settings guidance; `getUserMedia` on `localhost` secure context
+- [ ] Driver evaluation token invite 30d expiry + 48h reminder: complete trip as passenger → invite email → token page 4 categories with sub-hints → `overall=AVG(4)` anonymous → dashboard `Cleanliness/Behavior/Appearance/Safety`
+- [ ] Booking rules live: create/edit respects `max_advance_booking_days`/`min_advance_booking_hours`/`max_trip_duration_hours` + `require_return_confirmation` gate (`complete.php` blocked, `view.php` button disabled)
+- [ ] Security sub-pages (summary/rate-limits/sms/email/odometer) + View-as (`All Father → driver/approver`) + badge counts clear-on-visit
+- [ ] Cron at load: hit `?page=cron&action=trips&key=SECRET&limit=5` — currently HTTP timeout on 512 rows; profile `processTripJobs` query (add `start_datetime` index if needed) or raise `max_execution_time` 30→60 for cron
+
+## Candidate Next Features (prioritize with DICT)
+1. **Vehicle/gas cost analytics** — fuel_records vs gas_vouchers reconciliation
+2. **SMS gateway provisioning** — plug real `android-sms-gateway` URL/key via `System Control → SMS` (code ready, `sms_enabled=0`)
+3. **Vite/Tailwind consolidation** — skipped in Phase 6 (keep Bootstrap 5 unless design asks)
+4. **Dashboard partialization** — 8 partials + stats include (optional polish)
+5. **Duplicate cleanup SQL** — admin report for historical duplicate requests (user+dest+start+purpose within 5 min)
+
+## Guardrails (keep)
+- Never add new dep for what `stdlib`/existing `classes/*` does; `ponytail:` comment on any deliberate ceiling
+- Every phase ends with `php -l` + this plan's QA checklist before next

@@ -90,8 +90,8 @@ Options -Indexes
     </IfModule>
 </FilesMatch>
 
-# Allow access to index.php and assets
-<FilesMatch "^(index\.php|.*\.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot))$">
+# Allow access to index.php, health.php and assets
+<FilesMatch "^(index\.php|health\.php|.*\.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot))$">
     <IfModule mod_authz_core.c>
         Require all granted
     </IfModule>
