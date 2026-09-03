@@ -21,10 +21,14 @@ assets/dist/.vite/
 Thumbs.db
 .DS_Store
 
-# Local agent / IDE scratch (never commit)
-.cursor/
-graphify-out/
-agent-transcripts/
+# Local editor / IDE
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+
+# One-off local scripts
 *_import.bat
 _import.bat
 

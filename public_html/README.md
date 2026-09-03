@@ -531,7 +531,8 @@ SHOW INDEX FROM vehicles;
 ### Documentation
 - `QUICK_START.md` - Fast deployment guide
 - `DEPLOYMENT_GUIDE.md` - Comprehensive deployment instructions
-- `../AGENTS.md` - Development guidelines
+- `docs/STYLE_GUIDE.md` - UI/layout conventions
+- `../Plan.md` - Project plan index and status
 
 ### Logs
 - Application: `/var/www/html/logs/`
