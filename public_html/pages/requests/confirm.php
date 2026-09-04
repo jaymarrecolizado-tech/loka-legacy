@@ -30,10 +30,27 @@ if (!$confirmation) {
     $error = 'This confirmation link has not been activated yet. Please wait for the confirmation email.';
 } elseif (in_array($confirmation->status, ['confirmed', 'declined_cancel', 'declined_reschedule', 'expired', 'cancelled'], true)) {
     $done = true; // show outcome below
+} elseif ($confirmation->status === 'pending' && !tripConfirmationStillEligible($confirmation)) {
+    // Trip already dispatched, started, or completed — cancel leftover pending row
+    if (function_exists('cancelPendingTripConfirmations')) {
+        cancelPendingTripConfirmations((int) $confirmation->request_id, 'confirm page: trip no longer eligible');
+    } else {
+        db()->update(
+            'trip_confirmations',
+            ['status' => 'cancelled', 'updated_at' => date(DATETIME_FORMAT)],
+            'id = ? AND status = ?',
+            [$confirmation->id, 'pending']
+        );
+    }
+    $confirmation->status = 'cancelled';
+    $error = 'This confirmation is no longer needed. The trip has already been dispatched, started, or completed.';
 }
 
 // Process POST decline actions before any output
 if (!$error && !$done && $confirmation && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!tripConfirmationStillEligible($confirmation)) {
+        $error = 'This confirmation is no longer needed. The trip has already been dispatched, started, or completed.';
+    } else {
     $declineAction = (string) post('decline_action', '');
     $note = postSafe('reschedule_note', '', 1000);
     $requestId = (int) $confirmation->request_id;
@@ -173,11 +190,18 @@ if (!$error && !$done && $confirmation && $_SERVER['REQUEST_METHOD'] === 'POST')
         error_log('confirm.php: ' . $e->getMessage());
         $error = 'Something went wrong while processing your response. Please try again.';
     }
+    } // end eligible else
 }
 
 // Simple GET navigations
 if (!$error && !$done && $confirmation) {
-    if ($choice === 'proceed' && $confirmation->status === 'pending' && $confirmation->sent_at !== null) {
+    if (!tripConfirmationStillEligible($confirmation) && $confirmation->status === 'pending') {
+        if (function_exists('cancelPendingTripConfirmations')) {
+            cancelPendingTripConfirmations((int) $confirmation->request_id, 'confirm GET: trip no longer eligible');
+        }
+        $confirmation->status = 'cancelled';
+        $error = 'This confirmation is no longer needed. The trip has already been dispatched, started, or completed.';
+    } elseif ($choice === 'proceed' && $confirmation->status === 'pending' && $confirmation->sent_at !== null) {
         $affected = db()->update('trip_confirmations', [
             'status' => 'confirmed',
             'responded_at' => date(DATETIME_FORMAT),

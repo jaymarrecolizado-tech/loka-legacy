@@ -18,6 +18,7 @@
 | #12 | Hostinger KVM 2 Staging Migration (`lokastage`) | DONE (deployed 2026-09-03; rotate secrets + manual QA left) |
 | #13 | Trip Email One-Thread (by Control No.) | DONE (2026-09-04) |
 | #14 | Driver Evaluation Access, Anonymity, Reports & PDF | DONE (2026-09-04; SMTP send + full browser click-through manual) |
+| #15 | Skip Trip Confirmation After Dispatch/Complete | DONE (2026-09-04) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -1030,4 +1031,26 @@ Audit export as `data_export` / `driver_evaluations` with format pdf + filter ke
 - `public_html/pages/reports/export-driver-rankings-csv.php` — 4 columns + filters + export audit
 - `public_html/pages/reports/export-driver-evaluations-pdf.php` (new) — anonymous DICT PDF
 - `public_html/cron/process_trip_confirmations.php` — unchanged (reminder path stays queue-only)
+
+---
+
+# LOKA Plan #15: Skip Trip Confirmation After Dispatch/Complete — DONE (2026-09-04)
+
+## Goal
+Pre-trip “Will you proceed?” emails must only go out for **future approved** trips that are **not** yet dispatched / on trip / completed (fix for #570 false send).
+
+## Done
+- [x] `tripConfirmationStillEligible()` — approved + no `actual_dispatch_datetime` + `start_datetime` still in the future
+- [x] `cancelPendingTripConfirmations()` helper
+- [x] Cron SEND skips + cancels ineligible pending rows (no email)
+- [x] Cron EXPIRE cancels quietly when ineligible (no “trip proceeding” noise)
+- [x] Guard dispatch + complete cancel pending confirmations
+- [x] `confirm.php` blocks Proceed/Don’t Proceed when trip no longer eligible
+- [x] `php -l` clean on touched files
+
+## Files
+- `public_html/includes/trip-enhancements.php`
+- `public_html/cron/process_trip_confirmations.php`
+- `public_html/pages/guard/actions.php`
+- `public_html/pages/requests/confirm.php`
 

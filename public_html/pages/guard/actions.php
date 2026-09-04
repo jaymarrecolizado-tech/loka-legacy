@@ -126,6 +126,11 @@ switch ($action) {
         }
         db()->update('requests', $updateData, 'id = ?', [$requestId]);
 
+        // Pre-trip confirmation is no longer meaningful once the vehicle has left
+        if (function_exists('cancelPendingTripConfirmations')) {
+            cancelPendingTripConfirmations((int) $requestId, 'vehicle dispatched');
+        }
+
         // Keep vehicle odometer in sync
         if ($request->vehicle_id && $odo['mileage'] !== null) {
             db()->update('vehicles', [
@@ -274,6 +279,11 @@ switch ($action) {
         }
 
         db()->update('requests', $updateData, 'id = ?', [$requestId]);
+
+        // Belt-and-suspenders: cancel any leftover pending confirmation after complete
+        if (function_exists('cancelPendingTripConfirmations')) {
+            cancelPendingTripConfirmations((int) $requestId, 'trip completed');
+        }
 
         // Update vehicle and driver status back to available
         if ($request->vehicle_id) {

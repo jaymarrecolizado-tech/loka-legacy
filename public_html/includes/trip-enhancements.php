@@ -118,6 +118,46 @@ if (!defined('TRIP_ENHANCEMENTS_LOADED')) {
     }
 
     /**
+     * Whether a request may still receive / answer a pre-trip confirmation email.
+     * False once dispatched (on trip), past start, completed, cancelled, etc.
+     */
+    function tripConfirmationStillEligible(object $request): bool
+    {
+        $status = (string) ($request->status ?? $request->request_status ?? '');
+        if ($status !== STATUS_APPROVED) {
+            return false;
+        }
+        if (!empty($request->actual_dispatch_datetime)) {
+            return false;
+        }
+        $start = $request->start_datetime ?? null;
+        if ($start === null || $start === '' || strtotime((string) $start) <= time()) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Cancel unsent/pending confirmation rows for a request (e.g. after dispatch).
+     */
+    function cancelPendingTripConfirmations(int $requestId, string $reason = ''): int
+    {
+        $affected = (int) db()->update(
+            'trip_confirmations',
+            ['status' => 'cancelled', 'updated_at' => date(DATETIME_FORMAT)],
+            "request_id = ? AND status = 'pending'",
+            [$requestId]
+        );
+        if ($affected > 0) {
+            error_log(
+                'cancelPendingTripConfirmations(#' . $requestId . '): cancelled '
+                . $affected . ($reason !== '' ? " — {$reason}" : '')
+            );
+        }
+        return $affected;
+    }
+
+    /**
      * Create a trip confirmation row for an approved request (if applicable).
      *
      * Scheduling rule:
@@ -144,14 +184,8 @@ if (!defined('TRIP_ENHANCEMENTS_LOADED')) {
                 [$requestId]
             );
 
-            if (!$request || $request->status !== STATUS_APPROVED) {
+            if (!$request || !tripConfirmationStillEligible($request)) {
                 return null;
-            }
-            if (!empty($request->actual_dispatch_datetime)) {
-                return null; // already dispatched — nothing to confirm
-            }
-            if (strtotime($request->end_datetime) <= time()) {
-                return null; // trip window already over
             }
 
             // Never duplicate an active confirmation
@@ -229,7 +263,8 @@ if (!defined('TRIP_ENHANCEMENTS_LOADED')) {
         return db()->fetch(
             "SELECT tc.*, r.user_id AS requester_id, r.status AS request_status,
                     r.start_datetime, r.end_datetime, r.destination, r.purpose,
-                    r.vehicle_id, r.driver_id, r.motorpool_head_id
+                    r.vehicle_id, r.driver_id, r.motorpool_head_id,
+                    r.actual_dispatch_datetime
              FROM trip_confirmations tc
              JOIN requests r ON r.id = tc.request_id AND r.deleted_at IS NULL
              WHERE tc.token_hash = ?",

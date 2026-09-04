@@ -87,6 +87,27 @@ function processTripJobs(): array
     );
 
     foreach ($dueRows as $row) {
+        $request = db()->fetch(
+            "SELECT id, status, start_datetime, actual_dispatch_datetime
+             FROM requests WHERE id = ? AND deleted_at IS NULL",
+            [$row->request_id]
+        );
+
+        if (!$request || !tripConfirmationStillEligible($request)) {
+            db()->update(
+                'trip_confirmations',
+                ['status' => 'cancelled', 'updated_at' => $now],
+                'id = ? AND status = ?',
+                [$row->id, 'pending']
+            );
+            error_log(
+                'processTripJobs: skipped confirmation #' . $row->id
+                . ' for request #' . $row->request_id
+                . ' — trip already dispatched, started, completed, or otherwise ineligible'
+            );
+            continue;
+        }
+
         // The raw token cannot be recovered from its hash; re-issue a token
         // and update the stored hash so the emailed link stays valid.
         $rawToken = bin2hex(random_bytes(32));
@@ -117,6 +138,23 @@ function processTripJobs(): array
     );
 
     foreach ($deadlineRows as $row) {
+        $requestCheck = db()->fetch(
+            "SELECT id, status, start_datetime, actual_dispatch_datetime, user_id
+             FROM requests WHERE id = ? AND deleted_at IS NULL",
+            [$row->request_id]
+        );
+
+        // Trip already started/completed — cancel quietly (no "proceeding" noise)
+        if (!$requestCheck || !tripConfirmationStillEligible($requestCheck)) {
+            db()->update(
+                'trip_confirmations',
+                ['status' => 'cancelled', 'updated_at' => $now],
+                'id = ? AND status = ?',
+                [$row->id, 'pending']
+            );
+            continue;
+        }
+
         $affected = db()->update(
             'trip_confirmations',
             ['status' => 'expired', 'responded_at' => $now, 'updated_at' => $now],
@@ -138,14 +176,10 @@ function processTripJobs(): array
             );
 
             // Also inform the requester of the default outcome
-            $request = db()->fetch(
-                "SELECT user_id FROM requests WHERE id = ? AND deleted_at IS NULL",
-                [$row->request_id]
-            );
-            if ($request) {
+            if ($requestCheck) {
                 try {
                     notify(
-                        (int) $request->user_id,
+                        (int) $requestCheck->user_id,
                         'trip_confirmation_response',
                         'Trip Proceeding (No Response Recorded)',
                         "Request #{$row->request_id}: since no confirmation was received before the deadline, "
