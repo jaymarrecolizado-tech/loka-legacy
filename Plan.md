@@ -15,6 +15,9 @@
 | #9 | Production Deployment & Cron Handover | DONE (code ready; VPS cutover when scheduled) |
 | #10 | Manual QA & Backlog | DONE (documented 2026-09-03) |
 | #11 | Reports Follow-up Gaps | OPEN |
+| #12 | Hostinger KVM 2 Staging Migration (`lokastage`) | DONE (deployed 2026-09-03; rotate secrets + manual QA left) |
+| #13 | Trip Email One-Thread (by Control No.) | DONE (2026-09-04) |
+| #14 | Driver Evaluation Access, Anonymity, Reports & PDF | DONE (2026-09-04; SMTP send + full browser click-through manual) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -751,3 +754,280 @@ Finish leftover gaps from the Better LOKA Reports work. Core enrichment (mileage
 - Mileage/fuel/dispatch enrichment on Vehicle History + Driver Report
 - Trip Requests dept/vehicle/driver filters, cancelled + km stats, PDF filter pass-through
 - Hub badges "CSV & PDF Export" + tooltips + populated `total_km`
+
+---
+
+# LOKA Plan #12: Hostinger KVM 2 Staging Migration — DONE (2026-09-03)
+
+## Goal
+Deploy this app (`cleancopy`) to Hostinger KVM 2 **staging** at `https://lokastage.dictr2.cloud`, using `prod/public_html/` and [prod/PRODUCTION_GUIDE.md](prod/PRODUCTION_GUIDE.md). Live prod domain `lokafleet.dictr2.cloud` is a later cutover if needed.
+
+## Security rules (mandatory)
+- **Never** commit SSH/FTP passwords, DB passwords, SMTP secrets, or staging `.env` to git.
+- Credentials are used only at execution time — not written into `Plan.md` or scripts.
+- After first successful login: prefer SSH key auth; **rotate** any password shared in chat.
+- Server `.env` must be `chmod 600` and **outside nginx docroot** on this host (`/home/lokaloka/htdocs/.env.lokastage`) — Apache `.htaccess` does **not** block static files under nginx.
+- **2026-09-03:** staging `.env` was briefly publicly readable via nginx before move-out; **rotate** DB password, Gmail app password, and SSH password.
+
+## Target (confirmed 2026-09-03)
+| Item | Value |
+|------|--------|
+| Provider | Hostinger KVM 2 |
+| Domain | `lokastage.dictr2.cloud` |
+| Site URL | `https://lokastage.dictr2.cloud` |
+| IP | `187.77.150.203` |
+| Site user | `lokaloka` |
+| SSH user | `lokacloud-ssh` |
+| Web root (confirmed) | `/home/lokaloka/htdocs/lokastage.dictr2.cloud/` |
+| Secrets file | `/home/lokaloka/htdocs/.env.lokastage` (not in webroot) |
+| Package | `prod/public_html/` |
+| Localhost | remains `APP_ENV=development` / immediate mail — do not break XAMPP |
+| Pre-deploy backup | `/home/lokaloka/backups/pre_migrate_20260903_132720/` |
+
+### Staging MySQL (confirmed 2026-09-03 — password offline only)
+| Item | Value |
+|------|--------|
+| `DB_HOST` | `localhost` (on VPS) |
+| `DB_PORT` | `3306` |
+| `DB_NAME` | `dbfleet3` |
+| `DB_USER` | `dbfleet3user` |
+| `DB_CHARSET` | `utf8mb4` |
+| `DB_PASSWORD` | **not in git** — set only in server env file (rotate if chat-exposed) |
+
+### Staging SMTP — Gmail (same as local `.env`, 2026-09-03)
+| Item | Value |
+|------|--------|
+| Provider | Gmail SMTP |
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `587` |
+| `SMTP_ENCRYPTION` | `tls` |
+| `SMTP_USER` / `SMTP_FROM_EMAIL` | `jelite.demo@gmail.com` (same as local) |
+| `SMTP_FROM_NAME` | `LOKA Fleet Management` |
+| `SMTP_PASSWORD` | **not in git** — Gmail App Password in server env only (rotate after nginx leak) |
+| Staging mail mode | `MAIL_ENABLED=true`, `EMAIL_DELIVERY_MODE=queued`, `MAIL_SYNC_SEND=false` |
+
+## Phase 0 — Pre-flight (local)
+- [x] On `cleancopy`: rebuild `prod/public_html` from `public_html` (exclude `.env`, runtime logs/cache)
+- [x] Prepare DB dump for import (local `old_loka_db`); keep SQL in `_deploy_tmp/` (gitignored)
+- [x] Staging DB name/user collected (`dbfleet3` / `dbfleet3user`); password kept offline
+- [x] SMTP = Gmail, same local account (`jelite.demo@gmail.com`); app password offline only
+- [x] Confirm DNS `lokastage.dictr2.cloud` → `187.77.150.203`
+
+## Phase 1 — Access & backup
+- [x] `ssh lokacloud-ssh@187.77.150.203` — PHP 8.4+, MySQL 8.4, site user `lokaloka`
+- [x] Confirm document root `/home/lokaloka/htdocs/lokastage.dictr2.cloud`
+- [x] Tar backup + mysqldump under `/home/lokaloka/backups/pre_migrate_20260903_132720/`
+
+## Phase 2 — Upload
+- [x] Upload `prod/public_html/` tarball → staging web root
+
+## Phase 3 — Staging `.env`
+- [x] Staging env written (then moved outside docroot for nginx)
+- [x] `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://lokastage.dictr2.cloud`
+- [x] Set `DB_*`, Gmail `SMTP_*`, `EMAIL_DELIVERY_MODE=queued`, `MAIL_ENABLED=true`, `CRON_SECRET`
+- [x] `chmod 600` on secrets file
+- [x] HTTPS force in packaged `.htaccess`; TLS already terminating at nginx
+
+## Phase 4 — Database
+- [x] Use Hostinger DB `dbfleet3` as `dbfleet3user` (utf8mb4)
+- [x] Import local dump into `dbfleet3` (36 tables)
+- [x] `php migrate.php`
+- [x] `https://lokastage.dictr2.cloud/health.php` → healthy
+
+## Phase 5 — Cron, SSL, perms
+- [x] Dirs/files perms set; logs/cache writable
+- [x] Cron for `lokaloka`: `process_queue.php` */2, `process_trip_confirmations.php` */5
+- [x] TLS + login page OK; `/.env` no longer serves secrets
+
+## Phase 6 — Post-deploy QA
+- [x] Login page loads on `https://lokastage.dictr2.cloud`
+- [x] Queue cron sends mail (manual run: Sent>0)
+- [ ] New request redirects fast; email within ~2 min via cron (manual user test)
+- [ ] No duplicate on double-submit
+- [ ] Reports CSV/PDF
+- [ ] Admin rollback smoke
+- [ ] Gas stations toggle
+- [x] `/config/` → 403; `/.env` leak fixed (302 empty, secrets outside webroot)
+
+## Rollback
+Restore `/home/lokaloka/backups/pre_migrate_20260903_132720/` site tarball + `dbfleet3.sql`; leave localhost XAMPP unchanged.
+
+## Follow-ups
+- [ ] Rotate DB + Gmail app + SSH passwords after chat + brief nginx leak
+- [ ] Prefer SSH key auth for `lokacloud-ssh`
+- [ ] Optional: nginx `location` deny for `/\.env` as defense-in-depth
+- [ ] User manual QA checklist above
+
+## Execution gate
+Deployed 2026-09-03. Remaining: rotate secrets + manual QA in browser.
+
+---
+
+# LOKA Plan #13: Trip Email One-Thread (by Control No.) — DONE (2026-09-04)
+
+## Goal
+All notification emails for the same Control No. (`request_id`) land in **one mailbox thread** (Gmail/Outlook) via a stable subject + RFC `Message-ID` / `In-Reply-To` / `References`.
+
+## Done
+- [x] Stable subject: `Control No. {id}: LOKA Fleet Request` when `request_id` is set (`EmailQueue::requestThreadSubject`, applied in `queue()` + `queueTemplate()`)
+- [x] Template event title shown as body heading (status stays in body, not subject)
+- [x] `Mailer::buildHeaders` sets `Message-ID`; with `request_id` also sets `In-Reply-To` + `References` to `<loka-request-{id}@{from-domain}>`
+- [x] Sync + cron `process()` pass `request_id` and `email_queue.id` into `Mailer::send`
+- [x] Direct queue callers updated: trip confirmations, driver eval invite/reminder
+- [x] Password-reset / non-request mail unchanged (no shared thread)
+
+## QA
+- [x] Local header invariant script (`php -l` + reflection headers check)
+- [ ] Staging Gmail: submit → approve → assign → complete → one thread for same Control No. (manual)
+
+## Files
+- `public_html/classes/Mailer.php`
+- `public_html/classes/EmailQueue.php`
+- `public_html/cron/process_trip_confirmations.php`
+- `public_html/includes/trip-enhancements.php`
+
+---
+
+# LOKA Plan #14: Driver Evaluation Access, Anonymity, Reports & PDF — ✅ DONE (2026-09-04)
+
+## Goal
+After a completed trip, **only the real riders** can rate the driver (token-gated, one invite each). Reports and the PDF stay **anonymous** (no rater name/email/user id). The form keeps **4 required star categories** plus **optional comments**. Logged-in riders are **nagged** until they submit (banner + email); booking is **not** blocked. Staff get usable filters and a professional ranking PDF with analytics and optional comments.
+
+Extends Plan #7 (4-category rubric, already DONE). Does not reopen Plan #11 (other report UI gaps).
+
+## Current model (trip #555 with 4 participants)
+
+Participants = **requester + `request_passengers` companions**. The UI already counts that way (`countRequestPassengers()` in `public_html/includes/functions.php` = companions + 1). The assigned driver is not an evaluator.
+
+Each allowed person gets **one** `driver_evaluations` row with a 64-hex token stored only as SHA-256. The email link is the capability. DB guard: `UNIQUE (request_id, evaluator_user_id)` (`migrations/044_driver_evaluations.php`). Submit is single-use (`submitted_at`) and expires after `driver_evaluation_expiry_days` (default 30).
+
+```mermaid
+flowchart TD
+  tripDone[Trip 555 completed]
+  invite[One invite per real rider]
+  email[Email unique token link]
+  form[Public form 4 stars required]
+  nag[Banner plus email until submitted]
+  store[Store ratings without showing name]
+  report[Reports: averages, filters, PDF]
+
+  tripDone --> invite
+  invite --> email
+  invite --> nag
+  email --> form
+  nag --> form
+  form --> store
+  store --> report
+```
+
+## Gaps vs that model
+
+- Invites are built only from `request_passengers`, so the **requester is skipped**. If #555 is requester + 3 companions, only 3 invites (or fewer) are created. Requester cannot be added as a companion (`pages/requests/manage-passengers.php` blocks it).
+- Submit is documented as public but `index.php` `$publicPages` omits `evaluations`, so `requireAuth()` runs first and login does not return to the token URL.
+- Guest tokens are created then discarded (never emailed or shown). Re-running create on guests can insert extra guest rows.
+- Invites use `EmailQueue::queue()` which does **not** sync-send; they wait on `process_queue.php`.
+- If the passenger must log in, `auditLog()` on submit writes session `user_id` into `audit_logs` (deanonymizes the rater).
+- Rankings/CSV still average the **old 5 columns** (punctuality/courtesy/…) while new submits fill the **4 new columns**.
+- Tagged drivers cannot open Rankings (`$driverAllowed` omits those actions) even though the page already self-scopes.
+
+Residual (accept): a trip with one submitter can still be inferred by staff who know the passenger list. Email-queue admins can see who was invited. That is operational, not the public report.
+
+## Form (no rubric change)
+
+- **Stars (required, 1–5 each):** Cleanliness of the Vehicle; Behavior of the Driver; Appearance and Hygiene; Road Safety and Driving Skills. Overall = average of those 4.
+- **Comments (optional, max 2000):** stored in `remarks`, shown as “Anonymous passenger”.
+
+## Mandatory evaluation (nag, do not block booking)
+
+**Thoughts:** Require all 4 stars on the form (already does). Keep comments **optional** — forcing a comment produces “n/a” noise. Do not hard-lock the app: motorpool heads and approvers also ride, and blocking new requests would stall operations. True 100% compliance is impossible for guests and anyone who ignores email. Accountability is the **response-rate** column on reports.
+
+**Enforcement (nag only):** logged-in riders are pushed until they submit; they can still create trips.
+
+- Form: 4 stars required (JS + PHP). Comments optional.
+- Email: invite on trip complete + existing 48-hour reminder (`cron/process_trip_confirmations.php`).
+- In-app: persistent header/dashboard banner when the current user has unsubmitted, non-expired invites. “You have N driver evaluation(s) to complete.” **Rate now** re-issues a token and opens the public submit page. Hide banner on login/public/submit pages and after expiry or submit.
+- Do **not** block `requests/create` or other modules.
+- Guests: email/reminder only (no login, no banner).
+- Driver: never nagged to rate their own trip.
+
+## Reports and filters (anonymous)
+
+Never SELECT `evaluator_user_id`, `guest_label`, or passenger names in UI/CSV/PDF. Never add a passenger/evaluator filter.
+
+**1. Evaluations** — `/?page=evaluations` (`pages/evaluations/index.php`)
+
+- Per-driver averages for the 4 star areas, eval count, overall.
+- Response rate per trip (invites vs submitted vs average).
+- Anonymous remarks: trip #, destination, driver, plate, overall, quote — “Anonymous passenger”.
+- Access: `requireReportsAccess()`. Self-scoped tagged drivers see **their own** `driver_id` only.
+
+**2. Driver Rankings** — `/?page=reports&action=driver-rankings` plus CSV. Must use the **same 4 columns** as the form.
+
+**Filter bar (both reports, GET, Clear/Reset):**
+
+- From / To — trip `start_datetime` (Rankings default current month; Evaluations blank = all time).
+- Driver — dropdown (approver+). Self-scoped drivers: no picker, locked to self.
+- Vehicle — plate dropdown (approver+), same pattern as `pages/reports/trips.php`.
+- Trip no. — optional request id (e.g. 555).
+- Min evaluations — Rankings only (default 2). CSV gets the same query string (`from`, `to`, `min_eval`, `driver_id`, `vehicle_id`, `request_id`).
+
+**Access:** add `driver-rankings`, `export-driver-rankings-csv`, and `export-driver-evaluations-pdf` to `$driverAllowed` in `index.php`. Keep `de.driver_id = currentDriverId()` lock for tagged drivers.
+
+## Professional PDF
+
+Landscape TCPDF, same DICT style as `pages/reports/export-driver.php` / `export-gas-vouchers-pdf.php`. Header “DICT - Driver Evaluation Report”, period, generated time, page numbers. Confidentiality line: passenger identities never included. Reuse `reportPdfWriteMeta()`. Shared queries in a small helper (gas-voucher pattern) so Rankings / CSV / PDF do not copy SQL. PDF file under ~250 lines.
+
+**Entry:** Export PDF on Rankings and Evaluations. Checkbox **Include anonymous comments** (`include_remarks=1`). Same filters as the screen. PDF lists **every driver with ≥1 submitted evaluation** in the filter set (do not apply Min evaluations). Self-scoped drivers: own analytics only.
+
+**Page 1 — analytics + full ranking**
+
+- Title, period, filters, generated-by (exporter staff name is fine).
+- KPIs: fleet overall average, total submitted evals, invite response rate, drivers ranked.
+- Category analytics: fleet averages for the 4 stars + simple filled-cell bars (no Chart.js).
+- Full ranking table best → worst: Rank, Driver, Eval count, Overall, four category averages. Highlight ranks 1–3. Empty state if none submitted.
+
+**Following pages — comments (optional)**
+
+- Only if checkbox on. Group by driver. Each block: overall stars, trip #, destination, date, quoted remark, “Anonymous passenger”. Cap ~200 newest remarks. Omit section if checkbox off.
+
+Audit export as `data_export` / `driver_evaluations` with format pdf + filter keys, not rater ids.
+
+## Implementation — ✅ DONE (2026-09-04)
+
+- [x] Invite requester + companions in `createDriverEvaluations()` (`includes/trip-enhancements.php`); skip driver; skip already-invited users; guest rows idempotent (top-up to current guest count, `Guest N` ordinals stable — no extras on second complete/arrival); queue+sync-send email for every user with an address.
+- [x] Allow `page=evaluations&action=submit` without login (`evaluations` in `$publicPages` in `index.php`; submit case stays public, index re-gated by `requireReportsAccess()` → anonymous hits 302 to login, HTTP-verified).
+- [x] Do not record the rater on submit — `pages/evaluations/submit.php` writes the `evaluation_submitted` audit row directly with `user_id NULL` (auditLog() would stamp the session id).
+- [x] After `queue()`, sync-send in `immediate` mode — new `queueDriverEvaluationEmail()` (`includes/trip-enhancements.php`) queues then `Mailer::send()` + `markSent()` when `emailDeliveryMode()='immediate'`; failures stay queued for cron. Reminders stay queued (`cron/process_trip_confirmations.php` unchanged).
+- [x] `pendingDriverEvaluationsForUser()` + persistent header banner (`includes/header.php`, hidden under View-as) + `Rate now` → new `pages/evaluations/rate.php` re-issues the token (old emailed link dies) and forwards to the public form. In-app notification inserted on invite create (own inbox only, no duplicate email). Booking never blocked.
+- [x] Rankings + CSV now average `rating_cleanliness / behavior / appearance / safety` (old 5 columns dropped).
+- [x] Shared filters on Evaluations + Rankings + CSV (From/To, Driver, Vehicle, Trip no.; Rankings min evals) via `includes/eval_report.php` `evalReportFilterBarHtml()` / `evalReportParseFilters()`; Clear/Reset links.
+- [x] `driver-rankings`, `export-driver-rankings-csv`, `export-driver-evaluations-pdf` added to `$driverAllowed` in `index.php` (tagged drivers keep the `de.driver_id` self-scope lock; unresolvable scope locks to empty set).
+- [x] Professional PDF: `includes/eval_report.php` helper + `pages/reports/export-driver-evaluations-pdf.php` (landscape TCPDF, DICT header, `reportPdfWriteMeta()` filters, confidentiality line, KPIs, 4-category analytics with filled-cell bars, full ranking best→worst w/ ranks 1–3 highlighted, ignores Min-evaluations, optional anonymous-comments pages grouped by driver, cap 200). Export buttons with **Include comments** checkbox on both Evaluations and Rankings; exports audited as `data_export`/`driver_evaluations` with filter keys only.
+- [x] Guests: one token row each, tokens never displayed or shared (created then discarded).
+
+## QA — verified 2026-09-04 (`_deploy_tmp/verify_plan14_*.php`, rolled-back transactions, mail disabled — nothing persisted, nobody emailed)
+
+- [x] Complete a trip with requester + 3 companions (+1 guest) → 4 user invite rows + 1 guest row, 4 emails queued, driver not invited, requester invited (was skipped before); re-run → 0 extra rows, guest stays `Guest 1` (verify_plan14_evals).
+- [x] Email link logged out → form renders (`?page=evaluations&action=submit` → 200, no auth); second submit blocked (single-use `submitted_at IS NULL` guard re-verified); random/empty token → "Link Not Usable" (HTTP-verified).
+- [x] Evaluations + rankings + CSV show 4-category averages and anonymous comments; remarks rows never expose `evaluator_user_id`/name/email; audit row on submit has `user_id NULL` (verify_plan14_evals + page renders).
+- [x] Filter Trip no. (and From/To/Driver/Vehicle) applies to rankings, response-rate table, remarks and KPIs; response rate 1/5 = 20% on seeded trip; Clear links restore defaults; CSV uses the same parse+rankings path as the screen (verify_plan14_pages).
+- [x] Tagged driver: actions allowed in `$driverAllowed`; `evalReportParseFilters()` forces own `driver_id` and locks unresolvable scope to empty set. Approver sees driver/vehicle pickers.
+- [x] PDF renders both variants: comments off = no comments section; comments on = grouped anonymous remarks (DICT header, KPIs, 4-category bars, ranking table, confidentiality line) (verify_plan14_pdf → valid `%PDF-1.7`, content text-checked).
+- [x] Banner: pending invite → "You have N driver evaluation(s) to complete." + per-trip **Rate now** links; Rate now re-issues token and lands on the public form; banner hidden under View-as; guests get email only, drivers never invited (verify_plan14_banner).
+- [x] `php -l` clean on all 10 touched files + full public_html sweep 0 errors; `?page=evaluations` still 302→login for anonymous; rankings 302→login.
+- [ ] Manual (browser, when DICT schedules): real SMTP delivery of invite + reminder, tagged-driver self-scoped click-through, View-as sanity.
+
+## Files
+
+- `public_html/index.php` — `evaluations` public (submit), `rate` route, PDF route, `$driverAllowed` +3
+- `public_html/includes/trip-enhancements.php` — `createDriverEvaluations()` rewrite, `queueDriverEvaluationEmail()`, `pendingDriverEvaluationsForUser()`
+- `public_html/includes/header.php` — pending-evaluation nag banner
+- `public_html/includes/eval_report.php` (new) — shared filters/queries/KPIs/remarks/filter-bar/PDF-export HTML
+- `public_html/pages/evaluations/submit.php` — anonymous audit insert
+- `public_html/pages/evaluations/rate.php` (new) — Rate now token re-issue
+- `public_html/pages/evaluations/index.php` — shared filters + PDF export button
+- `public_html/pages/reports/driver-rankings.php` — 4 columns + shared filters + PDF export
+- `public_html/pages/reports/export-driver-rankings-csv.php` — 4 columns + filters + export audit
+- `public_html/pages/reports/export-driver-evaluations-pdf.php` (new) — anonymous DICT PDF
+- `public_html/cron/process_trip_confirmations.php` — unchanged (reminder path stays queue-only)
+

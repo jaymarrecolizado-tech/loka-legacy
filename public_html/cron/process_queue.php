@@ -50,6 +50,9 @@ chdir(dirname(__DIR__));
 // pre-load, SMTP credentials stay empty and every email silently fails with:
 //   "MAIL_USERNAME and MAIL_PASSWORD must be configured"
 $envFile = __DIR__ . '/../.env';
+if (!file_exists($envFile)) {
+    $envFile = __DIR__ . '/../../.env.lokastage';
+}
 if (file_exists($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {

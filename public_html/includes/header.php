@@ -141,6 +141,26 @@
         
         <!-- Main Content -->
         <main class="main-content" id="main-content">
+            <!-- Pending driver evaluation nag (anonymous rating, booking never blocked) -->
+            <?php if (isLoggedIn() && function_exists('pendingDriverEvaluationsForUser') && !isViewingAs()):
+                $pendingEvals = pendingDriverEvaluationsForUser(userId());
+                if (!empty($pendingEvals)): ?>
+                <div class="alert alert-warning alert-dismissible fade show m-3 mb-0" role="alert">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <div class="me-auto">
+                            <i class="bi bi-star-half me-1"></i>
+                            <strong>You have <?= count($pendingEvals) ?> driver evaluation<?= count($pendingEvals) > 1 ? 's' : '' ?> to complete.</strong>
+                            <span class="text-muted small ms-1">Your feedback is anonymous.</span>
+                        </div>
+                        <?php foreach ($pendingEvals as $pe): ?>
+                        <a class="btn btn-sm btn-primary text-nowrap" href="<?= APP_URL ?>/?page=evaluations&action=rate&id=<?= (int) $pe->request_id ?>">
+                            Rate now — Trip #<?= (int) $pe->request_id ?>
+                        </a>
+                        <?php endforeach; ?>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                </div>
+            <?php endif; endif; ?>
             <!-- Flash Messages -->
             <?php if ($flash = getFlash()): ?>
             <div class="alert alert-<?= e($flash['type']) ?> alert-dismissible fade show m-3" role="alert">

@@ -1,11 +1,11 @@
 ﻿<?php
 /**
- * LOKA - Guard Trip Tickets Page
- * 
- * Dedicated page for guards to manage trip tickets for completed trips
+ * LOKA - Trip Tickets Review Page
+ *
+ * Motorpool/admin review of trip tickets (create is driver My Trips)
  */
 
-requireRole(ROLE_GUARD);
+requireAnyRole([ROLE_MOTORPOOL, ROLE_ADMIN]);
 
 $pageTitle = 'Trip Tickets';
 $action = get('action', 'list');
@@ -17,142 +17,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'list') {
     
     switch ($action) {
         case 'create':
-            // Create trip ticket (after trip completion)
+            // Guards previously created tickets here; creation is driver-only via create_form
             header('Content-Type: application/json');
-            
-            $requestId = postInt('request_id');
-            $driverId = postInt('driver_id');
-            $tripType = post('trip_type', 'official');
-            $tripTypeOther = postSafe('trip_type_other', '', 100);
-            $startDate = post('start_date');
-            $endDate = post('end_date');
-            $destination = postSafe('destination', '', 255);
-            $purpose = postSafe('purpose', '', 500);
-            $passengers = (int) post('passengers', 0);
-
-            // Mileage
-            $startMileage = post('start_mileage') ? (int)post('start_mileage') : null;
-            $endMileage = post('end_mileage') ? (int)post('end_mileage') : null;
-            $distanceTraveled = post('distance_traveled') ? (int)post('distance_traveled') : null;
-            
-            // Fuel
-            $fuelConsumed = post('fuel_consumed') ? (float)post('fuel_consumed') : null;
-            $fuelCost = post('fuel_cost') ? (float)post('fuel_cost') : null;
-            
-            // Documents (will be handled by upload endpoint)
-            $travelOrderPath = null; // From upload
-            $obSlipPath = null; // From upload
-            $otherDocumentsPath = null; // From upload
-            
-            // Issues
-            $hasIssues = post('has_issues') ? 1 : 0;
-            $issuesDescription = postSafe('issues_description', '', 1000);
-            $resolved = post('resolved') ? 1 : 0;
-            $resolutionNotes = postSafe('resolution_notes', '', 1000);
-            $guardNotes = postSafe('guard_notes', '', 1000);
-            
-            // Validation
-            $errors = [];
-            
-            if (!$requestId) {
-                $errors[] = 'Request ID is required';
-            }
-            if (!$driverId) {
-                $errors[] = 'Driver ID is required';
-            }
-            if (!$tripType || !in_array($tripType, ['official', 'personal', 'maintenance', 'travel_order', 'other'])) {
-                $errors[] = 'Invalid trip type';
-            }
-            if ($tripType === 'other' && empty($tripTypeOther)) {
-                $errors[] = 'Please specify the trip type when "Other" is selected.';
-            }
-            if (!$startDate) {
-                $errors[] = 'Start date is required';
-            }
-            if (!$endDate) {
-                $errors[] = 'End date is required';
-            }
-            if (!$destination) {
-                $errors[] = 'Destination is required';
-            }
-            
-            if (!empty($errors)) {
-                try {
-                    db()->beginTransaction();
-                    
-                    // Insert trip ticket
-                    $ticketId = db()->insert('trip_tickets', [
-                        'request_id' => $requestId,
-                        'driver_id' => $driverId,
-                        'trip_type' => $tripType,
-                        'trip_type_other' => $tripType === 'other' ? $tripTypeOther : null,
-                        'start_date' => date('Y-m-d H:i:s', strtotime($startDate)),
-                        'end_date' => date('Y-m-d H:i:s', strtotime($endDate)),
-                        'destination' => $destination,
-                        'purpose' => $purpose,
-                        'passengers' => $passengers,
-                        'start_mileage' => $startMileage,
-                        'end_mileage' => $endMileage,
-                        'distance_traveled' => $distanceTraveled,
-                        'fuel_consumed' => $fuelConsumed,
-                        'fuel_cost' => $fuelCost,
-                        'travel_order_path' => $travelOrderPath,
-                        'ob_slip_path' => $obSlipPath,
-                        'other_documents_path' => $otherDocumentsPath,
-                        'has_issues' => $hasIssues,
-                        'issues_description' => $issuesDescription,
-                        'resolved' => $resolved,
-                        'resolution_notes' => $resolutionNotes,
-                        'dispatch_guard_id' => userId(),
-                        'arrival_guard_id' => userId(),
-                        'guard_notes' => $guardNotes,
-                        'status' => 'draft',
-                        'created_by' => userId()
-                    ]);
-                    
-                    // Link ticket to request
-                    db()->update('requests', 
-                        ['trip_ticket_id' => $ticketId], 
-                        'id = ?', 
-                        [$requestId]
-                    );
-                    
-                    // Audit log
-                    auditLog(
-                        'trip_ticket_created',
-                        'trip_ticket',
-                        $ticketId,
-                        null,
-                        [
-                            'request_id' => $requestId,
-                            'driver_id' => $driverId,
-                            'trip_type' => $tripType
-                        ]
-                    );
-                    
-                    db()->commit();
-                    
-                    echo json_encode([
-                        'success' => true,
-                        'message' => 'Trip ticket created successfully',
-                        'ticket_id' => $ticketId
-                    ]);
-                    
-                } catch (Exception $e) {
-                    db()->rollback();
-                    http_response_code(500);
-                    echo json_encode([
-                        'success' => false,
-                        'error' => 'Failed to create trip ticket: ' . $e->getMessage()
-                    ]);
-                }
-            } else {
-                http_response_code(400);
-                echo json_encode([
-                    'success' => false,
-                    'errors' => $errors
-                ]);
-            }
+            echo json_encode(['success' => false, 'message' => 'Trip ticket creation is not available on this page.']);
             exit;
             
         case 'approve':
@@ -317,18 +184,11 @@ $sql = "SELECT tt.*,
 $params = [];
 
 // Role-based filtering
-if (isGuard()) {
-    // Guards see all tickets they created or are involved in
-    $sql .= " AND (tt.created_by = ? OR tt.driver_id = ?)";
-    $params[] = userId();
-    $params[] = userId();
-} elseif (isMotorpool()) {
-    // Motorpool sees all tickets for review
+if (isMotorpool() && !isAdmin()) {
+    // Motorpool sees tickets awaiting / past review
     $sql .= " AND tt.status IN ('submitted', 'reviewed', 'approved')";
-} else {
-    // Other roles (admin) see all
-    $sql .= "";
 }
+// Admin sees all
 
 // Filter by status
 $statusFilter = get('status', '');
@@ -373,11 +233,6 @@ require_once INCLUDES_PATH . '/header.php';
             <p class="text-muted mb-0">Manage trip completion tickets and documentation</p>
         </div>
         <div>
-            <?php if (isGuard()): ?>
-                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createTicketModal">
-                    <i class="bi bi-plus-circle me-1"></i>Create Trip Ticket
-                </button>
-            <?php endif; ?>
             <?php if (isMotorpool()): ?>
                 <a href="?page=reports" class="btn btn-outline-secondary">
                     <i class="bi bi-bar-chart me-1"></i>View Reports
@@ -667,260 +522,8 @@ require_once INCLUDES_PATH . '/header.php';
     </div>
 </div>
 
-<!-- Create Trip Ticket Modal (for guards) -->
-<?php if (isGuard()): ?>
-<div class="modal fade" id="createTicketModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-file-earmark-plus me-2"></i>Create Trip Ticket
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="createTicketForm" enctype="multipart/form-data">
-                    <?= csrfField() ?>
-                    
-                    <!-- Trip Selection -->
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Request <span class="text-danger">*</span></label>
-                            <select class="form-select" name="request_id" required>
-                                <option value="">Select completed trip...</option>
-                                <?php
-                                // Get driver's recent completed trips without tickets
-                                $completedTrips = db()->fetchAll(
-                                    "SELECT r.id, r.destination, r.actual_arrival_datetime,
-                                           d.id as driver_id, u.name as driver_name
-                                     FROM requests r
-                                     JOIN drivers d ON r.driver_id = d.id
-                                     JOIN users u ON d.user_id = u.id
-                                     LEFT JOIN trip_tickets tt ON r.id = tt.request_id
-                                     WHERE d.user_id = ?
-                                       AND r.status = 'completed'
-                                       AND r.actual_arrival_datetime IS NOT NULL
-                                       AND tt.id IS NULL
-                                     ORDER BY r.actual_arrival_datetime DESC
-                                     LIMIT 50",
-                                    [userId()]
-                                );
-                                ?>
-                                <?php foreach ($completedTrips as $trip): ?>
-                                    <option value="<?= $trip->id ?>">
-                                        <?= '#'.$trip->id.' - '.$trip->destination.' ('.formatDate($trip->actual_arrival_datetime, 'M/d').')' ?>
-                                        - <?= e($trip->driver_name) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <small class="text-muted">Select from your recent completed trips</small>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Trip Type <span class="text-danger">*</span></label>
-                            <select class="form-select" name="trip_type" required onchange="toggleTripTypeOtherModal()">
-                                <option value="official">Official Business</option>
-                                <option value="personal">Personal</option>
-                                <option value="maintenance">Maintenance Run</option>
-                                <option value="travel_order">Travel Order</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Other Trip Type Description (shown only when Other is selected) -->
-                    <div class="row mb-3" id="tripTypeOtherRowModal" style="display: none;">
-                        <div class="col-12">
-                            <label class="form-label">Specify Trip Type <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="trip_type_other" placeholder="Please specify the type of trip...">
-                            <small class="text-muted">Required when "Other" is selected as trip type</small>
-                        </div>
-                    </div>
-
-                    <!-- Date & Time -->
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                            <input type="datetime-local" class="form-control" name="start_date" required>
-                            <small class="text-muted">Actual departure time</small>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">End Date <span class="text-danger">*</span></label>
-                            <input type="datetime-local" class="form-control" name="end_date" required>
-                            <small class="text-muted">Actual arrival time</small>
-                        </div>
-                    </div>
-
-                    <!-- Destination & Purpose -->
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Destination <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="destination" required placeholder="e.g., Main Office, Warehouse">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Purpose</label>
-                            <textarea class="form-control" name="purpose" rows="2" placeholder="Purpose of this trip..."></textarea>
-                        </div>
-                    </div>
-
-                    <!-- Passengers -->
-                    <div class="mb-3">
-                        <label class="form-label">Number of Passengers</label>
-                        <input type="number" class="form-control" name="passengers" min="0" value="0">
-                    </div>
-
-                    <!-- Mileage -->
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label class="form-label">Start Odometer</label>
-                            <input type="number" class="form-control" name="start_mileage" placeholder="Starting reading">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">End Odometer</label>
-                            <input type="number" class="form-control" name="end_mileage" placeholder="Ending reading">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Distance (km)</label>
-                            <input type="number" class="form-control" name="distance_traveled" placeholder="Auto-calculated if different">
-                        </div>
-                    </div>
-
-                    <!-- Fuel -->
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Fuel Consumed (L)</label>
-                            <input type="number" step="0.01" class="form-control" name="fuel_consumed" placeholder="Total liters">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Fuel Cost (PHP)</label>
-                            <input type="number" step="0.01" class="form-control" name="fuel_cost" placeholder="Total cost">
-                        </div>
-                    </div>
-
-                    <!-- Documents -->
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label class="form-label">Travel Order (TO)</label>
-                            <input type="file" class="form-control" name="travel_order" accept=".pdf,.jpg,.png">
-                            <small class="text-muted">Optional</small>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">OB Slip</label>
-                            <input type="file" class="form-control" name="ob_slip" accept=".pdf,.jpg,.png">
-                            <small class="text-muted">Optional</small>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Other Documents</label>
-                            <input type="file" class="form-control" name="other_documents" accept=".pdf,.zip" multiple>
-                            <small class="text-muted">Optional</small>
-                        </div>
-                    </div>
-
-                    <!-- Issues -->
-                    <div class="mb-3">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" name="has_issues" id="hasIssues" onchange="toggleIssuesFields()">
-                            <label class="form-check-label" for="hasIssues">Any issues or incidents?</label>
-                        </div>
-                    </div>
-
-                    <div id="issuesFields" class="mb-3" style="display: none;">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <label class="form-label">Issues Description</label>
-                                <textarea class="form-control" name="issues_description" rows="2" placeholder="Describe any issues..."></textarea>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Resolved?</label>
-                                <select class="form-select" name="resolved">
-                                    <option value="0">No</option>
-                                    <option value="1">Yes</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="mt-2">
-                            <label class="form-label">Resolution Notes</label>
-                            <textarea class="form-control" name="resolution_notes" rows="2" placeholder="How was it resolved?"></textarea>
-                        </div>
-                    </div>
-
-                    <!-- Guard Notes -->
-                    <div class="mb-3">
-                        <label class="form-label">Additional Notes</label>
-                        <textarea class="form-control" name="guard_notes" rows="3" placeholder="Any additional observations..."></textarea>
-                    </div>
-
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle me-2"></i>
-                        <strong>Note:</strong> Documents will be uploaded after creating the ticket. You can then attach TO/OB slips and other documentation.
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" onclick="createTicket()">
-                    <i class="bi bi-plus-circle me-1"></i>Create Ticket
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
 
 <script>
-function toggleIssuesFields() {
-    const hasIssues = document.getElementById('hasIssues').checked;
-    document.getElementById('issuesFields').style.display = hasIssues ? 'block' : 'none';
-}
-
-function toggleTripTypeOtherModal() {
-    const tripTypeSelect = document.querySelector('#createTicketForm select[name="trip_type"]');
-    const otherRow = document.getElementById('tripTypeOtherRowModal');
-    const otherInput = otherRow.querySelector('input[name="trip_type_other"]');
-
-    if (tripTypeSelect.value === 'other') {
-        otherRow.style.display = 'block';
-        otherInput.required = true;
-    } else {
-        otherRow.style.display = 'none';
-        otherInput.required = false;
-        otherInput.value = '';
-    }
-}
-
-async function createTicket() {
-    const form = document.getElementById('createTicketForm');
-    const formData = new FormData(form);
-    
-    try {
-        const response = await fetch('?page=trip-tickets&action=create', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            // Close modal
-            bootstrap.Modal.getInstance(document.getElementById('createTicketModal')).hide();
-            
-            // Show success message
-            showAlert('success', result.message);
-            
-            // Reload page
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        } else {
-            showAlert('danger', result.error || 'Failed to create ticket');
-            if (result.errors) {
-                showValidationErrors(result.errors);
-            }
-        }
-    } catch (error) {
-        showAlert('danger', 'An error occurred. Please try again.');
-    }
-}
-
 function approveTicket(ticketId) {
     if (!confirm('Are you sure you want to approve this trip ticket?')) return;
     

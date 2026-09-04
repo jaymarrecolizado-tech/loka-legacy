@@ -3,8 +3,13 @@
  * LOKA - View Trip Ticket
  *
  * View details of a trip ticket
- * Drivers can view their own tickets, guards/admins can view all
+ * Drivers can view their own tickets; motorpool/admin/approvers can view for review
  */
+
+// Guards do not have trip-ticket access
+if (isGuard() && !isMotorpool() && !isAdmin() && !isDriver() && !isApprover()) {
+    redirectWith('/?page=guard', 'danger', 'You do not have access to trip tickets.');
+}
 
 $ticketId = (int) get('id', 0);
 if (!$ticketId) {

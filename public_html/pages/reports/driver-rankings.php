@@ -1,57 +1,24 @@
 <?php
 /**
  * LOKA - Driver Rankings Report (Anonymous evaluations, GRAB-like)
- * Computed average overall per driver (+ per-criterion averages, eval count)
- * sorted best → worst, with Chart.js bar and CSV export.
- * Identity of remarks providers never shown.
+ * Per-driver averages on the SAME 4 categories as the submit form
+ * (Cleanliness / Behavior / Appearance / Safety), sorted best → worst,
+ * with Chart.js bar, CSV + anonymous PDF exports.
+ * Identity of raters is never shown.
  */
 
-requireReportsAccess();
+require_once INCLUDES_PATH . '/eval_report.php';
+requireEvalReportAccess();
 
 $pageTitle = 'Driver Rankings';
-$isSelfScoped = isSelfScopedDriverReporter();
+$f = evalReportParseFilters(true); // defaults to current month
 
-$from = get('from', date('Y-m-01'));
-$to = get('to', date('Y-m-t'));
-$minEval = max(1, (int) get('min_eval', 2));
-
-$fromSql = $from ? date('Y-m-d 00:00:00', strtotime($from)) : null;
-$toSql = $to ? date('Y-m-d 23:59:59', strtotime($to)) : null;
-
-$where = "de.submitted_at IS NOT NULL";
-$params = [];
-if ($fromSql) { $where .= " AND r.start_datetime >= ?"; $params[] = $fromSql; }
-if ($toSql) { $where .= " AND r.start_datetime <= ?"; $params[] = $toSql; }
-if ($isSelfScoped) {
-    $driverId = currentDriverId();
-    if ($driverId) {
-        $where .= " AND de.driver_id = ?";
-        $params[] = $driverId;
-    }
-}
-
-$rankings = db()->fetchAll(
-    "SELECT de.driver_id, u.name AS driver_name,
-            COUNT(*) AS eval_count,
-            AVG(de.overall) AS avg_overall,
-            AVG(de.rating_punctuality) AS avg_punctuality,
-            AVG(de.rating_safety) AS avg_safety,
-            AVG(de.rating_courtesy) AS avg_courtesy,
-            AVG(de.rating_driving) AS avg_driving,
-            AVG(de.rating_vehicle) AS avg_vehicle
-     FROM driver_evaluations de
-     JOIN requests r ON de.request_id = r.id AND r.deleted_at IS NULL
-     JOIN drivers d ON de.driver_id = d.id AND d.deleted_at IS NULL
-     JOIN users u ON d.user_id = u.id
-     WHERE {$where}
-     GROUP BY de.driver_id
-     HAVING eval_count >= ?
-     ORDER BY avg_overall DESC, eval_count DESC",
-    array_merge($params, [$minEval])
-);
+$rankings = evalReportRankings($f, true);
 
 // For chart: use top 15
 $chartDrivers = array_slice($rankings, 0, 15);
+
+$csvUrl = APP_URL . evalReportQueryString($f, ['action' => 'export-driver-rankings-csv']);
 
 require_once INCLUDES_PATH . '/header.php';
 ?>
@@ -67,27 +34,22 @@ require_once INCLUDES_PATH . '/header.php';
             </ol></nav>
             <small class="text-muted"><i class="bi bi-shield-lock me-1"></i>Anonymous — passenger identities never shown. Rankings computed from submitted evaluations only.</small>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-3 align-items-center flex-wrap">
+            <?= evalReportPdfExportHtml($f) ?>
             <?php if (!empty($rankings)): ?>
-                <a href="<?= APP_URL ?>/?page=reports&action=export-driver-rankings-csv&from=<?= e($from) ?>&to=<?= e($to) ?>&min_eval=<?= (int) $minEval ?>" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV</a>
+                <a href="<?= e($csvUrl) ?>" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV</a>
             <?php endif; ?>
             <a href="<?= APP_URL ?>/?page=evaluations" class="btn btn-outline-primary"><i class="bi bi-star me-1"></i>Evaluations</a>
         </div>
     </div>
 
-    <div class="card mb-4">
-        <div class="card-body">
-            <form method="GET" class="row g-3 align-items-end">
-                <input type="hidden" name="page" value="reports">
-                <input type="hidden" name="action" value="driver-rankings">
-                <div class="col-md-3"><label class="form-label">From</label><input type="date" class="form-control" name="from" value="<?= e($from) ?>"></div>
-                <div class="col-md-3"><label class="form-label">To</label><input type="date" class="form-control" name="to" value="<?= e($to) ?>"></div>
-                <div class="col-md-2"><label class="form-label">Min Evaluations</label><input type="number" class="form-control" name="min_eval" value="<?= (int) $minEval ?>" min="1" max="100"></div>
-                <div class="col-md-2"><button type="submit" class="btn btn-primary w-100"><i class="bi bi-funnel me-1"></i>Apply</button></div>
-                <div class="col-md-2"><a href="<?= APP_URL ?>/?page=reports&action=driver-rankings" class="btn btn-outline-secondary w-100">Reset</a></div>
-            </form>
-        </div>
-    </div>
+    <?= evalReportFilterBarHtml(
+        $f,
+        'reports',
+        'driver-rankings',
+        true,
+        APP_URL . '/?page=reports&action=driver-rankings'
+    ) ?>
 
     <?php if (empty($rankings)): ?>
         <div class="card"><div class="card-body text-center py-5 text-muted"><i class="bi bi-inbox fs-1"></i><p class="mt-2 mb-0">No driver has reached the minimum evaluation threshold for this period.<br>Try lowering the minimum or expanding the date range.</p></div></div>
@@ -107,7 +69,7 @@ require_once INCLUDES_PATH . '/header.php';
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover mb-0 align-middle">
-                        <thead class="table-light"><tr><th>#</th><th>Driver</th><th class="text-center">Evals</th><th class="text-center">Overall</th><th class="text-center">Punct.</th><th class="text-center">Safety</th><th class="text-center">Courtesy</th><th class="text-center">Driving</th><th class="text-center">Vehicle</th></tr></thead>
+                        <thead class="table-light"><tr><th>#</th><th>Driver</th><th class="text-center">Evals</th><th class="text-center">Overall</th><th class="text-center">Cleanliness</th><th class="text-center">Behavior</th><th class="text-center">Appearance</th><th class="text-center">Safety</th></tr></thead>
                         <tbody>
                         <?php foreach ($rankings as $idx => $row): $rank = $idx+1; ?>
                             <tr class="<?= $rank<=3 ? 'table-warning' : '' ?>">
@@ -120,11 +82,10 @@ require_once INCLUDES_PATH . '/header.php';
                                 <td><strong><?= e($row->driver_name) ?></strong></td>
                                 <td class="text-center"><?= (int) $row->eval_count ?></td>
                                 <td class="text-center"><span class="badge bg-success fs-6"><?= number_format((float)$row->avg_overall,2) ?></span></td>
-                                <td class="text-center"><?= number_format((float)$row->avg_punctuality,2) ?></td>
-                                <td class="text-center"><?= number_format((float)$row->avg_safety,2) ?></td>
-                                <td class="text-center"><?= number_format((float)$row->avg_courtesy,2) ?></td>
-                                <td class="text-center"><?= number_format((float)$row->avg_driving,2) ?></td>
-                                <td class="text-center"><?= number_format((float)$row->avg_vehicle,2) ?></td>
+                                <td class="text-center"><?= $row->avg_cleanliness !== null ? number_format((float)$row->avg_cleanliness,2) : '—' ?></td>
+                                <td class="text-center"><?= $row->avg_behavior !== null ? number_format((float)$row->avg_behavior,2) : '—' ?></td>
+                                <td class="text-center"><?= $row->avg_appearance !== null ? number_format((float)$row->avg_appearance,2) : '—' ?></td>
+                                <td class="text-center"><?= $row->avg_safety !== null ? number_format((float)$row->avg_safety,2) : '—' ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>

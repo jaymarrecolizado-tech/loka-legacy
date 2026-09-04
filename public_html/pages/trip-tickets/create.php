@@ -3,11 +3,11 @@
  * LOKA - Create Trip Ticket Form
  *
  * Pre-filled form for creating trip ticket after trip completion
- * Only drivers can create tickets for their own completed trips
+ * Drivers create tickets for their own completed trips; admins may assist
  */
 
-// Allow drivers and guards to access
-if (!isDriver() && !isGuard() && !isAdmin()) {
+// Guards no longer create trip tickets — drivers/admins only
+if (!isDriver() && !isAdmin()) {
     redirectWith('/?page=dashboard', 'danger', 'You do not have permission to create trip tickets.');
 }
 
@@ -19,8 +19,7 @@ $requestId = (int) get('request_id', 0);
 
 // Validate request ID
 if (!$requestId) {
-    $redirectPage = isDriver() ? 'my-trips' : 'guard';
-    redirectWith('/?page=' . $redirectPage, 'danger', 'Invalid request ID.');
+    redirectWith('/?page=my-trips', 'danger', 'Invalid request ID.');
 }
 
 // Get request with all trip details for pre-filling
@@ -45,7 +44,7 @@ $request = db()->fetch(
 );
 
 if (!$request) {
-    $redirectPage = isDriver() ? 'my-trips' : 'guard';
+    $redirectPage = 'my-trips';
     redirectWith('/?page=' . $redirectPage, 'danger', 'Request not found.');
 }
 
@@ -69,7 +68,7 @@ if (isDriver()) {
 
 // Can only create trip ticket for completed trips
 if ($request->status !== STATUS_COMPLETED) {
-    $redirectPage = isDriver() ? 'my-trips' : 'guard';
+    $redirectPage = 'my-trips';
     redirectWith(
         '/?page=requests&action=view&id=' . $requestId,
         'warning',
@@ -410,8 +409,8 @@ require_once INCLUDES_PATH . '/header.php';
             <p class="text-muted mb-0">Document completed trip details and documents</p>
         </div>
         <div>
-            <a href="?page=<?= isDriver() ? 'my-trips' : 'guard' ?>" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1"></i>Back to <?= isDriver() ? 'My Trips' : 'Guard Dashboard' ?>
+            <a href="?page=my-trips" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Back to My Trips
             </a>
             <?php if (!isDriver()): ?>
             <a href="?page=trip-tickets" class="btn btn-outline-primary">
@@ -771,7 +770,7 @@ require_once INCLUDES_PATH . '/header.php';
 
                 <!-- Action Buttons -->
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <a href="?page=<?= isDriver() ? 'my-trips' : 'guard' ?>" class="btn btn-outline-secondary">
+                    <a href="?page=my-trips" class="btn btn-outline-secondary">
                         <i class="bi bi-x-circle me-1"></i>
                         Cancel
                     </a>

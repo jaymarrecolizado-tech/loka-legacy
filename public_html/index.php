@@ -7,6 +7,9 @@
 
 // Load environment variables
 $envFile = __DIR__ . '/.env';
+if (!file_exists($envFile)) {
+    $envFile = __DIR__ . '/../.env.lokastage';
+}
 if (file_exists($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
@@ -136,7 +139,8 @@ $page = get('page', 'dashboard');
 $action = get('action', 'index');
 
 // Public pages (no auth required)
-$publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'verify-ticket', 'cron'];
+// evaluations = anonymous token-gated submit page; index/rate re-gate inside the case below
+$publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'verify-ticket', 'cron', 'evaluations'];
 
 // Route handling
 if (!in_array($page, $publicPages)) {
@@ -309,9 +313,9 @@ switch ($page) {
 
     case 'reports':
         requireReportsAccess();
-        // Non-approver drivers may only use own Driver Report + exports
+        // Non-approver drivers may only use own Driver Report + anonymous eval rankings/exports
         if (isSelfScopedDriverReporter()) {
-            $driverAllowed = ['index', 'driver', 'export-driver', 'export-driver-csv'];
+            $driverAllowed = ['index', 'driver', 'export-driver', 'export-driver-csv', 'driver-rankings', 'export-driver-rankings-csv', 'export-driver-evaluations-pdf'];
             if (!in_array($action, $driverAllowed, true)) {
                 redirectWith('/?page=reports', 'danger', 'You do not have permission to access that report.');
             }
@@ -344,6 +348,8 @@ switch ($page) {
             require_once PAGES_PATH . '/reports/driver-rankings.php';
         } elseif ($action === 'export-driver-rankings-csv') {
             require_once PAGES_PATH . '/reports/export-driver-rankings-csv.php';
+        } elseif ($action === 'export-driver-evaluations-pdf') {
+            require_once PAGES_PATH . '/reports/export-driver-evaluations-pdf.php';
         } else {
             require_once PAGES_PATH . '/reports/index.php';
         }
@@ -511,8 +517,11 @@ switch ($page) {
 
     case 'evaluations':
         if ($action === 'submit') {
-            // Public evaluation form (token-gated, no login)
+            // Public evaluation form (token-gated, no login — token is the capability)
             require_once PAGES_PATH . '/evaluations/submit.php';
+        } elseif ($action === 'rate') {
+            // "Rate now" re-issue handler (page calls requireAuth() itself)
+            require_once PAGES_PATH . '/evaluations/rate.php';
         } else {
             requireReportsAccess();
             require_once PAGES_PATH . '/evaluations/index.php';

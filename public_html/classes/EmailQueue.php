@@ -13,6 +13,15 @@ class EmailQueue
     {
         $this->db = Database::getInstance();
     }
+
+    /**
+     * Stable subject for all emails tied to one Control No. (request_id).
+     * Keeps Gmail/Outlook threading; event details stay in the body.
+     */
+    public static function requestThreadSubject(int $requestId): string
+    {
+        return "Control No. {$requestId}: LOKA Fleet Request";
+    }
     
     /**
      * Add email to queue
@@ -37,6 +46,10 @@ class EmailQueue
         ?string $scheduledAt = null,
         ?int $requestId = null
     ): int {
+        if ($requestId !== null && $requestId > 0) {
+            $subject = self::requestThreadSubject($requestId);
+        }
+
         return $this->db->insert('email_queue', [
             'to_email' => $toEmail,
             'to_name' => $toName,
@@ -58,7 +71,7 @@ class EmailQueue
      * @param array $data Template data (message, link, link_text)
      * @param string|null $toName Recipient name
      * @param int $priority Email priority (1-10, lower = higher priority)
-     * @param int|null $requestId Request ID for Control No. in subject
+     * @param int|null $requestId Request ID for Control No. threading
      * @return int Inserted email queue ID
      */
     public function queueTemplate(
@@ -76,14 +89,12 @@ class EmailQueue
         }
         
         $template = $templates[$templateKey];
-        $subject = $template['subject'];
+        // Event title stays in the body; subject is stable when request_id is set
+        $subject = ($requestId !== null && $requestId > 0)
+            ? self::requestThreadSubject($requestId)
+            : $template['subject'];
         
-        // FIX: Add Control No. to subject if request ID is provided
-        if ($requestId !== null) {
-            $subject = "Control No. {$requestId}: {$subject}";
-        }
-        
-        // Build email body
+        // Build email body (include template subject as heading for context)
         $body = $this->buildEmailBody($templateKey, $template, $data);
         
         // Optional sync send, controlled by delivery mode (immediate|queued|hybrid).
@@ -117,12 +128,22 @@ class EmailQueue
             $shouldSync = true;
         }
 
-        $syncSent = false;
+        // Queue first so Message-ID can use email_queue.id
+        $queueId = $this->queue($toEmail, $subject, $body, $toName, $templateKey, $priority, null, $requestId);
 
+        $syncSent = false;
         if ($shouldSync && MAIL_ENABLED) {
             try {
                 $mailer = new Mailer();
-                $syncSent = $mailer->send($toEmail, $subject, $body, $toName);
+                $syncSent = $mailer->send(
+                    $toEmail,
+                    $subject,
+                    $body,
+                    $toName,
+                    true,
+                    $requestId,
+                    $queueId
+                );
                 
                 if ($syncSent) {
                     error_log("[SYNC-EMAIL] Email sent successfully: {$templateKey} to {$toEmail}");
@@ -134,9 +155,6 @@ class EmailQueue
                 error_log("[SYNC-EMAIL] Send exception (queued as backup): {$templateKey} to {$toEmail} - " . $e->getMessage());
             }
         }
-        
-        // Add to queue database for tracking
-        $queueId = $this->queue($toEmail, $subject, $body, $toName, $templateKey, $priority, null, $requestId);
         
         // If it was successfully sent synchronously, mark it as sent immediately
         if ($syncSent) {
@@ -154,6 +172,7 @@ class EmailQueue
         $message = $data['message'] ?? $template['template'];
         $link = $data['link'] ?? null;
         $linkText = $data['link_text'] ?? 'View Details';
+        $eventTitle = $template['subject'] ?? '';
         
         // Build full URL - link already starts with /, so just append to SITE_URL
         $fullLink = $link ? (SITE_URL . $link) : null;
@@ -164,13 +183,14 @@ class EmailQueue
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>' . htmlspecialchars($template['subject']) . '</title>
+            <title>' . htmlspecialchars($eventTitle) . '</title>
             <style>
                 body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f4f4f4; }
                 .container { max-width: 600px; margin: 20px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
                 .header { background: #0d6efd; color: #fff; padding: 20px; text-align: center; }
                 .header h1 { margin: 0; font-size: 24px; }
                 .content { padding: 30px; }
+                .event-title { margin: 0 0 16px 0; font-size: 20px; color: #333; }
                 .message { margin-bottom: 20px; }
                 .btn { display: inline-block; padding: 12px 24px; background: #0d6efd; color: #fff; text-decoration: none; border-radius: 5px; font-weight: bold; }
                 .btn:hover { background: #0b5ed7; }
@@ -182,8 +202,13 @@ class EmailQueue
                 <div class="header">
                     <h1>' . APP_NAME . '</h1>
                 </div>
-                <div class="content">
-                    <div class="message">' . nl2br(htmlspecialchars($message)) . '</div>';
+                <div class="content">';
+        
+        if ($eventTitle !== '') {
+            $html .= '<h2 class="event-title">' . htmlspecialchars($eventTitle) . '</h2>';
+        }
+
+        $html .= '<div class="message">' . nl2br(htmlspecialchars($message)) . '</div>';
         
         if ($fullLink) {
             $html .= '<p><a href="' . htmlspecialchars($fullLink) . '" class="btn">' . htmlspecialchars($linkText) . '</a></p>';
@@ -332,11 +357,15 @@ class EmailQueue
                 
                 try {
                     // FIX: Removed duplicate instantiation - uses existing $mailer
+                    $requestId = !empty($email->request_id) ? (int) $email->request_id : null;
                     $sent = $mailer->send(
                         $email->to_email,
                         $email->subject,
                         $email->body,
-                        $email->to_name
+                        $email->to_name,
+                        true,
+                        $requestId,
+                        (int) $email->id
                     );
                     
                     if ($sent) {

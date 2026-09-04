@@ -35,3 +35,7 @@ _import.bat
 # Production package (generated - rebuild with robocopy, see PRODUCTION_GUIDE.md)
 prod/*
 !prod/PRODUCTION_GUIDE.md
+
+# Local deploy scratch
+_deploy_tmp/
+

@@ -49,7 +49,7 @@ function sendTripConfirmationEmail(object $confirmation): bool
         $queue = new EmailQueue();
         $queue->queue(
             $request->requester_email,
-            "[Trip #{$confirmation->request_id}] Will you proceed with your trip?",
+            EmailQueue::requestThreadSubject((int) $confirmation->request_id),
             buildTripConfirmationEmailBody($request, $rawToken),
             $request->requester_name,
             null,  // template
@@ -239,7 +239,7 @@ function processTripJobs(): array
             $queue = new EmailQueue();
             $queue->queue(
                 $user->email,
-                'Reminder: Rate your driver for trip #' . $eval->request_id,
+                EmailQueue::requestThreadSubject((int) $eval->request_id),
                 buildDriverEvaluationEmailBody((int) $eval->request_id, $rawToken),
                 $user->name,
                 null,

@@ -84,13 +84,6 @@
                     <span>Guard Dashboard</span>
                 </a>
             </li>
-            <!-- Trip Tickets -->
-            <li class="nav-item">
-                <a class="nav-link <?= activeMenu('trip-tickets') ?>" href="<?= APP_URL ?>/?page=trip-tickets">
-                    <i class="bi bi-file-earmark-text"></i>
-                    <span>Trip Tickets</span>
-                </a>
-            </li>
             <?php endif; ?>
 
             <?php if (isMotorpool() || isAdmin()): ?>

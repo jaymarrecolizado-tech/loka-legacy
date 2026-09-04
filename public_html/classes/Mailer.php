@@ -30,10 +30,62 @@ class Mailer
     }
 
     /**
-     * Send an email
+     * Domain part for Message-ID headers (from MAIL_FROM_ADDRESS).
      */
-    public function send(string $to, string $subject, string $body, ?string $toName = null, bool $isHtml = true): bool
+    public static function mailDomain(): string
     {
+        $from = defined('MAIL_FROM_ADDRESS') ? (string) MAIL_FROM_ADDRESS : '';
+        if ($from !== '' && strpos($from, '@') !== false) {
+            return substr(strrchr($from, '@'), 1) ?: 'lokafleet.local';
+        }
+        return 'lokafleet.local';
+    }
+
+    /**
+     * Stable thread root Message-ID for a Control No. / request_id.
+     */
+    public static function threadRootId(int $requestId): string
+    {
+        return '<loka-request-' . $requestId . '@' . self::mailDomain() . '>';
+    }
+
+    /**
+     * Unique Message-ID for one outbound message in a request thread.
+     */
+    public static function threadMessageId(int $requestId, ?int $queueId = null): string
+    {
+        $suffix = $queueId !== null
+            ? 'q' . $queueId
+            : 't' . time() . 'r' . bin2hex(random_bytes(4));
+        return '<loka-request-' . $requestId . '-' . $suffix . '@' . self::mailDomain() . '>';
+    }
+
+    /**
+     * Unique Message-ID when no request thread applies.
+     */
+    public static function uniqueMessageId(?int $queueId = null): string
+    {
+        $suffix = $queueId !== null
+            ? 'q' . $queueId
+            : 't' . time() . 'r' . bin2hex(random_bytes(4));
+        return '<loka-mail-' . $suffix . '@' . self::mailDomain() . '>';
+    }
+
+    /**
+     * Send an email
+     *
+     * @param int|null $requestId Control No. for conversation threading
+     * @param int|null $queueId email_queue.id for unique Message-ID
+     */
+    public function send(
+        string $to,
+        string $subject,
+        string $body,
+        ?string $toName = null,
+        bool $isHtml = true,
+        ?int $requestId = null,
+        ?int $queueId = null
+    ): bool {
         // Reset errors for this send attempt
         $this->errors = [];
         
@@ -102,7 +154,7 @@ class Mailer
             $this->sendCommand("DATA", 354);
             
             // Build message
-            $headers = $this->buildHeaders($to, $subject, $isHtml, $toName);
+            $headers = $this->buildHeaders($to, $subject, $isHtml, $toName, $requestId, $queueId);
             
             // Send headers and body separately for proper SMTP handling
             $fullMessage = $headers . "\r\n\r\n" . $body . "\r\n.";
@@ -134,7 +186,7 @@ class Mailer
     /**
      * Send email using template
      */
-    public function sendTemplate(string $to, string $templateKey, array $data = [], ?string $toName = null): bool
+    public function sendTemplate(string $to, string $templateKey, array $data = [], ?string $toName = null, ?int $requestId = null): bool
     {
         if (!isset(MAIL_TEMPLATES[$templateKey])) {
             $this->errors[] = "Template not found: {$templateKey}";
@@ -142,19 +194,27 @@ class Mailer
         }
 
         $template = MAIL_TEMPLATES[$templateKey];
-        $subject = $template['subject'];
+        $subject = $requestId !== null
+            ? ('Control No. ' . $requestId . ': LOKA Fleet Request')
+            : $template['subject'];
         
         // Build HTML body
         $body = $this->buildHtmlBody($template['subject'], $template['template'], $data);
         
-        return $this->send($to, $subject, $body, $toName, true);
+        return $this->send($to, $subject, $body, $toName, true, $requestId);
     }
 
     /**
-     * Build email headers
+     * Build email headers (includes RFC threading when request_id is set)
      */
-    private function buildHeaders(string $to, string $subject, bool $isHtml, ?string $toName = null): string
-    {
+    private function buildHeaders(
+        string $to,
+        string $subject,
+        bool $isHtml,
+        ?string $toName = null,
+        ?int $requestId = null,
+        ?int $queueId = null
+    ): string {
         $headers = [];
         $headers[] = "Date: " . date('r');
         $headers[] = "From: {$this->fromName} <{$this->fromAddress}>";
@@ -169,6 +229,17 @@ class Mailer
         // Encode subject to handle special characters
         $encodedSubject = mb_encode_mimeheader($subject, 'UTF-8', 'Q');
         $headers[] = "Subject: {$encodedSubject}";
+
+        if ($requestId !== null && $requestId > 0) {
+            $rootId = self::threadRootId($requestId);
+            $messageId = self::threadMessageId($requestId, $queueId);
+            $headers[] = "Message-ID: {$messageId}";
+            $headers[] = "In-Reply-To: {$rootId}";
+            $headers[] = "References: {$rootId}";
+        } else {
+            $headers[] = "Message-ID: " . self::uniqueMessageId($queueId);
+        }
+
         $headers[] = "MIME-Version: 1.0";
         
         if ($isHtml) {

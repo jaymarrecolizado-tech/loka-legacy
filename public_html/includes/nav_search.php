@@ -63,7 +63,6 @@ function getNavSearchItems(): array
     }
     if (isGuard()) {
         $add('Guard Dashboard', '/?page=guard', 'bi-shield-check', 'Main', 'guard dispatch arrival');
-        $add('Trip Tickets', '/?page=trip-tickets', 'bi-file-earmark-text', 'Main', 'trip tickets guard');
     }
     if (isMotorpool() || isAdmin()) {
         $add('Review Trip Tickets', '/?page=trip-tickets', 'bi-clipboard-check', 'Main', 'review trip tickets motorpool');

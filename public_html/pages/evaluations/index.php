@@ -2,90 +2,18 @@
 /**
  * LOKA - Evaluations Dashboard (response rates per trip, per-driver averages)
  * Access: approver+ or tagged driver (requireReportsAccess). Self-scoped drivers see own stats only.
+ * Anonymous: rater identity is never selected or displayed.
  */
 
-requireReportsAccess();
+require_once INCLUDES_PATH . '/eval_report.php';
+requireEvalReportAccess();
 
 $pageTitle = 'Driver Evaluations';
-$isSelfScoped = isSelfScopedDriverReporter();
-$driverId = null;
-if ($isSelfScoped) {
-    $driverId = currentDriverId();
-}
+$f = evalReportParseFilters(false); // blank From/To = all time
 
-// Filters
-$from = get('from', '');
-$to = get('to', '');
-$fromSql = $from ? date('Y-m-d 00:00:00', strtotime($from)) : null;
-$toSql = $to ? date('Y-m-d 23:59:59', strtotime($to)) : null;
-
-// Response rate per trip
-$whereTrip = "r.status = 'completed'";
-$paramsTrip = [];
-if ($fromSql) { $whereTrip .= " AND r.start_datetime >= ?"; $paramsTrip[] = $fromSql; }
-if ($toSql) { $whereTrip .= " AND r.start_datetime <= ?"; $paramsTrip[] = $toSql; }
-if ($isSelfScoped && $driverId) { $whereTrip .= " AND r.driver_id = ?"; $paramsTrip[] = $driverId; }
-
-$trips = db()->fetchAll(
-    "SELECT r.id, r.destination, r.start_datetime, r.driver_id,
-            u.name AS driver_name, v.plate_number,
-            (SELECT COUNT(*) FROM driver_evaluations de WHERE de.request_id = r.id) AS total_invites,
-            (SELECT COUNT(*) FROM driver_evaluations de WHERE de.request_id = r.id AND de.submitted_at IS NOT NULL) AS submitted_cnt,
-            (SELECT AVG(de.overall) FROM driver_evaluations de WHERE de.request_id = r.id AND de.submitted_at IS NOT NULL) AS avg_overall
-     FROM requests r
-     LEFT JOIN drivers d ON r.driver_id = d.id AND d.deleted_at IS NULL
-     LEFT JOIN users u ON d.user_id = u.id
-     LEFT JOIN vehicles v ON r.vehicle_id = v.id AND v.deleted_at IS NULL
-     WHERE {$whereTrip} AND r.deleted_at IS NULL
-     ORDER BY r.start_datetime DESC LIMIT 100",
-    $paramsTrip
-);
-
-// Per-driver averages (anonymous)
-$whereDriver = "de.submitted_at IS NOT NULL";
-$paramsDriver = [];
-if ($fromSql) { $whereDriver .= " AND r.start_datetime >= ?"; $paramsDriver[] = $fromSql; }
-if ($toSql) { $whereDriver .= " AND r.start_datetime <= ?"; $paramsDriver[] = $toSql; }
-if ($isSelfScoped && $driverId) { $whereDriver .= " AND de.driver_id = ?"; $paramsDriver[] = $driverId; }
-
-$perDriver = db()->fetchAll(
-    "SELECT de.driver_id, u.name AS driver_name,
-            COUNT(*) AS eval_count,
-            AVG(de.overall) AS avg_overall,
-            AVG(de.rating_cleanliness) AS avg_cleanliness,
-            AVG(de.rating_behavior) AS avg_behavior,
-            AVG(de.rating_appearance) AS avg_appearance,
-            AVG(de.rating_safety) AS avg_safety
-     FROM driver_evaluations de
-     JOIN requests r ON de.request_id = r.id AND r.deleted_at IS NULL
-     JOIN drivers d ON de.driver_id = d.id AND d.deleted_at IS NULL
-     JOIN users u ON d.user_id = u.id
-     WHERE {$whereDriver}
-     GROUP BY de.driver_id
-     ORDER BY avg_overall DESC",
-    $paramsDriver
-);
-
-// Anonymous remarks (never show evaluator identity)
-$whereRemarks = "de.submitted_at IS NOT NULL AND de.remarks IS NOT NULL AND TRIM(de.remarks) <> ''";
-$paramsRemarks = [];
-if ($fromSql) { $whereRemarks .= " AND r.start_datetime >= ?"; $paramsRemarks[] = $fromSql; }
-if ($toSql) { $whereRemarks .= " AND r.start_datetime <= ?"; $paramsRemarks[] = $toSql; }
-if ($isSelfScoped && $driverId) { $whereRemarks .= " AND de.driver_id = ?"; $paramsRemarks[] = $driverId; }
-
-$remarks = db()->fetchAll(
-    "SELECT de.remarks, de.overall, de.created_at, de.submitted_at,
-            r.id AS request_id, r.destination, r.start_datetime,
-            u.name AS driver_name, v.plate_number
-     FROM driver_evaluations de
-     JOIN requests r ON de.request_id = r.id AND r.deleted_at IS NULL
-     JOIN drivers d ON de.driver_id = d.id AND d.deleted_at IS NULL
-     JOIN users u ON d.user_id = u.id
-     LEFT JOIN vehicles v ON r.vehicle_id = v.id AND v.deleted_at IS NULL
-     WHERE {$whereRemarks}
-     ORDER BY de.submitted_at DESC LIMIT 50",
-    $paramsRemarks
-);
+$trips = evalReportTrips($f);
+$perDriver = evalReportRankings($f, false); // no minimum — show everyone with ≥1 submit
+$remarks = evalReportRemarks($f, 50);
 
 require_once INCLUDES_PATH . '/header.php';
 ?>
@@ -98,21 +26,21 @@ require_once INCLUDES_PATH . '/header.php';
                 <li class="breadcrumb-item"><a href="<?= APP_URL ?>">Dashboard</a></li>
                 <li class="breadcrumb-item active">Evaluations</li>
             </ol></nav>
-            <?php if ($isSelfScoped): ?><div class="alert alert-info py-2 px-3 mt-2 mb-0 small"><i class="bi bi-info-circle me-1"></i>You are viewing your own trip evaluations only.</div><?php endif; ?>
+            <?php if ($f['self_scoped']): ?><div class="alert alert-info py-2 px-3 mt-2 mb-0 small"><i class="bi bi-info-circle me-1"></i>You are viewing your own trip evaluations only.</div><?php endif; ?>
         </div>
-        <a href="<?= APP_URL ?>/?page=reports&action=driver-rankings" class="btn btn-primary"><i class="bi bi-trophy me-1"></i>Driver Rankings</a>
+        <div class="d-flex gap-3 align-items-center flex-wrap">
+            <?= evalReportPdfExportHtml($f) ?>
+            <a href="<?= APP_URL ?>/?page=reports&action=driver-rankings" class="btn btn-primary"><i class="bi bi-trophy me-1"></i>Driver Rankings</a>
+        </div>
     </div>
 
-    <form method="GET" class="card mb-4">
-        <input type="hidden" name="page" value="evaluations">
-        <div class="card-body">
-            <div class="row g-3 align-items-end">
-                <div class="col-md-3"><label class="form-label">From</label><input type="date" class="form-control" name="from" value="<?= e($from) ?>"></div>
-                <div class="col-md-3"><label class="form-label">To</label><input type="date" class="form-control" name="to" value="<?= e($to) ?>"></div>
-                <div class="col-md-3"><button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1"></i>Filter</button> <a href="<?= APP_URL ?>/?page=evaluations" class="btn btn-outline-secondary">Clear</a></div>
-            </div>
-        </div>
-    </form>
+    <?= evalReportFilterBarHtml(
+        $f,
+        'evaluations',
+        'index',
+        false,
+        APP_URL . '/?page=evaluations'
+    ) ?>
 
     <!-- Per-driver averages -->
     <div class="card mb-4">
