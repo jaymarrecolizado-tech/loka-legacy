@@ -3,7 +3,7 @@
  * MIGRATION 033: Per-user badge acknowledgements (clear counters after view)
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'fleetdb';
 $dbUser = 'root';

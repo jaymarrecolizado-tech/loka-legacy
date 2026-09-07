@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $settingsToUpdate = [
         'system_name' => post('system_name', APP_NAME),
         'max_advance_booking_days' => $trackClamp('Maximum advance booking', post('max_advance_booking_days', '30'), 1, 365, 30),
-        'min_advance_booking_hours' => $trackClamp('Minimum notice', post('min_advance_booking_hours', '24'), 0, 168, 24),
+        'min_advance_booking_hours' => $trackClamp('Minimum notice', post('min_advance_booking_hours', '0'), 0, 168, 0),
         'max_trip_duration_hours' => $trackClamp('Maximum trip duration', post('max_trip_duration_hours', '72'), 1, 720, 72),
         'require_return_confirmation' => post('require_return_confirmation', '0') === '1' ? '1' : '0',
         // Travel Order / OB Slip toggle — Admin and All Father only (both pass requireRole admin via level)
@@ -123,19 +123,19 @@ require_once INCLUDES_PATH . '/header.php';
                                 <label class="form-label">Maximum Advance Booking (days)</label>
                                 <input type="number" class="form-control" name="max_advance_booking_days" 
                                        value="<?= e($settings['max_advance_booking_days'] ?? '30') ?>" min="1" max="365">
-                                <small class="text-muted form-help">How far in advance can requests be made</small>
+                                <small class="text-muted form-help">How far ahead the start date can be. 5 = only the next 5 days are selectable. 30 is typical. Allowed 1-365.</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Minimum Notice (hours)</label>
                                 <input type="number" class="form-control" name="min_advance_booking_hours" 
-                                       value="<?= e($settings['min_advance_booking_hours'] ?? '24') ?>" min="0" max="168">
-                                <small class="text-muted form-help">Minimum hours before trip start</small>
+                                       value="<?= e($settings['min_advance_booking_hours'] ?? '0') ?>" min="0" max="168">
+                                <small class="text-muted form-help">Minimum hours before trip start. 0 = same-day bookings allowed (start time cannot be in the past)</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Maximum Trip Duration (hours)</label>
                                 <input type="number" class="form-control" name="max_trip_duration_hours" 
                                        value="<?= e($settings['max_trip_duration_hours'] ?? '72') ?>" min="1" max="720">
-                                <small class="text-muted form-help">Maximum allowed trip length</small>
+                                <small class="text-muted form-help">Hours of trip length. 72 = 3 days. A Mon-Fri trip needs about 120 hours. Allowed 1-720 (up to 30 days).</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Require Return Confirmation</label>

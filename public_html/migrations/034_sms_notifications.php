@@ -3,7 +3,7 @@
  * MIGRATION 034: SMS notification queue + default settings
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'fleetdb';
 $dbUser = 'root';

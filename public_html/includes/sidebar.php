@@ -86,6 +86,16 @@
             </li>
             <?php endif; ?>
 
+            <?php if (canAccessLiveBoard()): ?>
+            <!-- Live Trip Board -->
+            <li class="nav-item">
+                <a class="nav-link <?= activeMenu('live-board') ?>" href="<?= APP_URL ?>/?page=live-board">
+                    <i class="bi bi-display"></i>
+                    <span>Live Trip Board</span>
+                </a>
+            </li>
+            <?php endif; ?>
+
             <?php if (isMotorpool() || isAdmin()): ?>
             <!-- Review Trip Tickets -->
             <li class="nav-item">

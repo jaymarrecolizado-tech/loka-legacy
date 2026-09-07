@@ -3,7 +3,7 @@
  * MIGRATION 031: Add chief_admin_finance role to users table ENUM
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'loka_fleet';
 $dbUser = 'root';

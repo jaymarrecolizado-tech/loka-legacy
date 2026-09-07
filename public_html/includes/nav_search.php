@@ -64,6 +64,9 @@ function getNavSearchItems(): array
     if (isGuard()) {
         $add('Guard Dashboard', '/?page=guard', 'bi-shield-check', 'Main', 'guard dispatch arrival');
     }
+    if (canAccessLiveBoard()) {
+        $add('Live Trip Board', '/?page=live-board', 'bi-display', 'Main', 'live board trips overdue dispatch wall');
+    }
     if (isMotorpool() || isAdmin()) {
         $add('Review Trip Tickets', '/?page=trip-tickets', 'bi-clipboard-check', 'Main', 'review trip tickets motorpool');
     }

@@ -176,7 +176,7 @@ $pdf->SetFont('helvetica', '', 9);
   $pdf->WriteHTMLCell(85, 0, '', '', $dateText, 'B', 0, 0, true, 'L', true);
   $pdf->SetFont('helvetica', '', 9);
   $pdf->Cell(22, 6, 'Destination:', 0, 0);
-  $pdf->WriteHTMLCell(0, 0, '', '', $ticket->destination, 'B', 1, 0, true, 'L', true);
+  $pdf->WriteHTMLCell(0, 0, '', '', e(formatDestinationChain($ticket->destination)), 'B', 1, 0, true, 'L', true);
 
 // Row 2: Time Out & Time In
 $pdf->Cell(25, 6, 'Time Out:', 0, 0);

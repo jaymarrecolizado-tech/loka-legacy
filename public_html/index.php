@@ -543,6 +543,11 @@ switch ($page) {
         }
         break;
 
+    case 'live-board':
+        requireLiveBoardAccess();
+        require_once PAGES_PATH . '/live-board/index.php';
+        break;
+
     case 'trip-tickets':
         if ($action === 'view') {
             require_once PAGES_PATH . '/trip-tickets/view.php';

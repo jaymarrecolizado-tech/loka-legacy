@@ -3,7 +3,7 @@
  * MIGRATION 032: All Father role + vehicle observation tables
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'fleetdb';
 $dbUser = 'root';

@@ -4,7 +4,7 @@
  * Same powers as chief_admin_finance (acting/OIC capacity).
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'loka_fleet';
 $dbUser = 'root';

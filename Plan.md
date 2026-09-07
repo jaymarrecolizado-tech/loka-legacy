@@ -19,6 +19,8 @@
 | #13 | Trip Email One-Thread (by Control No.) | DONE (2026-09-04) |
 | #14 | Driver Evaluation Access, Anonymity, Reports & PDF | DONE (2026-09-04; SMTP send + full browser click-through manual) |
 | #15 | Skip Trip Confirmation After Dispatch/Complete | DONE (2026-09-04) |
+| #16 | Overdue PDF + Daily Motorpool Report (All Father) | OPEN (2026-09-04; not next build) |
+| #17 | Live Trip Board | DONE (2026-09-04) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -1053,4 +1055,161 @@ Pre-trip “Will you proceed?” emails must only go out for **future approved**
 - `public_html/cron/process_trip_confirmations.php`
 - `public_html/pages/guard/actions.php`
 - `public_html/pages/requests/confirm.php`
+
+---
+
+# LOKA Plan #16: Overdue PDF + Daily Motorpool Report — OPEN (2026-09-04)
+
+## Goal
+Motorpool Head (and anyone All Father adds) can get a **PDF of overdue trips** by email, **in addition to** the existing short overdue text alert. Separately, All Father can turn on a **daily digest PDF** (summary + analytics) and **choose which users** receive it and **what time** it is sent (default **8:00 PM** Asia/Manila).
+
+Does not reopen Plan #11 (other report UI). Does not change the existing overdue *text* notification.
+
+## Current behavior
+- Cron every 5 minutes (`public_html/cron/process_trip_confirmations.php`) emails Motorpool Head `trip_overdue_alert` when an approved trip is past `end_datetime` with no arrival. Re-alert: Settings `trip_overdue_renotify_hours` (default 24). **No PDF. No on/off toggle.**
+- No daily trip digest. Vehicle-care cron is unrelated.
+- TCPDF exists (e.g. `public_html/pages/reports/export-driver-evaluations-pdf.php`). `Mailer` / `EmailQueue` have **no attachment** support yet.
+
+## All Father controls (System Control only)
+Gate with `canAccessSystemControl()` (real All Father, not View-as). New System Control card/page under `public_html/pages/security/` — not the admin Settings page.
+
+| Control | Setting key | Default |
+|---------|-------------|---------|
+| Overdue PDF emails on/off | `overdue_pdf_email_enabled` | off |
+| Daily report emails on/off | `mh_daily_report_enabled` | off |
+| Daily report recipients (any active users, multi-select) | `mh_daily_report_user_ids` (JSON ids) | `[]` (send to nobody) |
+| Daily report send time (Asia/Manila, `HH:MM`) | `mh_daily_report_send_time` | `20:00` (8:00 PM) |
+| Last daily send date (idempotency) | `mh_daily_report_last_sent` | empty |
+
+Empty recipient list = no daily mail even if the daily toggle is on.
+
+## Overdue PDF
+When the overdue-PDF toggle is **on** and the existing overdue job fires: keep `notifyMotorpoolHeads` text as today, **and** queue an email with a TCPDF attachment (DICT header, generated timestamp, table of **all currently overdue** approved trips: id, destination, end time, hours overdue, driver, plate, assigned MH).
+
+Default recipients = Motorpool Head(s) (same as the text alert). All Father may **add other users** for the overdue PDF.
+
+## Daily report PDF
+If daily toggle is off or no recipients: do nothing. Otherwise, after the chosen Manila clock time that calendar day, generate **one** PDF and email each selected user who has an email.
+
+**Summary** (yesterday Asia/Manila + “right now” overdue): completed / cancelled / still pending or approved; currently overdue; dispatched-not-arrived; upcoming next 24h.
+
+**Analytics:** Motorpool-dashboard style KPIs (`public_html/includes/dashboard_stats.php`) — available vs assigned vehicles/drivers, top destinations, trip volume by status, average planned duration. Simple TCPDF bars/tables (same idea as eval PDF). No new JS chart library.
+
+Subject is a daily digest (not Control-No. threading). One send per Manila day (`mh_daily_report_last_sent` = `Y-m-d`).
+
+```mermaid
+flowchart TD
+  af[All Father System Control]
+  togOverdue[Overdue PDF on or off]
+  togDaily[Daily report on or off]
+  recip[Pick users]
+  clock[Send time default 20:00]
+  cron5[Cron every 5 min]
+  overdueText[Existing overdue text email]
+  overduePdf[Overdue trips PDF]
+  dailyPdf[Daily summary plus analytics PDF]
+
+  af --> togOverdue
+  af --> togDaily
+  af --> recip
+  af --> clock
+  cron5 --> overdueText
+  togOverdue -->|on| overduePdf
+  cron5 --> overduePdf
+  togDaily -->|on and after send time| dailyPdf
+  recip --> dailyPdf
+```
+
+## Implementation notes
+- Attachments: optional files on `Mailer` + nullable `email_queue.attachments` JSON (paths under `logs/reports/`, not web-served).
+- Helper `public_html/includes/mh_reports.php` (keep under ~200–300 lines) for queries + TCPDF HTML.
+- Overdue PDF hook: overdue loop in `process_trip_confirmations.php`.
+- Daily job: `process_mh_daily_report.php` every 5 minutes (same cadence as trip confirmations). Send when Manila `now >= send_time` and `last_sent !== today`. **Do not** hard-code 8:00 PM (or 07:15) in VPS crontab — All Father changing the time must not require a server crontab edit.
+- Migration: settings defaults + `email_queue.attachments`; env via `_load_env.php`.
+
+## Out of scope
+Importing local trip data; changing overdue *text* alerts; Plan #11 report UI; SMS.
+
+## QA
+- [ ] Toggles off: no extra PDFs; existing overdue text still works
+- [ ] Daily on, no recipients: no daily mail
+- [ ] Daily on + selected users: one PDF/day after chosen time (default 8:00 PM); changing time in UI needs no crontab change
+- [ ] Overdue PDF on: text + PDF; extra overdue recipients if All Father added them
+- [ ] `php -l` on touched files
+- [ ] Do not commit `_deploy_tmp` or `.env`
+
+## Files (expected)
+- `Plan.md` (this section)
+- `public_html/pages/security/` (All Father UI)
+- `public_html/includes/mh_reports.php`
+- `public_html/classes/Mailer.php` / `public_html/classes/EmailQueue.php`
+- `public_html/cron/process_trip_confirmations.php`
+- `public_html/cron/process_mh_daily_report.php`
+- `public_html/migrations/` (settings + attachments column)
+
+---
+
+# LOKA Plan #17: Live Trip Board — DONE (2026-09-04)
+
+Leave Plan #16 OPEN but **not** in the next build queue. Do not reopen Plan #11.
+
+## Goal
+A Motorpool/Guard **wall board**: who is out, which plate, where, when they should be back, and who is overdue — without opening the full request list. Matches the agreed mockup (KPI row + status table + filters). **No GPS / no map.** Guard dispatch/arrival in `public_html/pages/guard/` stays the source of truth; the board only **reads** it.
+
+## Who can see it
+**Motorpool Head, Guard, Admin, All Father.** Requesters/approvers do not get the nav link (they use their own request list). Optional later: kiosk/TV full-width; not in v1.
+
+Sidebar: near Guard — `public_html/includes/sidebar.php` (`?page=guard`). Route: `?page=live-board` in `public_html/index.php`.
+
+## What is on screen
+**Header:** Live Trip Board, Manila clock, auto-refresh ~30s (`meta refresh` or light JS fetch of the same page/partial).
+
+**Filters:** Today | On trip | Overdue | Due within 1 hour | search plate / driver / Control No.
+
+**KPIs (counts for the active filter/day):**
+- On trip — approved, `actual_dispatch_datetime` set, `actual_arrival_datetime` null
+- Overdue — same, plus `end_datetime` < now
+- Due within 1 hour — on trip, `end_datetime` in the next 60 minutes, not overdue
+- Available vehicles — `vehicles.status = available` and not currently on-trip (same idea as dashboard)
+
+**Table columns:** Status chip (Overdue / On trip / Due soon / Approved not dispatched) | Control No. (link to request view) | Plate | Driver | Destination | Passengers | Dispatched | Expected return | Late by / time left.
+
+**Rows included (v1):** today’s operational set — approved trips that are (a) not yet dispatched with end still today/future, or (b) dispatched and not arrived. **Drop** completed and cancelled. Sort: overdue first, then due soon, then on trip, then not dispatched.
+
+```mermaid
+flowchart LR
+  guard[Guard dispatch or arrival]
+  req[requests table]
+  board[Live Trip Board]
+  guard --> req
+  req --> board
+```
+
+## Implementation notes
+- New page `public_html/pages/live-board/index.php` (keep lean; extract query helper if the file grows).
+- Query `requests` + vehicle + driver + passenger count; reuse overdue logic already used on `public_html/pages/requests/index.php` (`status = approved`, no arrival, `end_datetime` past).
+- No new tables. No cron. No PDF. `php -l` on touched files.
+- Do not commit `_deploy_tmp` or `.env`.
+
+## QA
+- [ ] Guard dispatch appears on the board; arrival removes the row. (manual)
+- [ ] Overdue row is red and stays until arrival. (manual)
+- [x] Requester login: no Live Board menu (`canAccessLiveBoard()` = Guard / Motorpool / Admin / All Father only)
+- [x] MH/Guard: KPIs counted from the same Today operational set as the table
+- [x] `php -l` on touched files
+- [x] Do not commit `_deploy_tmp` or `.env`
+
+## Out of scope
+GPS, SMS, Plan #16 PDFs, cloning trips, fuel-vs-km, public QR.
+
+## Files (expected)
+- `Plan.md` (this section)
+- `public_html/pages/live-board/index.php`
+- `public_html/includes/live_board.php`
+- `public_html/includes/sidebar.php`
+- `public_html/includes/nav_search.php`
+- `public_html/index.php`
+- `public_html/includes/functions.php` (`canAccessLiveBoard`)
+- `public_html/pages/requests/view.php` (Guard can open Control No. via `canGuardViewActiveTrip`)
+
 

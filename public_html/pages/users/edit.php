@@ -12,6 +12,7 @@ if (!$user)
 
 $errors = [];
 $departments = getDepartments(); // Use cached departments
+$validRoles = array_keys(ROLE_LABELS);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
@@ -20,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = post('email');
     $password = post('password');
     $phone = postSafe('phone', '', 20);
-    $role = postSafe('role', '', 20);
+    $role = (string) post('role');
     $departmentId = postInt('department_id') ?: null;
 
     if (empty($name))
@@ -31,6 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Invalid email format';
     if ($password && strlen($password) < 8)
         $errors[] = 'Password must be at least 8 characters';
+    if ($role === '')
+        $errors[] = 'Role is required';
+    elseif (!in_array($role, $validRoles, true))
+        $errors[] = 'Invalid role selected';
 
     if (empty($errors)) {
         db()->beginTransaction();
@@ -71,6 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } catch (Exception $e) {
             db()->rollback();
+            error_log('Failed to update user #' . $userId . ': ' . $e->getMessage());
             $errors[] = 'Failed to update user';
         }
     }

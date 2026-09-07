@@ -6,7 +6,7 @@
  * to the correct fuel supplier (Petromar or Queensforth).
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'loka_fleet';
 $dbUser = 'root';

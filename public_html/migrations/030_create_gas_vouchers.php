@@ -6,7 +6,7 @@
  * Approval workflow: Requester â†’ Reviewer (OIC Motorpool) â†’ Approver (Admin & Finance Chief)
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'loka_fleet';
 $dbUser = 'root';

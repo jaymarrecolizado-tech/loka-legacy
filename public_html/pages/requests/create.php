@@ -5,6 +5,7 @@
 
 $pageTitle = 'New Request';
 $errors = [];
+$bookingSettings = getBookingRules();
 
 // Get available vehicles for selection (cached)
 $availableVehicles = getAvailableVehicles();
@@ -145,8 +146,7 @@ $vehicleId = postInt('vehicle_id') ?: null;
     $motorpoolHeadId = postInt('motorpool_head_id');
     $requestedDriverId = postInt('requested_driver_id') ?: null;
     
-    // Load booking rules settings (shared helper)
-    $bookingSettings = getBookingRules();
+    // Booking rules already loaded above (shared helper)
     $maxAdvanceDays = $bookingSettings['max_advance_booking_days'];
     $minAdvanceHours = $bookingSettings['min_advance_booking_hours'];
     $maxTripHours = $bookingSettings['max_trip_duration_hours'];
@@ -483,6 +483,7 @@ require_once INCLUDES_PATH . '/header.php';
                                 <label for="start_datetime" class="form-label">Start Date/Time <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control datetimepicker" id="start_datetime" 
                                        name="start_datetime" value="<?= e(post('start_datetime', '')) ?>" required>
+                                <small class="text-muted">You can book a start date up to <?= (int) ($bookingSettings['max_advance_booking_days'] ?? 30) ?> days from today.</small>
                                 <div class="invalid-feedback">Please select start date/time</div>
                             </div>
                             
@@ -490,6 +491,7 @@ require_once INCLUDES_PATH . '/header.php';
                                 <label for="end_datetime" class="form-label">End Date/Time <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control datetimepicker" id="end_datetime" 
                                        name="end_datetime" value="<?= e(post('end_datetime', '')) ?>" required>
+                                <small class="text-muted">Return cannot be more than <?= (int) ($bookingSettings['max_trip_duration_hours'] ?? 72) ?> hours after departure.</small>
                                 <div class="invalid-feedback">Please select end date/time</div>
                             </div>
                             
@@ -1722,7 +1724,7 @@ ob_start();
     if (typeof flatpickr !== 'undefined') {
         // Get booking rules from PHP settings
         const bookingMaxAdvanceDays = <?= (int) ($bookingSettings['max_advance_booking_days'] ?? 30) ?>;
-        const bookingMinAdvanceHours = <?= (int) ($bookingSettings['min_advance_booking_hours'] ?? 24) ?>;
+        const bookingMinAdvanceHours = <?= (int) ($bookingSettings['min_advance_booking_hours'] ?? 0) ?>;
         const bookingMaxTripHours = <?= (int) ($bookingSettings['max_trip_duration_hours'] ?? 72) ?>;
         
         // Calculate min and max dates
@@ -1770,7 +1772,7 @@ ob_start();
         setTimeout(function() {
             if (typeof flatpickr !== 'undefined') {
                 const bookingMaxAdvanceDays = <?= (int) ($bookingSettings['max_advance_booking_days'] ?? 30) ?>;
-                const bookingMinAdvanceHours = <?= (int) ($bookingSettings['min_advance_booking_hours'] ?? 24) ?>;
+                const bookingMinAdvanceHours = <?= (int) ($bookingSettings['min_advance_booking_hours'] ?? 0) ?>;
                 const bookingMaxTripHours = <?= (int) ($bookingSettings['max_trip_duration_hours'] ?? 72) ?>;
 
                 const today = new Date();

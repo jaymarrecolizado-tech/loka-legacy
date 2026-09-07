@@ -215,6 +215,26 @@ function canAccessReports(): bool
 }
 
 /**
+ * Motorpool Head, Guard, Admin, All Father — Live Trip Board (Plan #17).
+ * Approver-only and requester accounts do not get access.
+ */
+function canAccessLiveBoard(): bool
+{
+    return isGuard() || isMotorpool() || isAdmin();
+}
+
+/**
+ * Require Live Trip Board access
+ */
+function requireLiveBoardAccess(): void
+{
+    requireAuth();
+    if (!canAccessLiveBoard()) {
+        redirectWith('/?page=dashboard', 'danger', 'You do not have permission to access this page.');
+    }
+}
+
+/**
  * Driver-tagged user who is not approver+ (own Driver Report only)
  */
 function isSelfScopedDriverReporter(): bool
@@ -365,6 +385,21 @@ function truncate(string $text, int $length = 50): string
     if (strlen($text) <= $length)
         return e($text);
     return e(substr($text, 0, $length)) . '...';
+}
+
+/**
+ * Destination hops as ASCII " -> " so Helvetica PDFs do not print "?" for Unicode arrows.
+ */
+function formatDestinationChain(?string $destination): string
+{
+    $destination = trim((string) $destination);
+    if ($destination === '') {
+        return '-';
+    }
+    $destination = preg_replace('/\s*(?:\x{2192}|\x{21D2}|\x{2794}|\x{279C}|\x{00BB}|>>)\s*/u', ' -> ', $destination) ?? $destination;
+    $destination = preg_replace('/\s+\?\s+/', ' -> ', $destination) ?? $destination;
+    $destination = preg_replace('/(?:\s*->\s*)+/', ' -> ', $destination) ?? $destination;
+    return trim($destination);
 }
 
 /**

@@ -37,9 +37,9 @@ if (!$request) {
     redirectWith('/?page=requests', 'danger', 'Request not found.');
 }
 
-// Check access - owner, approver+, or assigned/requested driver
+// Check access - owner, approver+, assigned/requested driver, or Guard on an active/completed trip
 $isDriverOnTrip = isAssignedOrRequestedDriver($request);
-if ($request->user_id !== userId() && !isApprover() && !$isDriverOnTrip) {
+if ($request->user_id !== userId() && !isApprover() && !$isDriverOnTrip && !canGuardViewActiveTrip($request)) {
     redirectWith('/?page=requests', 'danger', 'You do not have permission to view this request.');
 }
 
@@ -173,21 +173,13 @@ require_once INCLUDES_PATH . '/header.php';
             <?php endif; ?>
 
             <?php
-            // Manage Passengers - motorpool head (or admin / all father) can add/remove
+            // Manage Passengers - any Motorpool Head / Admin / All Father can add/remove
             // passengers while the request is approved or still on routing (before dispatch)
             $canManagePassengers = false;
             if ($request->actual_dispatch_datetime === null
-                && in_array($request->status, [STATUS_PENDING, STATUS_PENDING_MOTORPOOL, STATUS_APPROVED], true)) {
-
-                if (isAdmin() || isAllFather()) {
-                    $canManagePassengers = true;
-                } elseif (isMotorpool()) {
-                    if ($request->motorpool_head_id && $request->motorpool_head_id == userId()) {
-                        $canManagePassengers = true;
-                    } elseif (!$request->motorpool_head_id) {
-                        $canManagePassengers = true;
-                    }
-                }
+                && in_array($request->status, [STATUS_PENDING, STATUS_PENDING_MOTORPOOL, STATUS_APPROVED], true)
+                && (isAdmin() || isAllFather() || isMotorpool())) {
+                $canManagePassengers = true;
             }
             ?>
             <?php if ($canManagePassengers): ?>

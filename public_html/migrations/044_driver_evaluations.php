@@ -7,7 +7,7 @@
  *  - settings defaults (idempotent)
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'fleetdb';
 $dbUser = 'root';
@@ -85,8 +85,8 @@ try {
     // --- Settings defaults (idempotent) ---
     $now = date('Y-m-d H:i:s');
     $defaults = [
-        ['driver_evaluation_reminder_hours', '48', 'int', 'trips'],
-        ['driver_evaluation_expiry_days', '30', 'int', 'trips'],
+        ['driver_evaluation_reminder_hours', '48', 'integer', 'trips'],
+        ['driver_evaluation_expiry_days', '30', 'integer', 'trips'],
     ];
 
     $stmt = $pdo->prepare(

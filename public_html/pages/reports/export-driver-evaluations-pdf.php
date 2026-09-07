@@ -206,7 +206,7 @@ if ($includeRemarks) {
             $pdf->MultiCell(0, 4.5, sprintf(
                 'Trip #%d - %s | %s | Overall: %s / 5',
                 (int) $r->request_id,
-                $r->destination ?: '-',
+                formatDestinationChain($r->destination),
                 date('M j, Y', strtotime($r->start_datetime)),
                 $r->overall !== null ? number_format((float) $r->overall, 2) : 'n/a'
             ), 0, 'L', false, 1);
