@@ -553,6 +553,8 @@ switch ($page) {
             require_once PAGES_PATH . '/trip-tickets/view.php';
         } elseif ($action === 'create_form') {
             require_once PAGES_PATH . '/trip-tickets/create.php';
+        } elseif ($action === 'delete') {
+            require_once PAGES_PATH . '/trip-tickets/delete.php';
         } elseif ($action === 'export-pdf') {
             require_once PAGES_PATH . '/trip-tickets/export-pdf.php';
         } elseif ($action === 'export-excel') {

@@ -455,6 +455,10 @@ require_once INCLUDES_PATH . '/header.php';
                                                 $statusClass = 'success';
                                                 $statusIcon = 'check-circle';
                                                 break;
+                                            default:
+                                                $statusClass = 'secondary';
+                                                $statusIcon = 'file-earmark';
+                                                break;
                                         }
                                         ?>
                                         <span class="badge bg-<?= $statusClass ?>">
@@ -499,7 +503,7 @@ require_once INCLUDES_PATH . '/header.php';
                                             <?= formatDateTime($ticket->created_at) ?>
                                         </small>
                                     </td>
-                                    <td>
+                                    <td class="text-nowrap">
                                         <a href="?page=trip-tickets&action=view&id=<?= $ticket->id ?>" class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-eye me-1"></i>View
                                         </a>
@@ -511,6 +515,7 @@ require_once INCLUDES_PATH . '/header.php';
                                                 <i class="bi bi-x-lg me-1"></i>
                                             </button>
                                         <?php endif; ?>
+                                        <?php $ticketId = (int) $ticket->id; require PAGES_PATH . '/trip-tickets/partials/delete_form.php'; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

@@ -323,6 +323,7 @@ require_once INCLUDES_PATH . '/header.php';
                                                 class="btn btn-outline-success" title="Export Excel">
                                                 <i class="bi bi-file-earmark-excel"></i>
                                             </a>
+                                            <?php $ticketId = (int) $tt->id; require PAGES_PATH . '/trip-tickets/partials/delete_form.php'; ?>
                                         </div>
                                     </td>
                                 </tr>

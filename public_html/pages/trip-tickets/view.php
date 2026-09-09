@@ -485,6 +485,7 @@ require_once INCLUDES_PATH . '/header.php';
                         <a href="?page=requests&action=view&id=<?= $ticket->request_id ?>" class="btn btn-info">
                             <i class="bi bi-eye me-1"></i>View Request
                         </a>
+                        <?php $ticketId = (int) $ticket->id; require PAGES_PATH . '/trip-tickets/partials/delete_form.php'; ?>
                     </div>
                 </div>
             </div>
