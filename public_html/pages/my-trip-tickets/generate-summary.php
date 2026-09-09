@@ -101,6 +101,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $isPrint) {
             if ($t->trip_driver_name) {
                 $t->all_people[] = ['name' => $t->trip_driver_name, 'role' => 'Driver'];
             }
+            $t->destination = formatDestinationChain($t->destination);
+            $t->purpose = trim((string) $t->purpose);
+
             foreach ($t->passengers_list as $p) {
                 $role = (strpos($p->display_name, '(Guest)') !== false) ? 'Guest' : 'Passenger';
                 $t->all_people[] = ['name' => $p->name, 'role' => $role];

@@ -423,6 +423,8 @@ if ($__verifyUrl) {
         .tbl-trip textarea {
             overflow: hidden;
             resize: none;
+            min-height: 22px;
+            height: auto;
         }
 
         @media print {
@@ -430,13 +432,11 @@ if ($__verifyUrl) {
                 -webkit-appearance: none;
                 appearance: none;
                 overflow: visible !important;
-                height: auto !important;
                 white-space: pre-wrap !important;
                 word-break: break-word !important;
             }
             .tbl-trip textarea.auto-expand {
                 overflow: visible !important;
-                height: auto !important;
             }
             .tbl-trip td {
                 height: auto !important;
@@ -957,8 +957,8 @@ if ($__verifyUrl) {
                                 <td rowspan="<?= $peopleCount ?>"><input type="time" value="<?= date('H:i', strtotime($t->end_date)) ?>"></td>
                                 <td rowspan="<?= $peopleCount ?>"><input type="text" placeholder="km" value="<?= $t->start_mileage ?>"></td>
                                 <td rowspan="<?= $peopleCount ?>"><input type="text" placeholder="km" value="<?= $t->end_mileage ?>"></td>
-                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Destination" rows="1" maxlength="500"><?= e($t->destination) ?></textarea></td>
-                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Purpose" rows="1" maxlength="500"><?= e($t->purpose) ?></textarea></td>
+                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Destination" rows="<?= tripTicketTextareaRows($t->destination, 26) ?>"><?= e($t->destination) ?></textarea></td>
+                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Purpose" rows="<?= tripTicketTextareaRows($t->purpose, 26) ?>"><?= e($t->purpose) ?></textarea></td>
                             <?php endif; ?>
                             <td style="padding:1px 3px;">
                                 <div style="display:flex; align-items:center; justify-content:flex-start; gap:0; white-space:nowrap; width:100%;">
@@ -1245,15 +1245,19 @@ if ($__verifyUrl) {
             el.style.height = el.scrollHeight + 'px';
         }
 
+        function resizeTripTextareas() {
+            document.querySelectorAll('textarea.auto-expand').forEach(el => autoResizeTextarea(el));
+        }
         window.addEventListener('load', function() {
+            resizeTripTextareas();
             document.querySelectorAll('textarea.auto-expand').forEach(el => {
-                autoResizeTextarea(el);
                 el.addEventListener('input', function() {
                     autoResizeTextarea(this);
                 });
             });
             calcTotals();
         });
+        window.addEventListener('beforeprint', resizeTripTextareas);
 
         // Handle page numbering with CSS counter (most reliable method)
         window.addEventListener('beforeprint', function() {

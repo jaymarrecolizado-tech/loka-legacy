@@ -343,13 +343,23 @@ if ($__verifyUrl) {
         .tbl-passengers td:nth-child(5) { width: 12%; }
 
         /* ITINERARY TABLE */
-        .tbl-itinerary td:nth-child(1) { width: 12%; }
-        .tbl-itinerary td:nth-child(2) { width: 14%; }
-        .tbl-itinerary td:nth-child(3) { width: 14%; }
-        .tbl-itinerary td:nth-child(4) { width: 10%; }
-        .tbl-itinerary td:nth-child(5) { width: 10%; }
+        .tbl-itinerary td:nth-child(1) { width: 10%; }
+        .tbl-itinerary td:nth-child(2) { width: 10%; }
+        .tbl-itinerary td:nth-child(3) { width: 10%; }
+        .tbl-itinerary td:nth-child(4) { width: 12%; }
+        .tbl-itinerary td:nth-child(5) { width: 22%; }
         .tbl-itinerary td:nth-child(6) { width: 22%; }
-        .tbl-itinerary td:nth-child(7) { width: 18%; }
+        .tbl-itinerary td:nth-child(7) { width: 14%; }
+
+        .tbl-itinerary textarea {
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            overflow: hidden;
+            resize: none;
+            height: auto;
+            min-height: 24px;
+        }
 
         /* PURPOSE TABLE */
         .tbl-purpose td:nth-child(1) { width: 15%; }
@@ -568,6 +578,12 @@ if ($__verifyUrl) {
                 color: #000 !important;
             }
 
+            .tbl-itinerary textarea {
+                overflow: visible !important;
+                white-space: pre-wrap !important;
+                word-break: break-word !important;
+            }
+
             .sig-title {
                 color: #555 !important;
             }
@@ -738,8 +754,8 @@ if ($__verifyUrl) {
                             <td><input type="time" value="<?= date('H:i', strtotime($t->start_date)) ?>"></td>
                             <td><input type="time" value="<?= date('H:i', strtotime($t->end_date)) ?>"></td>
                             <td><input class="left" type="text" value="Tuguegarao City" placeholder="Origin"></td>
-                            <td><input class="left" type="text" value="<?= e($t->destination) ?>" placeholder="Destination"></td>
-                            <td><textarea class="left" rows="2" placeholder="Purpose" maxlength="500"><?= e($t->purpose) ?></textarea></td>
+                            <td><textarea class="left" rows="<?= tripTicketTextareaRows($t->destination, 22) ?>" placeholder="Destination"><?= e($t->destination) ?></textarea></td>
+                            <td><textarea class="left" rows="<?= tripTicketTextareaRows($t->purpose, 26) ?>" placeholder="Purpose"><?= e($t->purpose) ?></textarea></td>
                             <td><input type="text" placeholder="Name"></td>
                         </tr>
                     <?php endforeach; ?>
@@ -753,8 +769,8 @@ if ($__verifyUrl) {
                             <td><input type="time"></td>
                             <td><input type="time"></td>
                             <td><input class="left" type="text" placeholder="Origin"></td>
-                            <td><input class="left" type="text" placeholder="Destination"></td>
-                            <td><textarea class="left" rows="2" placeholder="Purpose of trip" maxlength="500"></textarea></td>
+                            <td><textarea class="left" rows="2" placeholder="Destination"></textarea></td>
+                            <td><textarea class="left" rows="2" placeholder="Purpose of trip"></textarea></td>
                             <td><input type="text" placeholder="Approved By"></td>
                         </tr>
                     <?php endfor; ?>
@@ -975,6 +991,17 @@ if ($__verifyUrl) {
 
             if(odoStart) odoStart.addEventListener('input', calcDistance);
             if(odoEnd) odoEnd.addEventListener('input', calcDistance);
+            function resizeItineraryTextareas() {
+                document.querySelectorAll('.tbl-itinerary textarea').forEach(function (el) {
+                    el.style.height = 'auto';
+                    el.style.height = el.scrollHeight + 'px';
+                });
+            }
+            resizeItineraryTextareas();
+            document.querySelectorAll('.tbl-itinerary textarea').forEach(function (el) {
+                el.addEventListener('input', function () { resizeItineraryTextareas(); });
+            });
+            window.addEventListener('beforeprint', resizeItineraryTextareas);
             document.querySelectorAll('#sigDriver, #sigReviewer2, #sigApprover2').forEach(el=>{
                 el.addEventListener('change', function(){ this.classList.remove('is-invalid'); this.style.borderColor=''; const e=this.parentElement.querySelector('.field-error'); if(e) e.remove(); });
                 el.addEventListener('input', function(){ this.classList.remove('is-invalid'); this.style.borderColor=''; const e=this.parentElement.querySelector('.field-error'); if(e) e.remove(); });

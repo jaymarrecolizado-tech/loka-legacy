@@ -403,6 +403,20 @@ function formatDestinationChain(?string $destination): string
 }
 
 /**
+ * Rows so generated trip-ticket destination/purpose cells wrap instead of clipping.
+ */
+function tripTicketTextareaRows(?string $text, int $charsPerLine = 28, int $min = 2, int $max = 12): int
+{
+    $text = trim((string) $text);
+    if ($text === '' || $text === '-') {
+        return $min;
+    }
+    $hardLines = substr_count($text, "\n") + 1;
+    $wrapLines = (int) ceil(mb_strlen($text) / max(8, $charsPerLine));
+    return min($max, max($min, $hardLines, $wrapLines));
+}
+
+/**
  * Get pagination HTML
  */
 function pagination(int $total, int $current, int $perPage, string $baseUrl): string
