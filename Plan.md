@@ -21,6 +21,7 @@
 | #15 | Skip Trip Confirmation After Dispatch/Complete | DONE (2026-09-04) |
 | #16 | Overdue PDF + Daily Motorpool Report (All Father) | OPEN (2026-09-04; not next build) |
 | #17 | Live Trip Board | DONE (2026-09-04) |
+| #18 | Gas Voucher QR Public Verify | DONE (2026-09-09) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -1211,5 +1212,74 @@ GPS, SMS, Plan #16 PDFs, cloning trips, fuel-vs-km, public QR.
 - `public_html/index.php`
 - `public_html/includes/functions.php` (`canAccessLiveBoard`)
 - `public_html/pages/requests/view.php` (Guard can open Control No. via `canGuardViewActiveTrip`)
+
+---
+
+# LOKA Plan #18: Gas Voucher QR Public Verify — ✅ DONE (2026-09-09)
+
+Leave Plan #16 OPEN. Do not reopen Plan #11. Do not add a login wall on the scan page.
+
+## Goal
+
+When a gasoline station scans the QR on a printed gas voucher, they get a **reliable public authenticity check** (no login): HMAC already proves the link is ours; the page must render clearly on a phone and tell them if the voucher is approved and whether fuel was already paid.
+
+Stations already open `?page=verify-voucher&id=&hash=` with **no login** (`$publicPages` in `public_html/index.php`). That is correct. The HMAC is already checked (`gasVoucherVerifyHashValid`). The scan page is the weak part: `public_html/pages/public/verify-voucher.php` mixes Tailwind CDN with Bootstrap classes (same class of layout failure as the voucher view), has mojibake, and does not tell the station if fuel was already paid.
+
+Do **not** add a login wall. Printed QRs must keep working: hash stays `HMAC-SHA256(id-voucher_no)` truncated to 16 chars (`public_html/includes/functions.php` ~1630).
+
+```mermaid
+flowchart LR
+  print[Print voucher QR] --> scan[Station scans]
+  scan --> public["verify-voucher no login"]
+  public --> hmac[HMAC hash]
+  hmac --> status{approved?}
+  status -->|no| invalid[Not Valid]
+  status -->|yes| show[Authentic plus plate qty station paid]
+```
+
+## What the station should see
+
+**Not Valid (red)** if: missing id/hash, bad HMAC (hide all details), not approved, deleted.
+
+**Authentic (green)** only if approved. Then show voucher no., date, gas station, driver, plate, fuel + qty, reviewed by, approved by, **payment status**.
+
+If `payment_status` is `paid` / `processed` / `cancelled`: still authentic, but a **yellow/red warning** — do not release fuel again.
+
+## Code
+
+Rebuild `public_html/pages/public/verify-voucher.php` like `public_html/pages/public/verify-ticket.php`: Bootstrap 5 + Bootstrap Icons, mobile card, UTF-8, no Tailwind.
+
+Keep `$publicPages` entry in `public_html/index.php` (`verify-voucher`).
+
+No schema. No change to `public_html/pages/gas-vouchers/print.php` QR payload unless SITE_URL is wrong (QR must be `https://lokafleet.dictr2.cloud/...`, not localhost). Confirm that on print before a new voucher is issued.
+
+## Out of scope
+
+Gas-station login / PIN to redeem. Changing HMAC fields (would void already-printed QRs). Open `qr.php` generator.
+
+## Implementation — ✅ DONE (2026-09-09)
+
+- [x] Rebuilt `public_html/pages/public/verify-voucher.php` in the `verify-ticket.php` pattern: Bootstrap 5.3.2 + Bootstrap Icons, 480px mobile card, `#0b3d6e` DICT header, UTF-8 (proper `—`/`·`, BOM and mojibake removed), **zero Tailwind**.
+- [x] Not Valid (red) branch: missing id/hash, bad HMAC (voucher details nulled out — nothing leaks), non-approved status (shows current label), deleted/not found.
+- [x] AUTHENTIC (green) only when `status='approved'`; shows voucher no., date, gas station, driver, plate, fuel + qty (FULL TANK handling kept), reviewed by, approved by, **payment status badge**.
+- [x] Payment warnings: `paid` → yellow "Already Paid — do not release fuel again"; `processed` → yellow "Already Processed — do not release fuel again"; `cancelled` → red "Payment Cancelled — do not release fuel"; `unpaid` → neutral "Fuel not yet released" (badge only, no warning box). Still authentic in all cases — no login wall added.
+- [x] HMAC untouched: `gasVoucherVerifyHashValid()` / `gasVoucherVerifyHash()` / `gasVoucherVerifyUrl()` unchanged (`HMAC-SHA256(id-voucher_no)` truncated 16) — already-printed QRs keep working. `$publicPages` entry `verify-voucher` kept.
+- [x] QR payload check: `gasVoucherVerifyUrl()` builds from `SITE_URL`; `config/constants.php:20-24` refuses to boot production without HTTPS `SITE_URL`; `pages/gas-vouchers/print.php:47,397-399` prints the verify link + explicit "Still using localhost — phones cannot open this" warning. No code change needed.
+
+## QA — verified 2026-09-09 (local XAMPP; seeded `SMOKE-18-*` vouchers, deleted after)
+
+- [x] Approved + unpaid voucher scanned → green AUTHENTIC, all details readable at 390px phone viewport (browser screenshot; Bootstrap card stacks cleanly).
+- [x] Approved + `paid` → AUTHENTIC + yellow "Already Paid — Do not release fuel again" warning box + `Paid` badge (screenshot verified); `cancelled` → AUTHENTIC + red "Payment Cancelled" (HTTP-verified).
+- [x] `pending_review` voucher + valid hash → Not Valid, "not valid for fuel release", no plate/fuel details (HTTP-verified).
+- [x] Missing hash and bad hash → Not Valid, no voucher details leaked (HTTP-verified); non-existent id → "not found or has been deleted".
+- [x] 0 Tailwind refs, Bootstrap 5.3.2 present, 0 mojibake lines in served HTML.
+- [x] Printed-QR URL: production enforced HTTPS by `constants.php` + localhost warning on `print.php`; local URL is localhost only because dev `.env` has no `SITE_URL` (expected).
+- [x] `php -l` clean on `verify-voucher.php`. `_deploy_tmp` fixtures deleted; `.env` untouched.
+
+## Files
+
+- `public_html/pages/public/verify-voucher.php` (rebuilt)
+- `public_html/index.php` — unchanged (`verify-voucher` stays in `$publicPages`)
+- `public_html/includes/functions.php` — unchanged (hash helpers intact)
 
 

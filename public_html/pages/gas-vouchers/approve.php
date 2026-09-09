@@ -57,6 +57,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $decision = post('decision', '');
     $notes    = postSafe('notes', '', 500);
+    $rejectReason = postSafe('rejection_reason', '', 500);
+    if ($rejectReason === '') {
+        $rejectReason = $notes;
+    }
     $selectedReviewer = (int) post('reviewed_by', userId());
     $selectedApprover = (int) post('approved_by', userId());
 
@@ -64,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Invalid decision.';
     }
 
-    if ($decision === 'reject' && empty($notes)) {
+    if ($decision === 'reject' && $rejectReason === '') {
         $errors[] = 'A rejection reason is required.';
     }
 
@@ -206,7 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'user_id' => $requesterUserId,
                 'type' => 'gas_voucher_rejected',
                 'title' => 'Gas Voucher Rejected',
-                'message' => "Your gas voucher {$voucher->voucher_no} has been rejected." . ($notes ? " Reason: {$notes}" : ""),
+                'message' => "Your gas voucher {$voucher->voucher_no} has been rejected." . ($rejectReason ? " Reason: {$rejectReason}" : ""),
                 'link' => '/?page=gas-vouchers&action=view&id=' . $voucherId,
                 'requestId' => $voucherId
             ];
@@ -217,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'user_id' => $voucher->requested_reviewer_id,
                     'type' => 'gas_voucher_rejected',
                     'title' => 'Gas Voucher Rejected',
-                    'message' => "Gas voucher {$voucher->voucher_no} has been rejected." . ($notes ? " Reason: {$notes}" : ""),
+                    'message' => "Gas voucher {$voucher->voucher_no} has been rejected." . ($rejectReason ? " Reason: {$rejectReason}" : ""),
                     'link' => '/?page=gas-vouchers&action=view&id=' . $voucherId,
                     'requestId' => $voucherId
                 ];
@@ -231,7 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'user_id' => $user->id,
                         'type' => 'gas_voucher_rejected',
                         'title' => 'Gas Voucher Rejected',
-                        'message' => "Gas voucher {$voucher->voucher_no} has been rejected." . ($notes ? " Reason: {$notes}" : ""),
+                        'message' => "Gas voucher {$voucher->voucher_no} has been rejected." . ($rejectReason ? " Reason: {$rejectReason}" : ""),
                         'link' => '/?page=gas-vouchers&action=view&id=' . $voucherId,
                         'requestId' => $voucherId
                     ];
@@ -244,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'status'           => 'rejected',
                     'rejected_by'      => userId(),
                     'rejected_at'      => date(DATETIME_FORMAT),
-                    'rejection_reason' => $notes,
+                    'rejection_reason' => $rejectReason,
                     'updated_at'       => date(DATETIME_FORMAT),
                 ], 'id = ?', [$voucherId]);
                 auditLog('reject', 'gas_voucher', $voucherId);
@@ -379,15 +383,16 @@ require_once INCLUDES_PATH . '/header.php';
                     
                     <form method="POST">
                         <?= csrfField() ?>
+                        <input type="hidden" name="decision" value="<?= $canReview ? 'review_approve' : 'final_approve' ?>">
 
                         <?php if ($canReview): ?>
                         <div class="mb-4">
-                            <label class="form-label fw-semibold">Reviewed By (OIC, Motor Pool Unit) <span class="text-danger">*</label>
-                            <select name="reviewed_by" class="form-control" required>
+                            <label class="form-label fw-semibold">Reviewed By (OIC, Motor Pool Unit) <span class="text-danger">*</span></label>
+                            <select name="reviewed_by" class="form-select" required>
                                 <option value="">-- Select Reviewer --</option>
                                 <?php foreach ($motorpoolHeads as $mp): ?>
-                                <option value="<?= $mp->id ?>" <?= 
-                                    ($voucher->requested_reviewer_id && $mp->id == $voucher->requested_reviewer_id) ? 'selected' : 
+                                <option value="<?= $mp->id ?>" <?=
+                                    ($voucher->requested_reviewer_id && $mp->id == $voucher->requested_reviewer_id) ? 'selected' :
                                     (!$voucher->requested_reviewer_id && $mp->id == userId() ? 'selected' : '')
                                 ?>>
                                     <?= e($mp->name) ?>
@@ -397,12 +402,12 @@ require_once INCLUDES_PATH . '/header.php';
                         </div>
                         <?php elseif ($canApprove): ?>
                         <div class="mb-4">
-                            <label class="form-label fw-semibold">Approved By (Chief, Admin. and Finance) <span class="text-danger">*</label>
-                            <select name="approved_by" class="form-control" required>
+                            <label class="form-label fw-semibold">Approved By (Chief, Admin. and Finance) <span class="text-danger">*</span></label>
+                            <select name="approved_by" class="form-select" required>
                                 <option value="">-- Select Approver --</option>
                                 <?php foreach ($chiefFinanceUsers as $cf): ?>
-                                <option value="<?= $cf->id ?>" <?= 
-                                    ($voucher->requested_approver_id && $cf->id == $voucher->requested_approver_id) ? 'selected' : 
+                                <option value="<?= $cf->id ?>" <?=
+                                    ($voucher->requested_approver_id && $cf->id == $voucher->requested_approver_id) ? 'selected' :
                                     (!$voucher->requested_approver_id && $cf->id == userId() ? 'selected' : '')
                                 ?>>
                                     <?= e($cf->name) ?>
@@ -413,32 +418,34 @@ require_once INCLUDES_PATH . '/header.php';
                         <?php endif; ?>
 
                         <div class="mb-4">
-                            <label class="form-label fw-semibold">Notes / Comments</label>
+                            <label class="form-label fw-semibold">Notes / Comments <span class="text-muted fw-normal">(optional)</span></label>
                             <textarea name="notes" class="form-control" rows="3"
-                                      placeholder="Optional notes. Required if rejecting." maxlength="500"></textarea>
+                                      placeholder="Optional comments for this approval." maxlength="500"></textarea>
                         </div>
 
-                        <div class="d-flex gap-3 flex-wrap">
-                            <?php if ($canReview): ?>
-                            <button type="submit" name="decision" value="review_approve"
-                                    class="btn btn-success px-3 py-1 small fw-normal rounded-xl inline-d-flex align-items-center gap-2 transition-colors d-flex-fill"
-                                    onclick="return confirm('Approve this voucher for final review?')">
-                                <i class="bi bi-check-circle me-1"></i>Approve for Final Review
-                            </button>
-                            <?php elseif ($canApprove): ?>
-                            <button type="submit" name="decision" value="final_approve"
-                                    class="btn btn-success px-3 py-1 small fw-normal rounded-xl inline-d-flex align-items-center gap-2 transition-colors d-flex-fill"
-                                    onclick="return confirm('Authorize this gas voucher?')">
-                                <i class="bi bi-check2-all me-1"></i>Authorize Voucher
-                            </button>
-                            <?php endif; ?>
+                        <?php if ($canReview): ?>
+                        <button type="submit" class="btn btn-success"
+                                onclick="return confirm('Send this voucher for final approval?')">
+                            <i class="bi bi-check-circle me-1"></i>Approve for Final Review
+                        </button>
+                        <?php elseif ($canApprove): ?>
+                        <button type="submit" class="btn btn-success"
+                                onclick="return confirm('Authorize this gas voucher?')">
+                            <i class="bi bi-check2-all me-1"></i>Authorize Voucher
+                        </button>
+                        <?php endif; ?>
+                    </form>
 
-                            <button type="submit" name="decision" value="reject"
-                                    class="btn btn-danger px-3 py-1 small fw-normal rounded-xl inline-d-flex align-items-center gap-2 transition-colors d-flex-fill"
-                                    onclick="return confirm('Are you sure you want to reject this voucher?')">
-                                <i class="bi bi-x-circle me-1"></i>Reject
-                            </button>
-                        </div>
+                    <form method="POST" class="mt-4 pt-4 border-top">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="decision" value="reject">
+                        <label class="form-label fw-semibold text-danger">Reject this voucher</label>
+                        <textarea name="rejection_reason" class="form-control mb-2" rows="2" required
+                                  placeholder="Rejection reason (required)" maxlength="500"></textarea>
+                        <button type="submit" class="btn btn-outline-danger"
+                                onclick="return confirm('Reject this voucher? This cannot be undone from this screen.')">
+                            <i class="bi bi-x-circle me-1"></i>Reject
+                        </button>
                     </form>
                 </div>
             </div>
