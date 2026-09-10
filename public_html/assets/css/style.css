@@ -365,6 +365,22 @@ a.stat-card-link:focus .stat-hint {
     color: #6c757d;
 }
 
+.chart-container {
+    position: relative;
+    height: 280px;
+    width: 100%;
+}
+
+.chart-container-sm {
+    position: relative;
+    height: 220px;
+    width: 100%;
+}
+
+.dash-chart-empty {
+    min-height: 180px;
+}
+
 .empty-state i {
     font-size: 4rem;
     margin-bottom: 1rem;
@@ -651,10 +667,9 @@ a.stat-card-link:focus .stat-hint {
         width: 100%;
     }
 
-    /* Charts full width on mobile */
+    /* Charts full width on mobile; keep Chart.js container height */
     .card-body canvas {
         max-width: 100% !important;
-        height: auto !important;
     }
 
     /* Chart cards stack vertically on mobile */

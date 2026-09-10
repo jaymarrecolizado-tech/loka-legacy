@@ -22,6 +22,8 @@
 | #16 | Overdue PDF + Daily Motorpool Report (All Father) | OPEN (2026-09-04; not next build) |
 | #17 | Live Trip Board | DONE (2026-09-04) |
 | #18 | Gas Voucher QR Public Verify | DONE (2026-09-09) |
+| #19 | Leftover UX Fixes, then VAPT, then Optional Features | OPEN (2026-09-10) |
+| #20 | Useful Role Dashboard | DONE (2026-09-10) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -1281,5 +1283,141 @@ Gas-station login / PIN to redeem. Changing HMAC fields (would void already-prin
 - `public_html/pages/public/verify-voucher.php` (rebuilt)
 - `public_html/index.php` — unchanged (`verify-voucher` stays in `$publicPages`)
 - `public_html/includes/functions.php` — unchanged (hash helpers intact)
+
+---
+
+# LOKA Plan #19: Leftover UX Fixes, then VAPT, then Optional Features — OPEN (2026-09-10)
+
+## Goal
+
+Fix leftover trip-ticket, voucher, and report UX first. Document VAPT findings as a follow-up hardening sprint. Extra features stay a pick-list, not auto-build.
+
+Priority confirmed 2026-09-10: **bugs/UX first, then VAPT**.
+
+```mermaid
+flowchart LR
+  phaseA[Phase A Trip tickets]
+  phaseB[Phase B Gas vouchers]
+  phaseC[Phase C Reports Plan 11]
+  phaseD[Phase D VAPT]
+  pick[Pick extra features]
+  phaseA --> phaseB --> phaseC --> phaseD
+  phaseC --> pick
+```
+
+## Phase A — Trip tickets (do first)
+
+These are live bugs, not polish.
+
+1. **Tickets stay `draft` forever** — [`create.php`](public_html/pages/trip-tickets/create.php) always inserts `status => 'draft'`. Nothing sets `submitted`. Motorpool Review Trip Tickets then filters `IN ('submitted','reviewed','approved')`, so new tickets never show for MH (admin still sees drafts with a blank badge). **Fix:** save as `submitted` (or add a Submit action) so review/badges match what drivers filed.
+2. **Approve / Return is broken** — JS in [`trip-tickets/index.php`](public_html/pages/trip-tickets/index.php) POSTs `ticket_id` and a bogus CSRF field `<?= csrf_token ?>`. PHP reads GET `id` and `requireCsrf()`. The green/yellow buttons fail closed. **Fix:** POST `id` + `csrf_token` via `csrfToken()`, and read `post('id')`.
+3. **Filter drops the page** — Filter form has no `hidden page=trip-tickets`, so Filter navigates away from the list.
+4. **Combined dest/purpose caps clip multi-stop trips** — Request hops are 100 chars each joined with ` -> `; ticket create still maxlength 100/200 on the **whole** string. Align ticket dest/purpose with the request chain (print wrapping already landed 2026-09-09).
+5. **Label `TT-{request_id}`** — cosmetic; keep unless we want `TT-{ticket id}` plus request ref.
+
+## Phase B — Gas vouchers
+
+- **Edit is a dead link** — View/list/approve point to `?page=gas-vouchers&action=edit`, but [`index.php`](public_html/index.php) has no `edit` route and there is no `edit.php`. **Fix:** add `pages/gas-vouchers/edit.php` (draft / pending_review only, same fields as create) and route it.
+- Remove leftover Tailwind / mojibake on [`approve.php`](public_html/pages/gas-vouchers/approve.php) and [`print.php`](public_html/pages/gas-vouchers/print.php). QR public verify (Plan #18) stays as-is.
+
+## Phase C — Reports (Plan #11, already specified)
+
+Small UI/export parity in [`vehicle-history.php`](public_html/pages/reports/vehicle-history.php), [`trips.php`](public_html/pages/reports/trips.php), [`export.php`](public_html/pages/reports/export.php), admin [`csv.php`](public_html/pages/admin/exports/csv.php) / [`pdf.php`](public_html/pages/admin/exports/pdf.php):
+
+- Travel order + number on Vehicle History table (CSV already has it)
+- TO + OB slip on Trip Requests UI and CSV/PDF
+- Revision stats card (`$stats->revision` is already counted)
+- Note that Trip Requests date filter uses `created_at` vs Vehicle/Driver `start_datetime`
+- `department_usage` top-vehicles column
+
+**Defer Plan #16** (overdue PDF + daily digest): needs Mailer attachments + System Control toggles. Not a leftover bug.
+
+## Phase D — VAPT (after A–C, unless pulled forward)
+
+Code review only (no exploit steps). Highest real issues:
+
+| Severity | Where | Finding | Defensive fix |
+|----------|--------|---------|----------------|
+| High | [`functions.php`](public_html/includes/functions.php) `gasVoucherVerifySecret()` | Empty `APP_KEY` falls back to `LOKA_SECRET` | Require a real `APP_KEY`; **keep 16-char HMAC** so already-printed QRs still scan |
+| High | `uploads/` + [`.htaccess`](public_html/.htaccess) | Files under webroot; guessed URL skips login | Deny static access; serve via auth + ACL (`file-view` today has **no** owner check) |
+| High | [`trip-tickets/view.php`](public_html/pages/trip-tickets/view.php), [`export-excel.php`](public_html/pages/trip-tickets/export-excel.php) | Any logged-in user can open another ticket by `id` | Same owner-or-motorpool/admin gate as PDF export |
+| High | [`users/toggle.php`](public_html/pages/users/toggle.php) | Deactivate user is CSRF-able GET | POST + `requireCsrf()` |
+| High | [`cancel.php`](public_html/pages/requests/cancel.php), [`rollback.php`](public_html/pages/requests/rollback.php) | State change with no CSRF | `requireCsrf()` on POST |
+| High | [`Security.php`](public_html/classes/Security.php) `getClientIp()` | Trusts `X-Forwarded-For` | `REMOTE_ADDR` or trusted-proxy CIDR only |
+| High | [`index.php`](public_html/index.php) | `Host: localhost` or non-prod `APP_ENV` shows errors / skips rate limit | Gate on server `APP_ENV`, never `HTTP_HOST` |
+| High | [`Auth.php`](public_html/classes/Auth.php) | Password reset does not kill remember-me / extra tokens | Delete all reset + remember rows; regenerate session |
+| Medium | [`verify-voucher.php`](public_html/pages/public/verify-voucher.php) | Distinct messages leak voucher existence/status | One generic fail for anonymous clients |
+| Medium | [`export-excel.php`](public_html/pages/trip-tickets/export-excel.php) | Unescaped spreadsheet XML | `e()` + neutralize `= + - @` |
+| Medium | [`requests/print.php`](public_html/pages/requests/print.php) | Any Guard can print any request | Same ACL as request view |
+
+**Ops (Plan #12 leftover):** rotate DB / Gmail app / SSH passwords if they were ever chat-exposed; prefer SSH keys. Confirm live `APP_KEY` is not empty and not the `.env.example` placeholder. Do not commit secrets.
+
+SQLi on allowlisted sorts looked clean. Cron requires `CRON_SECRET`. `health.php` does not dump passwords.
+
+## Recommended features (discuss — do not build unless picked)
+
+1. **Override actually reassigns** the displaced trip (today [`approvals/process.php`](public_html/pages/approvals/process.php) only notifies; vehicle stays double-booked).
+2. **Fuel vs km / voucher reconciliation** by plate and date (Plan #10).
+3. **Weekly Vehicle Trip Ticket fuel lines** filled from approved vouchers for that plate ([`generate-summary.php`](public_html/pages/my-trip-tickets/generate-summary.php) fuel cells are still empty).
+4. **Duplicate-request admin report** (same user + dest + start + purpose within 5 min) for historical rows Plan #2 no longer prevents.
+5. **Plan #16** overdue PDF + All Father daily digest — useful, larger than A–C.
+
+## What we should do next
+
+Default after confirm: **Phase A on live + GitHub**, then B, then C. Pause before D so we can decide whether QR HMAC fallback and upload ACL are in the same week.
+
+## Out of scope
+
+New modules. Plan #16. Changing printed QR hash length. Rewriting reports.
+
+## Files (when implemented)
+
+- `public_html/pages/trip-tickets/create.php`
+- `public_html/pages/trip-tickets/index.php`
+- `public_html/pages/gas-vouchers/edit.php` (new)
+- `public_html/index.php` (gas-vouchers `edit` route)
+- Reports pages listed in Phase C
+- VAPT files listed in Phase D
+
+---
+
+# LOKA Plan #20: Useful Role Dashboard — DONE (2026-09-10)
+
+## Goal
+
+Make Dashboard a role-aware ops home. Wire the unused `dashboardStatsForUser()` helper, fix blank Chart.js canvases, and put today's work one click away.
+
+## What shipped
+
+- [`pages/dashboard/index.php`](public_html/pages/dashboard/index.php) calls `$dash = dashboardStatsForUser()` and renders short partials (`kpis`, `actions`, `charts`, `queue`).
+- Admin / Motorpool Head: pending approvals (all waiting, not “my requests”), trips today, on trip now → Live Board, overdue (`end_datetime < NOW()`, no arrival) → Live Board, available vehicles, gas pending, submitted tickets. Needs-attention strip and approval queue with destination, requester, age, Open.
+- Approver: department-scoped charts and pending/unviewed queue.
+- CAF / OIC CAF: voucher KPIs + voucher queue only (no trip charts).
+- Requester: my pending / revision / upcoming; New Request stays.
+- Driver (stacked): next-trip overlay, My Trips, create ticket for completed trips without a ticket.
+- Guard-only: redirect to Guard.
+- Charts: JS uses `s.status` (not PHP `s->status`); empty window shows “No trips in this window” + Reports link; removed `canvas { height: auto !important }` so Chart.js keeps container height.
+
+## QA
+
+- `php -l` clean on dashboard PHP.
+- Analytics JSON rows have `status` / `count` keys.
+- Browser pass: admin, MH, approver, CAF, requester, driver — charts plot or show empty copy, never a collapsed blank card. Guard-only redirects.
+
+## Out of scope
+
+New Chart library. GPS. Plan #16 PDF digest. Sidebar/theme rewrite. Fake demo data.
+
+## Files
+
+- `public_html/includes/dashboard_stats.php`
+- `public_html/pages/dashboard/index.php`
+- `public_html/pages/dashboard/partials/kpis.php`
+- `public_html/pages/dashboard/partials/actions.php`
+- `public_html/pages/dashboard/partials/charts.php`
+- `public_html/pages/dashboard/partials/queue.php`
+- `public_html/assets/css/style.css`
+- `public_html/config/constants.php` (2.7.3 cache-bust)
+
 
 

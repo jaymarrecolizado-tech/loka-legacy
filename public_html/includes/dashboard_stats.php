@@ -18,38 +18,33 @@ function dashboardStatsForUser(): array
 
     $kpis = [];
     $actions = [];
-    $queue = ['title' => 'Queue', 'href' => APP_URL . '/?page=requests', 'rows' => []];
+    $queue = ['title' => 'Queue', 'href' => APP_URL . '/?page=requests', 'kind' => 'request', 'rows' => []];
     $upcoming = [];
     $vehicleStats = [];
     $analytics = null;
-    $audit = [];
     $showCharts = false;
     $showUtilization = false;
     $showNewRequest = true;
     $showFleetKpis = false;
+    $nextTrip = null;
 
-    // --- Guard-only users are redirected by dashboard/index.php ---
-
-    // Shared fleet counts for ops roles
     $availableVehicles = 0;
-    $availableDrivers = 0;
     try {
         $availableVehicles = (int) db()->count('vehicles', "status = 'available' AND deleted_at IS NULL");
-        $availableDrivers = (int) db()->count('drivers', "status = 'available' AND deleted_at IS NULL");
     } catch (Throwable $e) {
         /* ignore */
     }
 
-    $pendingApprovals = badgeCountPendingApprovals();
-    $pendingGas = badgeCountPendingGasVouchers();
-    $pendingTickets = badgeCountSubmittedTripTickets();
-    $pendingMaint = badgeCountPendingMaintenance();
+    $pendingApprovals = count(badgePendingIdsApprovals());
+    $pendingGas = count(badgePendingIdsGasVouchers());
+    $pendingTickets = count(badgePendingIdsTripTickets());
+    $pendingMaint = count(badgePendingIdsMaintenance());
 
     if (isAdmin() || isMotorpool()) {
         $showCharts = true;
         $showUtilization = true;
         $showFleetKpis = true;
-        $showNewRequest = isAdmin(); // motorpool rarely creates requests from dash
+        $showNewRequest = isAdmin();
 
         $tripsToday = (int) db()->fetchColumn(
             "SELECT COUNT(*) FROM requests WHERE status = 'approved' AND DATE(start_datetime) = ? AND deleted_at IS NULL",
@@ -58,6 +53,7 @@ function dashboardStatsForUser(): array
         $onTrip = (int) db()->fetchColumn(
             "SELECT COUNT(*) FROM requests WHERE status = 'approved' AND actual_dispatch_datetime IS NOT NULL AND actual_arrival_datetime IS NULL AND deleted_at IS NULL"
         );
+        $overdue = dashboardOverdueTripCount();
 
         if ($pendingApprovals > 0) {
             $actions[] = ['label' => 'Approvals waiting', 'count' => $pendingApprovals, 'href' => APP_URL . '/?page=approvals', 'tone' => 'warning'];
@@ -74,27 +70,18 @@ function dashboardStatsForUser(): array
 
         $kpis = [
             ['label' => 'Pending Approvals', 'value' => $pendingApprovals, 'href' => APP_URL . '/?page=approvals', 'tone' => 'warning', 'icon' => 'bi-hourglass-split'],
-            ['label' => 'Trips Today', 'value' => $tripsToday, 'href' => APP_URL . '/?page=guard&filter=today', 'tone' => 'primary', 'icon' => 'bi-calendar-day'],
-            ['label' => 'On Trip Now', 'value' => $onTrip, 'href' => APP_URL . '/?page=guard&filter=pending_arrival', 'tone' => 'info', 'icon' => 'bi-truck'],
+            ['label' => 'Trips Today', 'value' => $tripsToday, 'href' => APP_URL . '/?page=live-board&filter=today', 'tone' => 'primary', 'icon' => 'bi-calendar-day'],
+            ['label' => 'On Trip Now', 'value' => $onTrip, 'href' => APP_URL . '/?page=live-board&filter=on_trip', 'tone' => 'info', 'icon' => 'bi-truck'],
+            ['label' => 'Overdue', 'value' => $overdue, 'href' => APP_URL . '/?page=live-board&filter=overdue', 'tone' => 'error', 'icon' => 'bi-exclamation-triangle'],
             ['label' => 'Available Vehicles', 'value' => $availableVehicles, 'href' => APP_URL . '/?page=vehicles&status=available', 'tone' => 'success', 'icon' => 'bi-car-front'],
             ['label' => 'Gas Pending', 'value' => $pendingGas, 'href' => APP_URL . '/?page=gas-vouchers', 'tone' => 'warning', 'icon' => 'bi-fuel-pump'],
+            ['label' => 'Tickets Submitted', 'value' => $pendingTickets, 'href' => APP_URL . '/?page=trip-tickets&status=submitted', 'tone' => 'info', 'icon' => 'bi-journal-check'],
         ];
 
         $queue = dashboardQueueApprovals(true);
         $upcoming = dashboardUpcomingTrips(null, 5);
         $vehicleStats = db()->fetchAll("SELECT status, COUNT(*) as count FROM vehicles WHERE deleted_at IS NULL GROUP BY status");
         $analytics = dashboardAnalyticsData(null);
-
-        if (isAdmin()) {
-            try {
-                $audit = db()->fetchAll(
-                    "SELECT a.*, u.name as user_name FROM audit_logs a LEFT JOIN users u ON a.user_id = u.id ORDER BY a.created_at DESC LIMIT 5"
-                );
-            } catch (Throwable $e) {
-                $audit = [];
-            }
-            $kpis[] = ['label' => 'Tickets Submitted', 'value' => $pendingTickets, 'href' => APP_URL . '/?page=trip-tickets&status=submitted', 'tone' => 'info', 'icon' => 'bi-journal-check'];
-        }
     } elseif (isApprover()) {
         $showCharts = true;
         $unviewed = 0;
@@ -142,13 +129,9 @@ function dashboardStatsForUser(): array
                 "SELECT COUNT(*) FROM gas_vouchers WHERE status = 'approved' AND payment_status = 'unpaid' AND deleted_at IS NULL"
             );
         } catch (Throwable $e) {
-            try {
-                $unpaid = (int) db()->fetchColumn(
-                    "SELECT COUNT(*) FROM gas_vouchers WHERE status = 'approved' AND deleted_at IS NULL"
-                );
-            } catch (Throwable $e2) {
-                $unpaid = 0;
-            }
+            $unpaid = (int) db()->fetchColumn(
+                "SELECT COUNT(*) FROM gas_vouchers WHERE status = 'approved' AND deleted_at IS NULL"
+            );
         }
 
         if ($cafPending > 0) {
@@ -163,19 +146,9 @@ function dashboardStatsForUser(): array
             ['label' => 'Approved Unpaid', 'value' => $unpaid, 'href' => APP_URL . '/?page=gas-vouchers&status=approved', 'tone' => 'info', 'icon' => 'bi-cash-stack'],
         ];
 
-        $queue = [
-            'title' => 'Gas Vouchers Needing Approval',
-            'href' => APP_URL . '/?page=gas-vouchers&status=pending_approval',
-            'rows' => db()->fetchAll(
-                "SELECT gv.id, gv.voucher_no as title, gv.status, gv.created_at as updated_at, u.name as meta
-                 FROM gas_vouchers gv JOIN users u ON gv.requested_by_user_id = u.id
-                 WHERE gv.status = 'pending_approval' AND gv.deleted_at IS NULL
-                 ORDER BY gv.created_at DESC LIMIT 8"
-            ),
-        ];
+        $queue = dashboardQueueCafVouchers();
         $upcoming = [];
     } else {
-        // Requester (and stacked driver capability)
         $myTotal = (int) db()->count('requests', 'user_id = ? AND deleted_at IS NULL', [$userId]);
         $myPending = (int) db()->count('requests', "user_id = ? AND status IN ('pending','pending_motorpool') AND deleted_at IS NULL", [$userId]);
         $myRevision = (int) db()->count('requests', "user_id = ? AND status = 'revision' AND deleted_at IS NULL", [$userId]);
@@ -209,67 +182,144 @@ function dashboardStatsForUser(): array
         $queue = [
             'title' => 'Requests Needing Attention',
             'href' => APP_URL . '/?page=requests',
-            'rows' => db()->fetchAll(
-                "SELECT r.id, r.purpose as title, r.status, r.updated_at, d.name as meta
+            'kind' => 'request',
+            'rows' => dashboardMapQueueRows(db()->fetchAll(
+                "SELECT r.id, r.purpose as title, r.status, r.updated_at, d.name as meta, r.destination
                  FROM requests r JOIN departments d ON r.department_id = d.id
                  WHERE r.user_id = ? AND r.status IN ('revision','pending','pending_motorpool') AND r.deleted_at IS NULL
                  ORDER BY r.updated_at DESC LIMIT 8",
                 [$userId]
-            ),
+            ), 'request'),
         ];
         $upcoming = dashboardUpcomingTrips(null, 5, $userId);
     }
 
-    // Driver overlay
     if ($driver) {
-        $driverRow = db()->fetch('SELECT id FROM drivers WHERE user_id = ? AND deleted_at IS NULL', [$userId]);
-        if ($driverRow) {
-            $nextTrip = db()->fetch(
-                "SELECT r.id, r.purpose, r.start_datetime, v.plate_number
-                 FROM requests r LEFT JOIN vehicles v ON r.vehicle_id = v.id
-                 WHERE (r.driver_id = ? OR r.requested_driver_id = ?) AND r.status = 'approved'
-                 AND r.start_datetime >= NOW() AND r.deleted_at IS NULL
-                 ORDER BY r.start_datetime ASC LIMIT 1",
-                [$driverRow->id, $driverRow->id]
-            );
-            $onTripNow = (int) db()->fetchColumn(
-                "SELECT COUNT(*) FROM requests WHERE (driver_id = ? OR requested_driver_id = ?) AND status = 'approved'
-                 AND actual_dispatch_datetime IS NOT NULL AND actual_arrival_datetime IS NULL AND deleted_at IS NULL",
-                [$driverRow->id, $driverRow->id]
-            );
+        $driverOverlay = dashboardDriverOverlay($userId);
+        if ($driverOverlay['nextTrip']) {
+            $nextTrip = $driverOverlay['nextTrip'];
+            array_unshift($actions, [
+                'label' => 'Next trip: ' . date('M j g:ia', strtotime((string) $nextTrip['start_datetime'])),
+                'count' => 1,
+                'href' => $nextTrip['href'],
+                'tone' => 'primary',
+            ]);
+        }
+        if (!$showFleetKpis) {
             array_unshift($kpis, [
                 'label' => 'On Trip Now',
-                'value' => $onTripNow,
+                'value' => $driverOverlay['onTripNow'],
                 'href' => APP_URL . '/?page=my-trips&filter=upcoming',
                 'tone' => 'info',
                 'icon' => 'bi-truck',
             ]);
-            if ($nextTrip) {
-                array_unshift($actions, [
-                    'label' => 'Next trip: ' . date('M j g:ia', strtotime($nextTrip->start_datetime)),
-                    'count' => 1,
-                    'href' => APP_URL . '/?page=requests&action=view&id=' . $nextTrip->id,
-                    'tone' => 'primary',
-                ]);
-            }
-            $actions[] = ['label' => 'My assigned trips', 'count' => null, 'href' => APP_URL . '/?page=my-trips', 'tone' => 'info'];
+        }
+        $actions[] = ['label' => 'My assigned trips', 'count' => null, 'href' => APP_URL . '/?page=my-trips', 'tone' => 'info'];
+        if ($driverOverlay['needsTicketCount'] > 0) {
+            $actions[] = [
+                'label' => 'Create ticket for completed trip',
+                'count' => $driverOverlay['needsTicketCount'],
+                'href' => $driverOverlay['needsTicketHref'],
+                'tone' => 'warning',
+            ];
         }
     }
 
     return [
-        'kpis' => array_slice($kpis, 0, 5),
+        'kpis' => array_slice($kpis, 0, 8),
         'actions' => $actions,
         'queue' => $queue,
         'upcoming' => $upcoming,
         'vehicleStats' => $vehicleStats,
         'analytics' => $analytics,
-        'audit' => $audit,
         'showCharts' => $showCharts && $analytics !== null,
         'showUtilization' => $showUtilization,
+        'showUpcoming' => !isChiefAdminFinance(),
         'showNewRequest' => $showNewRequest,
         'showFleetKpis' => $showFleetKpis,
         'isDriver' => $driver,
-        'activity' => dashboardRecentActivity(),
+        'nextTrip' => $nextTrip,
+        'reportsHref' => APP_URL . '/?page=reports&action=trips',
+        'requestsHref' => APP_URL . '/?page=requests',
+    ];
+}
+
+function dashboardOverdueTripCount(): int
+{
+    return (int) db()->fetchColumn(
+        "SELECT COUNT(*) FROM requests
+         WHERE status = 'approved'
+           AND end_datetime < NOW()
+           AND actual_arrival_datetime IS NULL
+           AND deleted_at IS NULL"
+    );
+}
+
+/**
+ * @return array{nextTrip: ?array<string, mixed>, onTripNow: int, needsTicketCount: int, needsTicketHref: string}
+ */
+function dashboardDriverOverlay(int $userId): array
+{
+    $empty = [
+        'nextTrip' => null,
+        'onTripNow' => 0,
+        'needsTicketCount' => 0,
+        'needsTicketHref' => APP_URL . '/?page=my-trips&filter=past',
+    ];
+    $driverRow = db()->fetch('SELECT id FROM drivers WHERE user_id = ? AND deleted_at IS NULL', [$userId]);
+    if (!$driverRow) {
+        return $empty;
+    }
+
+    $next = db()->fetch(
+        "SELECT r.id, r.purpose, r.destination, r.start_datetime, v.plate_number
+         FROM requests r LEFT JOIN vehicles v ON r.vehicle_id = v.id
+         WHERE (r.driver_id = ? OR r.requested_driver_id = ?) AND r.status = 'approved'
+         AND r.start_datetime >= NOW() AND r.deleted_at IS NULL
+         ORDER BY r.start_datetime ASC LIMIT 1",
+        [$driverRow->id, $driverRow->id]
+    );
+    $nextTrip = null;
+    if ($next) {
+        $nextTrip = [
+            'id' => (int) $next->id,
+            'purpose' => (string) ($next->purpose ?? ''),
+            'destination' => (string) ($next->destination ?? ''),
+            'start_datetime' => (string) $next->start_datetime,
+            'plate_number' => (string) ($next->plate_number ?? ''),
+            'href' => APP_URL . '/?page=requests&action=view&id=' . (int) $next->id,
+        ];
+    }
+
+    $onTripNow = (int) db()->fetchColumn(
+        "SELECT COUNT(*) FROM requests WHERE (driver_id = ? OR requested_driver_id = ?) AND status = 'approved'
+         AND actual_dispatch_datetime IS NOT NULL AND actual_arrival_datetime IS NULL AND deleted_at IS NULL",
+        [$driverRow->id, $driverRow->id]
+    );
+
+    $needsTicket = db()->fetch(
+        "SELECT r.id FROM requests r
+         LEFT JOIN trip_tickets tt ON tt.request_id = r.id AND tt.deleted_at IS NULL
+         WHERE (r.driver_id = ? OR r.requested_driver_id = ?)
+           AND r.status = 'completed' AND r.deleted_at IS NULL AND tt.id IS NULL
+         ORDER BY r.end_datetime DESC LIMIT 1",
+        [$driverRow->id, $driverRow->id]
+    );
+    $needsTicketCount = (int) db()->fetchColumn(
+        "SELECT COUNT(*) FROM requests r
+         LEFT JOIN trip_tickets tt ON tt.request_id = r.id AND tt.deleted_at IS NULL
+         WHERE (r.driver_id = ? OR r.requested_driver_id = ?)
+           AND r.status = 'completed' AND r.deleted_at IS NULL AND tt.id IS NULL",
+        [$driverRow->id, $driverRow->id]
+    );
+
+    return [
+        'nextTrip' => $nextTrip,
+        'onTripNow' => $onTripNow,
+        'needsTicketCount' => $needsTicketCount,
+        'needsTicketHref' => $needsTicket
+            ? APP_URL . '/?page=trip-tickets&action=create_form&request_id=' . (int) $needsTicket->id
+            : APP_URL . '/?page=my-trips&filter=past',
     ];
 }
 
@@ -278,14 +328,14 @@ function dashboardQueueApprovals(bool $motorpoolMode): array
     $href = APP_URL . '/?page=approvals';
     if (isAdmin()) {
         $rows = db()->fetchAll(
-            "SELECT r.id, r.purpose as title, r.status, r.updated_at, u.name as meta
+            "SELECT r.id, r.purpose as title, r.status, r.updated_at, u.name as meta, r.destination
              FROM requests r JOIN users u ON r.user_id = u.id
              WHERE r.status IN ('pending','pending_motorpool','revision') AND r.deleted_at IS NULL
              ORDER BY r.created_at DESC LIMIT 8"
         );
     } elseif ($motorpoolMode || isMotorpool()) {
         $rows = db()->fetchAll(
-            "SELECT r.id, r.purpose as title, r.status, r.updated_at, u.name as meta
+            "SELECT r.id, r.purpose as title, r.status, r.updated_at, u.name as meta, r.destination
              FROM requests r JOIN users u ON r.user_id = u.id
              WHERE (r.status = 'pending_motorpool' OR r.status = 'revision')
              AND r.motorpool_head_id = ? AND r.deleted_at IS NULL
@@ -295,7 +345,7 @@ function dashboardQueueApprovals(bool $motorpoolMode): array
     } else {
         $deptId = currentUser()->department_id ?? 0;
         $rows = db()->fetchAll(
-            "SELECT r.id, r.purpose as title, r.status, r.updated_at, u.name as meta
+            "SELECT r.id, r.purpose as title, r.status, r.updated_at, u.name as meta, r.destination
              FROM requests r JOIN users u ON r.user_id = u.id
              WHERE r.status = 'pending' AND r.department_id = ? AND r.deleted_at IS NULL
              ORDER BY (r.viewed_at IS NULL) DESC, r.created_at DESC LIMIT 8",
@@ -303,12 +353,93 @@ function dashboardQueueApprovals(bool $motorpoolMode): array
         );
     }
 
-    return ['title' => 'Approval Queue', 'href' => $href, 'rows' => $rows];
+    return [
+        'title' => 'Approval Queue',
+        'href' => $href,
+        'kind' => 'request',
+        'rows' => dashboardMapQueueRows($rows, 'request'),
+    ];
+}
+
+function dashboardQueueCafVouchers(): array
+{
+    $rows = [];
+    try {
+        $rows = db()->fetchAll(
+            "SELECT gv.id, gv.voucher_no as title, gv.status, gv.created_at as updated_at,
+                    CONCAT(u.name, ' · ', gv.vehicle_plate) as meta, gv.purpose as destination
+             FROM gas_vouchers gv JOIN users u ON gv.requested_by_user_id = u.id
+             WHERE gv.deleted_at IS NULL
+               AND (gv.status = 'pending_approval' OR (gv.status = 'approved' AND gv.payment_status = 'unpaid'))
+             ORDER BY gv.created_at DESC LIMIT 8"
+        );
+    } catch (Throwable $e) {
+        $rows = db()->fetchAll(
+            "SELECT gv.id, gv.voucher_no as title, gv.status, gv.created_at as updated_at,
+                    u.name as meta, gv.purpose as destination
+             FROM gas_vouchers gv JOIN users u ON gv.requested_by_user_id = u.id
+             WHERE gv.status = 'pending_approval' AND gv.deleted_at IS NULL
+             ORDER BY gv.created_at DESC LIMIT 8"
+        );
+    }
+
+    return [
+        'title' => 'Vouchers Needing Action',
+        'href' => APP_URL . '/?page=gas-vouchers&status=pending_approval',
+        'kind' => 'voucher',
+        'rows' => dashboardMapQueueRows($rows, 'voucher'),
+    ];
+}
+
+/**
+ * @param list<object> $rows
+ * @return list<array<string, mixed>>
+ */
+function dashboardMapQueueRows(array $rows, string $kind): array
+{
+    $mapped = [];
+    foreach ($rows as $row) {
+        $id = (int) ($row->id ?? 0);
+        $mapped[] = [
+            'id' => $id,
+            'title' => (string) ($row->title ?? ''),
+            'status' => (string) ($row->status ?? ''),
+            'meta' => (string) ($row->meta ?? ''),
+            'destination' => (string) ($row->destination ?? ''),
+            'age' => dashboardRelativeAge($row->updated_at ?? null),
+            'href' => $kind === 'voucher'
+                ? APP_URL . '/?page=gas-vouchers&action=view&id=' . $id
+                : APP_URL . '/?page=requests&action=view&id=' . $id,
+        ];
+    }
+    return $mapped;
+}
+
+function dashboardRelativeAge(?string $datetime): string
+{
+    if (!$datetime) {
+        return '—';
+    }
+    $ts = strtotime($datetime);
+    if ($ts === false) {
+        return '—';
+    }
+    $diff = time() - $ts;
+    if ($diff < 60) {
+        return 'just now';
+    }
+    if ($diff < 3600) {
+        return (int) floor($diff / 60) . 'm ago';
+    }
+    if ($diff < 86400) {
+        return (int) floor($diff / 3600) . 'h ago';
+    }
+    return (int) floor($diff / 86400) . 'd ago';
 }
 
 function dashboardUpcomingTrips(?int $departmentId, int $limit = 5, ?int $userId = null): array
 {
-    $sql = "SELECT r.id, r.start_datetime, r.purpose, u.name as requester_name, v.plate_number
+    $sql = "SELECT r.id, r.start_datetime, r.purpose, r.destination, u.name as requester_name, v.plate_number
             FROM requests r
             LEFT JOIN users u ON r.user_id = u.id
             LEFT JOIN vehicles v ON r.vehicle_id = v.id AND v.deleted_at IS NULL
@@ -326,37 +457,6 @@ function dashboardUpcomingTrips(?int $departmentId, int $limit = 5, ?int $userId
     }
     $sql .= ' ORDER BY r.start_datetime ASC LIMIT ' . (int) $limit;
     return db()->fetchAll($sql, $params);
-}
-
-function dashboardRecentActivity(): array
-{
-    $perPage = 8;
-    if (isAdmin() || isMotorpool()) {
-        $total = (int) db()->count('requests', 'deleted_at IS NULL');
-        $rows = db()->fetchAll(
-            "SELECT r.*, u.name as requester_name, d.name as department_name
-             FROM requests r
-             JOIN users u ON r.user_id = u.id
-             JOIN departments d ON r.department_id = d.id
-             WHERE r.deleted_at IS NULL
-             ORDER BY r.updated_at DESC LIMIT ?",
-            [$perPage]
-        );
-        return ['total' => $total, 'rows' => $rows, 'title' => 'Recent Activity'];
-    }
-
-    $userId = userId();
-    $total = (int) db()->count('requests', 'user_id = ? AND deleted_at IS NULL', [$userId]);
-    $rows = db()->fetchAll(
-        "SELECT r.*, u.name as requester_name, d.name as department_name
-         FROM requests r
-         JOIN users u ON r.user_id = u.id
-         JOIN departments d ON r.department_id = d.id
-         WHERE r.user_id = ? AND r.deleted_at IS NULL
-         ORDER BY r.updated_at DESC LIMIT ?",
-        [$userId, $perPage]
-    );
-    return ['total' => $total, 'rows' => $rows, 'title' => 'My Requests'];
 }
 
 function dashboardAnalyticsData(?int $departmentId): array
@@ -386,29 +486,19 @@ function dashboardAnalyticsData(?int $departmentId): array
         $dailyTripData[] = ['date' => date('M/d', strtotime($date)), 'count' => $count];
     }
 
-    $statusDistribution = db()->fetchAll(
+    $statusDistribution = dashboardRowsToArrays(db()->fetchAll(
         "SELECT status, COUNT(*) as count FROM requests
          WHERE created_at >= ? AND deleted_at IS NULL {$deptClause} GROUP BY status",
         [$thirtyDaysAgo]
-    );
+    ));
 
-    $departmentStats = db()->fetchAll(
+    $departmentStats = dashboardRowsToArrays(db()->fetchAll(
         "SELECT d.name as department, COUNT(*) as count
          FROM requests r JOIN departments d ON r.department_id = d.id
          WHERE r.created_at >= ? AND r.deleted_at IS NULL {$deptClauseR}
          GROUP BY d.name ORDER BY count DESC LIMIT 8",
         [$thirtyDaysAgo]
-    );
-
-    $vehicleUtilization = db()->fetchAll(
-        "SELECT v.plate_number, COUNT(r.id) as trip_count, COALESCE(SUM(r.mileage_actual), 0) as total_mileage
-         FROM vehicles v
-         LEFT JOIN requests r ON r.vehicle_id = v.id AND r.status = 'completed'
-             AND r.actual_arrival_datetime >= ? AND r.deleted_at IS NULL
-         WHERE v.deleted_at IS NULL
-         GROUP BY v.id ORDER BY trip_count DESC LIMIT 10",
-        [$thirtyDaysAgo]
-    );
+    ));
 
     $peakHours = db()->fetchAll(
         "SELECT HOUR(start_datetime) as hour, COUNT(*) as count FROM requests
@@ -421,11 +511,38 @@ function dashboardAnalyticsData(?int $departmentId): array
         $hourlyData[(int) $ph->hour] = (int) $ph->count;
     }
 
+    $dailyTotal = 0;
+    foreach ($dailyTripData as $row) {
+        $dailyTotal += (int) $row['count'];
+    }
+
     return [
         'dailyTrips' => $dailyTripData,
         'statusDistribution' => $statusDistribution,
         'departmentStats' => $departmentStats,
-        'vehicleUtilization' => $vehicleUtilization,
         'peakHours' => $hourlyData,
+        'hasDaily' => $dailyTotal > 0,
+        'hasStatus' => $statusDistribution !== [],
+        'hasDepartment' => $departmentStats !== [],
+        'hasPeak' => array_sum($hourlyData) > 0,
     ];
+}
+
+/**
+ * @param list<object|array<string, mixed>> $rows
+ * @return list<array<string, mixed>>
+ */
+function dashboardRowsToArrays(array $rows): array
+{
+    $out = [];
+    foreach ($rows as $row) {
+        if (is_object($row)) {
+            $row = get_object_vars($row);
+        }
+        if (isset($row['count'])) {
+            $row['count'] = (int) $row['count'];
+        }
+        $out[] = $row;
+    }
+    return $out;
 }
