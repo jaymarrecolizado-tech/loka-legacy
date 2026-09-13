@@ -5,6 +5,8 @@
 
 $pageTitle = 'Dashboard';
 
+require_once INCLUDES_PATH . '/dashboard_stats.php';
+
 if (isGuard() && !isDriver()) {
     redirect('/?page=guard');
 }
