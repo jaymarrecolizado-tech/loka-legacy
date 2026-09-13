@@ -24,7 +24,7 @@
 | #18 | Gas Voucher QR Public Verify | DONE (2026-09-09) |
 | #19 | Leftover UX Fixes, then VAPT, then Optional Features | OPEN (2026-09-10) |
 | #20 | Useful Role Dashboard | DONE (2026-09-10) |
-| #21 | Fair Driver Ranking + Trip Extract | DONE (2026-09-13; localhost QA done — NOT deployed to live) |
+| #21 | Fair Driver Ranking + Trip Extract | DONE (2026-09-13; live `lokafleet.dictr2.cloud`) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -1422,7 +1422,7 @@ New Chart library. GPS. Plan #16 PDF digest. Sidebar/theme rewrite. Fake demo da
 
 ---
 
-# LOKA Plan #21: Fair Driver Ranking + Trip Extract — ✅ DONE (2026-09-13, localhost only — do not deploy until signed off)
+# LOKA Plan #21: Fair Driver Ranking + Trip Extract — ✅ DONE (2026-09-13, live)
 
 ## Goal
 
@@ -1531,7 +1531,7 @@ Trip rows default **off:** plate, invite/submitted counts, rank score repeated o
 - [x] Browser visual (Chrome, seeded then cleaned): rankings grouped top-10 chart (5 datasets), trophy rank 1, bars per category, unranked table, expand → per-eval rows w/ anonymous remarks; extract summary + trip rows incl. a real unrated trip showing —; both PDFs render (score column + footnote; summary + per-trip rows honouring column flags).
 - [x] Anonymity: `evalReportDriverEvalRows` selects no `evaluator_user_id`/guest/name/email columns; comments rendered as "Anonymous passenger" everywhere.
 - [x] `php -l` clean on all 11 touched files + full public_html sweep 0 errors. Smoke fixtures (requests/evals/session file/temp PDFs) deleted — nothing persisted.
-- [ ] **NOT deployed to live** — deploy only after DICT sign-off (staging via `prod/public_html` rebuild when scheduled).
+- [x] **Deployed to live** 2026-09-13 — report PHP files only (`eval_report.php`, rankings/evaluations pages, trip extract + CSV/PDF, `index.php`/`sidebar.php`/`nav_search.php`). No schema, `.env` untouched. Backup `pre_plan21_20260913_095131`. Login 200; rankings/extract 302 (auth). `.env` not publicly readable.
 
 ## Out of scope
 
