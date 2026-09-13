@@ -24,7 +24,7 @@
 | #18 | Gas Voucher QR Public Verify | DONE (2026-09-09) |
 | #19 | Leftover UX Fixes, then VAPT, then Optional Features | OPEN (2026-09-10) |
 | #20 | Useful Role Dashboard | DONE (2026-09-10) |
-| #21 | Fair Driver Ranking + Trip Extract | OPEN (2026-09-13; localhost first, not live) |
+| #21 | Fair Driver Ranking + Trip Extract | DONE (2026-09-13; localhost QA done — NOT deployed to live) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -1422,7 +1422,7 @@ New Chart library. GPS. Plan #16 PDF digest. Sidebar/theme rewrite. Fake demo da
 
 ---
 
-# LOKA Plan #21: Fair Driver Ranking + Trip Extract — OPEN (2026-09-13)
+# LOKA Plan #21: Fair Driver Ranking + Trip Extract — ✅ DONE (2026-09-13, localhost only — do not deploy until signed off)
 
 ## Goal
 
@@ -1511,26 +1511,27 @@ Trip rows default **on:** date, trip #, driver, destination, overall, 4-category
 
 Trip rows default **off:** plate, invite/submitted counts, rank score repeated on each row.
 
-## Files (when implemented)
+## Implementation — ✅ DONE (2026-09-13, localhost)
 
-- `public_html/includes/eval_report.php`
-- `public_html/pages/reports/driver-rankings.php`
-- `public_html/pages/evaluations/index.php`
-- `public_html/pages/reports/driver-trip-extract.php` (new)
-- `public_html/pages/reports/export-driver-trip-extract-csv.php` (new)
-- `public_html/pages/reports/export-driver-trip-extract-pdf.php` (new)
-- `public_html/pages/reports/export-driver-rankings-csv.php`
-- `public_html/pages/reports/export-driver-evaluations-pdf.php`
-- `public_html/index.php` — routes + `$driverAllowed`
-- `public_html/includes/nav_search.php` / sidebar Reports
+- [x] **Fair rank score** — `evalReportRankings()` rewritten (`includes/eval_report.php`): `score = (v/(v+m))·R + (m/(v+m))·C` with `EVAL_RANK_PRIOR_STRENGTH = 5`, C = fleet mean over the SAME filters/period (separate AVG query, no Min-eval HAVING). Returns `['ranked', 'unranked', 'fleet_mean']`; rank order = score desc, evals desc tie-break; drivers with `eval_count < min_eval` land in `unranked` (no rank number). All four former callers migrated (Rankings, Evaluations, CSV, PDF).
+- [x] **Score breakdown tables** — shared `evalReportRankTableHtml()` renders Rank (trophy 1–3 incl. bronze), Driver (expand caret), Evals, **Rank score** badge, **Raw avg**, 4 category averages each with a compact green bar — identical on Rankings + Evaluations. Second **"Not ranked (too few evaluations)"** table under the ranked one. One formula footnote under the tables (`evalReportScoreFootnote()` prints R, v, C with the actual fleet mean, m = 5, threshold).
+- [x] **Expand a driver** — new `evalReportDriverEvalRows()` (never selects rater identity); each ranked/unranked row expands (Bootstrap collapse) to its submitted evals: trip #, date, destination, overall, 4 category scores, optional remark as "Anonymous passenger".
+- [x] **Grouped chart** — Rankings top-10 chart now plots Overall + the 4 categories (5 datasets, Chart.js).
+- [x] **CSV + evaluation PDF** — rankings CSV gains Rank Score column + formula/period comment rows; evaluation PDF gains a Score column (ranking = ranked ∪ unranked sorted by score; Min evaluations still not applied) + footnote.
+- [x] **Driver Trip Extract** — new `/?page=reports&action=driver-trip-extract` (`driver-trip-extract.php`): every assigned driver/trip with `driver_id` set, `deleted_at IS NULL`, `status IN ('approved','completed')`, `start_datetime` in From/To (cancelled/rejected out; same Driver/Vehicle/Trip-no. filters; self-scoped lock kept). Short driver summary on top (name/trips/evals always; rank score + raw avg default on), then one row per trip. Column checkboxes via GET flags (`evalTripExtractColumns()`; hidden-input pattern preserves defaults): ON by default — date, trip #, driver, destination, overall, 4-category breakdown, anonymous comments; OFF by default — plate, invite/submitted counts, rank score per row. Drivers/trips with no ratings show —.
+- [x] **Extract exports** — `export-driver-trip-extract-csv.php` (summary + trips sections honouring the same flags) and `export-driver-trip-extract-pdf.php` (landscape TCPDF, DICT header, `reportPdfWriteMeta()`, per-column width scaling, MultiCell wrapped rows, footnote); both audited as `data_export`/`driver_evaluations` with filter + column flags, no rater ids.
+- [x] **Routing/nav** — `index.php`: 3 new report actions + `$driverAllowed` extended (self-scoped drivers can open extract + exports). Sidebar "Driver Trip Extract" under Reports; nav search entry. No migration, no change to `submit.php`, no fake scores.
 
-No migration. No change to `submit.php`. No fake scores.
+## QA — verified 2026-09-13 (localhost; `_deploy_tmp/verify_plan21_*.php`; rolled-back seed txns + committed browser fixtures removed after)
 
-## QA (when implemented)
-
-- `php -l` on touched PHP
-- Local browser: Rankings, Evaluations, Trip Extract, CSV/PDF
-- Do not push this feature to live until local sign-off
+- [x] Score math exact: seeded v=5/R=4.60 → score 4.633; v=1/R=5.00 → 4.722; fleet mean C = 4.6667 — formula asserted to 3 decimals (`verify_plan21_rankings`).
+- [x] Ranked/unranked split (min 2): only the 5-eval driver ranked; 1-eval driver in "Not ranked"; order by score with evals tie-break; footnote shows C = 4.70 with real+seeded mix.
+- [x] Extract: 6 seeded trips present, cancelled excluded, driver C's approved + completed trips counted with 0 evals and — scores; summary covers every seeded driver incl. 0-eval; per-trip invite/submitted counts + per-trip overall (4.50) + 4-category avgs correct.
+- [x] Pages render clean (CLI authed harness, no PHP warnings): Rankings (chart + tables + unranked + footnote + extract link), Evaluations (same breakdown + response-rate + remarks), Trip Extract (with plate column flag on), both CSVs.
+- [x] Browser visual (Chrome, seeded then cleaned): rankings grouped top-10 chart (5 datasets), trophy rank 1, bars per category, unranked table, expand → per-eval rows w/ anonymous remarks; extract summary + trip rows incl. a real unrated trip showing —; both PDFs render (score column + footnote; summary + per-trip rows honouring column flags).
+- [x] Anonymity: `evalReportDriverEvalRows` selects no `evaluator_user_id`/guest/name/email columns; comments rendered as "Anonymous passenger" everywhere.
+- [x] `php -l` clean on all 11 touched files + full public_html sweep 0 errors. Smoke fixtures (requests/evals/session file/temp PDFs) deleted — nothing persisted.
+- [ ] **NOT deployed to live** — deploy only after DICT sign-off (staging via `prod/public_html` rebuild when scheduled).
 
 ## Out of scope
 

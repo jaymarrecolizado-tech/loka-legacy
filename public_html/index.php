@@ -313,9 +313,9 @@ switch ($page) {
 
     case 'reports':
         requireReportsAccess();
-        // Non-approver drivers may only use own Driver Report + anonymous eval rankings/exports
+        // Non-approver drivers may only use own Driver Report + anonymous eval rankings/extracts
         if (isSelfScopedDriverReporter()) {
-            $driverAllowed = ['index', 'driver', 'export-driver', 'export-driver-csv', 'driver-rankings', 'export-driver-rankings-csv', 'export-driver-evaluations-pdf'];
+            $driverAllowed = ['index', 'driver', 'export-driver', 'export-driver-csv', 'driver-rankings', 'export-driver-rankings-csv', 'export-driver-evaluations-pdf', 'driver-trip-extract', 'export-driver-trip-extract-csv', 'export-driver-trip-extract-pdf'];
             if (!in_array($action, $driverAllowed, true)) {
                 redirectWith('/?page=reports', 'danger', 'You do not have permission to access that report.');
             }
@@ -350,6 +350,12 @@ switch ($page) {
             require_once PAGES_PATH . '/reports/export-driver-rankings-csv.php';
         } elseif ($action === 'export-driver-evaluations-pdf') {
             require_once PAGES_PATH . '/reports/export-driver-evaluations-pdf.php';
+        } elseif ($action === 'driver-trip-extract') {
+            require_once PAGES_PATH . '/reports/driver-trip-extract.php';
+        } elseif ($action === 'export-driver-trip-extract-csv') {
+            require_once PAGES_PATH . '/reports/export-driver-trip-extract-csv.php';
+        } elseif ($action === 'export-driver-trip-extract-pdf') {
+            require_once PAGES_PATH . '/reports/export-driver-trip-extract-pdf.php';
         } else {
             require_once PAGES_PATH . '/reports/index.php';
         }

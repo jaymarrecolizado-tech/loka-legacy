@@ -215,6 +215,13 @@
                     <span>Driver Rankings</span>
                 </a>
             </li>
+            <!-- Driver Trip Extract (assigned trips + scores) -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page')==='reports' && get('action')==='driver-trip-extract') ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=reports&action=driver-trip-extract">
+                    <i class="bi bi-table"></i>
+                    <span>Driver Trip Extract</span>
+                </a>
+            </li>
             <!-- Evaluations -->
             <li class="nav-item">
                 <a class="nav-link <?= activeMenu('evaluations') ?>" href="<?= APP_URL ?>/?page=evaluations">

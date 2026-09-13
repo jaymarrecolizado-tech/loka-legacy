@@ -12,7 +12,8 @@ $pageTitle = 'Driver Evaluations';
 $f = evalReportParseFilters(false); // blank From/To = all time
 
 $trips = evalReportTrips($f);
-$perDriver = evalReportRankings($f, false); // no minimum — show everyone with ≥1 submit
+$rankData = evalReportRankings($f); // fair rank score; below-threshold drivers listed unranked
+$evalRows = evalReportDriverEvalRows($f);
 $remarks = evalReportRemarks($f, 50);
 
 require_once INCLUDES_PATH . '/header.php';
@@ -31,6 +32,7 @@ require_once INCLUDES_PATH . '/header.php';
         <div class="d-flex gap-3 align-items-center flex-wrap">
             <?= evalReportPdfExportHtml($f) ?>
             <a href="<?= APP_URL ?>/?page=reports&action=driver-rankings" class="btn btn-primary"><i class="bi bi-trophy me-1"></i>Driver Rankings</a>
+            <a href="<?= APP_URL ?>/?page=reports&action=driver-trip-extract&from=<?= e($f['from']) ?>&to=<?= e($f['to']) ?>" class="btn btn-outline-secondary"><i class="bi bi-table me-1"></i>Trip Extract</a>
         </div>
     </div>
 
@@ -42,34 +44,8 @@ require_once INCLUDES_PATH . '/header.php';
         APP_URL . '/?page=evaluations'
     ) ?>
 
-    <!-- Per-driver averages -->
-    <div class="card mb-4">
-        <div class="card-header"><h5 class="mb-0"><i class="bi bi-people me-2"></i>Per-Driver Averages (Anonymous)</h5></div>
-        <div class="card-body p-0">
-            <?php if (empty($perDriver)): ?>
-                <div class="text-center text-muted py-4">No evaluations yet for this period.</div>
-            <?php else: ?>
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
-                    <thead class="table-light"><tr><th>Driver</th><th class="text-center">Evaluations</th><th class="text-center">Overall</th><th class="text-center">Cleanliness<br><small class="text-muted">Vehicle</small></th><th class="text-center">Behavior<br><small class="text-muted">Driver</small></th><th class="text-center">Appearance<br><small class="text-muted">Hygiene</small></th><th class="text-center">Safety<br><small class="text-muted">Driving</small></th></tr></thead>
-                    <tbody>
-                    <?php foreach ($perDriver as $row): ?>
-                        <tr>
-                            <td><strong><?= e($row->driver_name) ?></strong></td>
-                            <td class="text-center"><?= (int) $row->eval_count ?></td>
-                            <td class="text-center"><span class="badge bg-success"><?= $row->avg_overall !== null ? number_format((float)$row->avg_overall,2) : '—' ?></span></td>
-                            <td class="text-center"><?= $row->avg_cleanliness !== null ? number_format((float)$row->avg_cleanliness,2) : '—' ?></td>
-                            <td class="text-center"><?= $row->avg_behavior !== null ? number_format((float)$row->avg_behavior,2) : '—' ?></td>
-                            <td class="text-center"><?= $row->avg_appearance !== null ? number_format((float)$row->avg_appearance,2) : '—' ?></td>
-                            <td class="text-center"><?= $row->avg_safety !== null ? number_format((float)$row->avg_safety,2) : '—' ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-            <?php endif; ?>
-        </div>
-    </div>
+    <!-- Score breakdown (fair rank score, expandable per-eval rows) -->
+    <?= evalReportRankTableHtml($rankData, $evalRows, $f) ?>
 
     <!-- Response rate per trip -->
     <div class="card mb-4">

@@ -23,7 +23,11 @@ $periodLabel = evalReportPeriodLabel($f);
 
 $kpis = evalReportKpis($f);
 $cats = evalReportCategoryAverages($f);
-$rankings = evalReportRankings($f, false); // do not apply Min evaluations
+$rankData = evalReportRankings($f); // Min evaluations NOT applied to the PDF listing
+// All drivers with >=1 submitted evaluation, best rank score first
+$rankings = array_merge($rankData['ranked'], $rankData['unranked']);
+usort($rankings, static fn(object $a, object $b): int =>
+    [$b->rank_score, $b->eval_count] <=> [$a->rank_score, $a->eval_count]);
 $remarks = $includeRemarks ? evalReportRemarks($f, 200, true) : [];
 
 auditLog('data_export', 'driver_evaluations', null, null, [
@@ -134,8 +138,8 @@ if (empty($rankings)) {
     $pdf->SetFont('helvetica', 'I', 9);
     $pdf->Cell(0, 6, 'No submitted evaluations in this period.', 0, 1);
 } else {
-    $columns = ['Rank', 'Driver', 'Evals', 'Overall', 'Cleanliness', 'Behavior', 'Appearance', 'Safety'];
-    $colWidths = [14, 80, 16, 20, 26, 26, 26, 26];
+    $columns = ['Rank', 'Driver', 'Evals', 'Score', 'Overall', 'Cleanliness', 'Behavior', 'Appearance', 'Safety'];
+    $colWidths = [14, 66, 16, 20, 18, 25, 25, 25, 25];
 
     $pdf->SetFont('helvetica', 'B', 8);
     $pdf->SetFillColor(13, 110, 253);
@@ -163,6 +167,7 @@ if (empty($rankings)) {
             (string) $rank,
             (string) $row->driver_name,
             (string) (int) $row->eval_count,
+            number_format((float) $row->rank_score, 2),
             number_format((float) $row->avg_overall, 2),
             $row->avg_cleanliness !== null ? number_format((float) $row->avg_cleanliness, 2) : '-',
             $row->avg_behavior !== null ? number_format((float) $row->avg_behavior, 2) : '-',
@@ -175,6 +180,10 @@ if (empty($rankings)) {
         $pdf->Ln();
         $fill = !$fill;
     }
+
+    $pdf->Ln(2);
+    $pdf->SetFont('helvetica', 'I', 7);
+    $pdf->MultiCell(0, 4, evalReportScoreFootnote($rankData, $f), 0, 'L', false, 1);
 }
 
 // ---------------------------------------------------------------------

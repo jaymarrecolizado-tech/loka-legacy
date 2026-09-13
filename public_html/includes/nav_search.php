@@ -95,6 +95,7 @@ function getNavSearchItems(): array
     if (canAccessReports()) {
         $add('Reports', '/?page=reports', 'bi-bar-chart', 'Reports', 'reports analytics');
         $add('Driver Rankings', '/?page=reports&action=driver-rankings', 'bi-trophy', 'Reports', 'driver rankings evaluation rating anonymous');
+        $add('Driver Trip Extract', '/?page=reports&action=driver-trip-extract', 'bi-table', 'Reports', 'driver trip extract assigned trips ratings export csv pdf');
         $add('Evaluations', '/?page=evaluations', 'bi-star-half', 'Reports', 'evaluations driver rating feedback anonymous');
         if (isApprover()) {
             $add('Vehicle History', '/?page=reports&action=vehicle-history', 'bi-clock-history', 'Reports', 'vehicle history trips');
