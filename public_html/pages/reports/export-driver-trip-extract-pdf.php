@@ -118,15 +118,15 @@ $pdf->Cell(0, 6, 'Trips (' . count($trips) . ')', 0, 1);
 
 $defs = [
     'date' => ['Date', 22],
-    'trip' => ['Trip #', 18],
-    'driver' => ['Driver', 32],
-    'plate' => ['Plate', 18],
-    'dest' => ['Destination', 55],
-    'invites' => ['Inv./Sub.', 18],
-    'overall' => ['Overall', 15],
-    'cats' => ['C / B / A / S', 46],
-    'score' => ['Score', 15],
-    'remarks' => ['Comments (anonymous)', 45],
+    'trip' => ['Trip #', 16],
+    'driver' => ['Driver', 28],
+    'plate' => ['Plate', 16],
+    'dest' => ['Destination', 48],
+    'invites' => ['Inv/Sub', 16],
+    'overall' => ['Overall', 14],
+    'cats' => ['C / B / A / S', 28],
+    'score' => ['Score', 14],
+    'remarks' => ['Comments', 42],
 ];
 $visible = array_keys(array_filter([
     'date' => $cols['col_date'], 'trip' => $cols['col_trip'], 'driver' => $cols['col_driver'],
@@ -134,10 +134,27 @@ $visible = array_keys(array_filter([
     'overall' => $cols['col_overall'], 'cats' => $cols['col_cats'], 'score' => $cols['col_score'],
     'remarks' => $cols['col_remarks'],
 ]));
-$usable = 273.0;
+$usable = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
 $totalW = 0.0;
-foreach ($visible as $k) { $totalW += $defs[$k][1]; }
-$scale = $totalW > 0 ? $usable / $totalW : 1;
+foreach ($visible as $k) {
+    $totalW += $defs[$k][1];
+}
+$scale = ($totalW > 0) ? ($usable / $totalW) : 1;
+$colW = [];
+foreach ($visible as $k) {
+    $colW[] = $defs[$k][1] * $scale;
+}
+
+$printTripHeader = static function () use ($pdf, $visible, $defs, $colW): void {
+    $pdf->SetFont('helvetica', 'B', 7);
+    $pdf->SetFillColor(13, 110, 253);
+    $pdf->SetTextColor(255, 255, 255);
+    foreach ($visible as $i => $k) {
+        $pdf->Cell($colW[$i], 6, $defs[$k][0], 1, 0, 'C', true);
+    }
+    $pdf->Ln();
+    $pdf->SetTextColor(0, 0, 0);
+};
 
 if (empty($trips)) {
     $pdf->SetFont('helvetica', 'I', 9);
@@ -146,66 +163,105 @@ if (empty($trips)) {
     $pdf->SetFont('helvetica', 'I', 9);
     $pdf->Cell(0, 6, 'No columns selected.', 0, 1);
 } else {
-    $pdf->SetFont('helvetica', 'B', 7);
-    $pdf->SetFillColor(13, 110, 253);
-    $pdf->SetTextColor(255, 255, 255);
-    foreach ($visible as $k) {
-        $pdf->Cell($defs[$k][1] * $scale, 6, $defs[$k][0], 1, 0, 'C', true);
-    }
-    $pdf->Ln();
-
-    $pdf->SetTextColor(0, 0, 0);
+    $printTripHeader();
     $lineH = 4;
     $fill = false;
+    $bottom = $pdf->getPageHeight() - 18;
 
     foreach ($trips as $t) {
         $rankRow = $rankByDriver[(int) $t->driver_id] ?? null;
         $tripRemarks = $remarksByReq[(int) $t->id] ?? [];
+        $remarkText = '-';
+        if ($tripRemarks !== []) {
+            $remarkText = implode("\n", array_map(
+                static fn($q): string => '"' . mb_substr((string) $q, 0, 180) . '"',
+                $tripRemarks
+            ));
+        }
 
-        $cells = [];
+        $rowData = [];
+        $aligns = [];
         foreach ($visible as $k) {
             $align = 'L';
             switch ($k) {
-                case 'date': $val = date('M j, Y g:i A', strtotime($t->start_datetime)); $align = 'C'; break;
-                case 'trip': $val = '#' . (int) $t->id . ' (' . ucfirst((string) $t->status) . ')'; break;
-                case 'driver': $val = (string) ($t->driver_name ?: '-'); break;
-                case 'plate': $val = (string) ($t->plate_number ?: '-'); $align = 'C'; break;
-                case 'dest': $val = (string) ($t->destination ?: '-'); break;
-                case 'invites': $val = (int) $t->submitted_cnt . ' / ' . (int) $t->total_invites; $align = 'C'; break;
-                case 'overall': $val = $t->avg_overall !== null ? number_format((float) $t->avg_overall, 2) : '-'; $align = 'C'; break;
+                case 'date':
+                    $val = date('m/d H:i', strtotime((string) $t->start_datetime));
+                    $align = 'C';
+                    break;
+                case 'trip':
+                    $val = '#' . (int) $t->id . "\n" . ucfirst((string) $t->status);
+                    $align = 'C';
+                    break;
+                case 'driver':
+                    $val = (string) ($t->driver_name ?: '-');
+                    break;
+                case 'plate':
+                    $val = (string) ($t->plate_number ?: '-');
+                    $align = 'C';
+                    break;
+                case 'dest':
+                    $val = formatDestinationChain($t->destination ?? '');
+                    break;
+                case 'invites':
+                    $val = (int) $t->submitted_cnt . '/' . (int) $t->total_invites;
+                    $align = 'C';
+                    break;
+                case 'overall':
+                    $val = $t->avg_overall !== null ? number_format((float) $t->avg_overall, 2) : '-';
+                    $align = 'C';
+                    break;
                 case 'cats':
                     $val = $t->avg_overall !== null
-                        ? $fmtE($t->avg_cleanliness !== null ? (float) $t->avg_cleanliness : null) . ' / '
-                          . $fmtE($t->avg_behavior !== null ? (float) $t->avg_behavior : null) . ' / '
-                          . $fmtE($t->avg_appearance !== null ? (float) $t->avg_appearance : null) . ' / '
-                          . $fmtE($t->avg_safety !== null ? (float) $t->avg_safety : null)
+                        ? $fmtE($t->avg_cleanliness !== null ? (float) $t->avg_cleanliness : null)
+                          . ' / ' . $fmtE($t->avg_behavior !== null ? (float) $t->avg_behavior : null)
+                          . ' / ' . $fmtE($t->avg_appearance !== null ? (float) $t->avg_appearance : null)
+                          . ' / ' . $fmtE($t->avg_safety !== null ? (float) $t->avg_safety : null)
                         : '-';
                     $align = 'C';
                     break;
-                case 'score': $val = $rankRow !== null ? number_format((float) $rankRow->rank_score, 2) : '-'; $align = 'C'; break;
-                case 'remarks':
-                    $val = empty($tripRemarks)
-                        ? '-'
-                        : implode(' | ', array_map(static fn($q): string => '"' . $q . '" — Anon.', $tripRemarks));
+                case 'score':
+                    $val = $rankRow !== null ? number_format((float) $rankRow->rank_score, 2) : '-';
+                    $align = 'C';
                     break;
-                default: $val = '-';
+                case 'remarks':
+                    $val = $remarkText;
+                    break;
+                default:
+                    $val = '-';
             }
-            $cells[] = [$val, $defs[$k][1] * $scale, $align];
+            $rowData[] = $val;
+            $aligns[] = $align;
         }
 
         $rowMax = 1;
-        foreach ($cells as [$val, $w]) {
-            $n = $pdf->getNumLines((string) $val, $w);
-            if ($n > $rowMax) $rowMax = $n;
+        foreach ($rowData as $i => $val) {
+            $n = $pdf->getNumLines((string) $val, $colW[$i]);
+            if ($n > $rowMax) {
+                $rowMax = $n;
+            }
         }
+        $rowMax = min($rowMax, 8);
         $rowH = $rowMax * $lineH;
 
+        if ($pdf->GetY() + $rowH > $bottom) {
+            $pdf->AddPage();
+            $printTripHeader();
+            $fill = false;
+        }
+
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
         $pdf->SetFont('helvetica', '', 7);
         $pdf->SetFillColor($fill ? 248 : 255, $fill ? 248 : 255, $fill ? 248 : 255);
-        foreach ($cells as [$val, $w, $align]) {
-            $pdf->MultiCell($w, $lineH, (string) $val, 1, $align, true, 0, '', '', true, 0, false, true, $rowH, 'M');
+        $pdf->SetDrawColor(0, 0, 0);
+        $pdf->SetAutoPageBreak(false);
+        foreach ($rowData as $i => $val) {
+            $cellX = $x + array_sum(array_slice($colW, 0, $i));
+            $pdf->Rect($cellX, $y, $colW[$i], $rowH, $fill ? 'DF' : 'D');
+            $pdf->MultiCell($colW[$i], $lineH, (string) $val, 0, $aligns[$i], false, 0, $cellX, $y, true, 0, false, true, $rowH, 'T');
         }
-        $pdf->Ln($rowH);
+        $pdf->SetAutoPageBreak(true, 14);
+        $pdf->SetXY($x, $y + $rowH);
         $fill = !$fill;
     }
 
