@@ -24,6 +24,7 @@
 | #18 | Gas Voucher QR Public Verify | DONE (2026-09-09) |
 | #19 | Leftover UX Fixes, then VAPT, then Optional Features | OPEN (2026-09-10) |
 | #20 | Useful Role Dashboard | DONE (2026-09-10) |
+| #21 | Fair Driver Ranking + Trip Extract | OPEN (2026-09-13; localhost first, not live) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -1419,5 +1420,120 @@ New Chart library. GPS. Plan #16 PDF digest. Sidebar/theme rewrite. Fake demo da
 - `public_html/assets/css/style.css`
 - `public_html/config/constants.php` (2.7.3 cache-bust)
 
+---
+
+# LOKA Plan #21: Fair Driver Ranking + Trip Extract — OPEN (2026-09-13)
+
+## Goal
+
+Make Driver Rankings and Evaluations show a real per-driver score breakdown, rank fairly when drivers have different numbers of ratings, and add a date-range **extract of every driver who went on a trip**. Display/query only. No schema. No rating-form change. **Build and QA on localhost; do not deploy to live until signed off.**
+
+## What the reports already do
+
+Both pages already average the 4 form categories (Cleanliness, Behavior, Appearance, Safety). Overall is `AVG` of those 4 (`evalReportRankings()` in [`eval_report.php`](public_html/includes/eval_report.php)).
+
+- **Driver Rankings** — 4 category columns exist; the **chart is overall only**. Default Min evaluations = 2. Sort is **raw average**.
+- **Evaluations** — same 4 averages, **no rank #**. Per-trip table has invite rate + overall, not the 4 stars per trip.
+- Ranking unit is **submitted evaluations** (one trip can have several passengers), not trip count.
+
+## Why raw average is not a fair rank
+
+- Driver A: 5.00 from 1 eval → rank 1
+- Driver B: 4.60 from 20 evals → rank 2
+
+Min-evals = 2 only hides 1-eval drivers; 3 evals and 40 evals still count the same.
+
+**Rank score (IMDb / Bayesian shrinkage toward the fleet mean):**
+
+`score = (v / (v + m)) * R + (m / (v + m)) * C`
+
+- `R` = driver’s raw overall average
+- `v` = evaluation count
+- `C` = fleet mean for the same filters/period
+- `m` = 5 (prior strength)
+
+Example, `C = 4.20`, `m = 5`: A → 4.33, B → 4.52 (B ranks higher).
+
+Show raw average and eval count. Rank # uses **score**, then more evals as tie-break. Below Min evaluations (default 2): second table **Not ranked (too few evaluations)** — no trophy number. One footnote under the table.
+
+```mermaid
+flowchart LR
+  evals[Submitted evals]
+  raw[Raw avg R plus count v]
+  fleet[Fleet mean C]
+  score[Rank score]
+  table[Ranked table]
+  unranked[Not ranked too few]
+  evals --> raw
+  evals --> fleet
+  raw --> score
+  fleet --> score
+  score --> table
+  raw --> unranked
+```
+
+## Score breakdown on Rankings + Evaluations
+
+- Columns: Rank, Driver, Evals, Rank score, Raw avg, 4 category averages
+- Compact 4-segment bars; grouped chart for top 10 (overall + 4 categories)
+- Expand a driver: each submitted eval (trip #, date, destination, overall, 4 scores, optional remark)
+- **Never** rater name / email / `evaluator_user_id` (Plan #14)
+
+Helper: `evalReportDriverEvalRows()` in `eval_report.php`. CSV + existing evaluation PDF get Rank score + one-line formula footnote.
+
+## Driver trip extract (new)
+
+**Layout (confirmed 2026-09-13):** one row per trip, plus a short driver summary on top.
+
+Not the ranking table. **Every assigned driver** in From/To, including **no ratings yet** (scores show —).
+
+**Trip set:** `driver_id` set, `deleted_at IS NULL`, `status IN ('approved','completed')`, `start_datetime` in From/To. Cancelled/rejected out. Same Driver / Vehicle / Trip no. filters.
+
+**Page:** `/?page=reports&action=driver-trip-extract`
+
+```mermaid
+flowchart TB
+  range[From To date range]
+  trips[Assigned trips in range]
+  summary[Driver summary trip count evals rank score]
+  detail[One row per trip]
+  range --> trips
+  trips --> summary
+  trips --> detail
+  detail --> cols[Columns you tick]
+```
+
+**Checkboxes (GET flags; CSV/PDF match the screen)**
+
+Driver summary: name, trip count, evals — always on; rank score + raw avg on by default.
+
+Trip rows default **on:** date, trip #, driver, destination, overall, 4-category breakdown, anonymous comments.
+
+Trip rows default **off:** plate, invite/submitted counts, rank score repeated on each row.
+
+## Files (when implemented)
+
+- `public_html/includes/eval_report.php`
+- `public_html/pages/reports/driver-rankings.php`
+- `public_html/pages/evaluations/index.php`
+- `public_html/pages/reports/driver-trip-extract.php` (new)
+- `public_html/pages/reports/export-driver-trip-extract-csv.php` (new)
+- `public_html/pages/reports/export-driver-trip-extract-pdf.php` (new)
+- `public_html/pages/reports/export-driver-rankings-csv.php`
+- `public_html/pages/reports/export-driver-evaluations-pdf.php`
+- `public_html/index.php` — routes + `$driverAllowed`
+- `public_html/includes/nav_search.php` / sidebar Reports
+
+No migration. No change to `submit.php`. No fake scores.
+
+## QA (when implemented)
+
+- `php -l` on touched PHP
+- Local browser: Rankings, Evaluations, Trip Extract, CSV/PDF
+- Do not push this feature to live until local sign-off
+
+## Out of scope
+
+GPS. Changing the 4-star form. Naming who rated. Separate leagues by trip volume. One-row-per-driver extract (trip rows chosen instead).
 
 
