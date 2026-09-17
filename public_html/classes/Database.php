@@ -44,7 +44,10 @@ class Database
         'vehicle_observations',
         'vehicle_observation_photos',
         'trip_confirmations',
-        'driver_evaluations'
+        'driver_evaluations',
+        'ob_requests',
+        'ob_approvals',
+        'ob_request_participants'
     ];
 
     private function __construct()

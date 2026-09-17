@@ -62,6 +62,17 @@ define('SMS_DEFAULT_ALLOWLIST', [
     'care_schedule_cancelled',
     'password_reset',
     'system_notification',
+    'ob_submitted',
+    'ob_submitted_motorpool',
+    'ob_supervisor_approved',
+    'ob_fully_approved',
+    'ob_rejected',
+    'ob_revision',
+    'ob_cancelled',
+    'ob_departed',
+    'ob_arrived',
+    'ob_coa_signed',
+    'ob_finalized',
     'default',
 ]);
 

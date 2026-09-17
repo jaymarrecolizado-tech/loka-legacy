@@ -240,6 +240,52 @@ define('MAIL_TEMPLATES', [
         'template' => 'A trip you are part of may be affected by a vehicle/driver override.'
     ],
     
+    // OB Pass Slip (Plan #22) — OB titles, never "Vehicle Request"
+    'ob_submitted' => [
+        'subject' => 'OB Pass Slip For Your Approval',
+        'template' => 'An Official Business Pass Slip requires your approval as immediate supervisor.'
+    ],
+    'ob_submitted_motorpool' => [
+        'subject' => 'OB Pass Slip Submitted',
+        'template' => 'An Official Business Pass Slip has been filed and will require motorpool approval after the supervisor.'
+    ],
+    'ob_supervisor_approved' => [
+        'subject' => 'OB Pass Slip Approved by Supervisor',
+        'template' => 'Your OB Pass Slip was approved by your immediate supervisor and is now awaiting motorpool approval.'
+    ],
+    'ob_fully_approved' => [
+        'subject' => 'OB Pass Slip Approved',
+        'template' => 'Your OB Pass Slip is fully approved. You can now print it and have the guard record your departure.'
+    ],
+    'ob_rejected' => [
+        'subject' => 'OB Pass Slip Rejected',
+        'template' => 'Your OB Pass Slip was rejected. Please check the comments.'
+    ],
+    'ob_revision' => [
+        'subject' => 'OB Pass Slip Sent Back for Revision',
+        'template' => 'Your OB Pass Slip was sent back for revision. Please review the comments and resubmit.'
+    ],
+    'ob_cancelled' => [
+        'subject' => 'OB Pass Slip Cancelled',
+        'template' => 'An OB Pass Slip you are involved in has been cancelled by the requester.'
+    ],
+    'ob_departed' => [
+        'subject' => 'OB Departure Recorded',
+        'template' => 'Your Official Business departure time has been recorded by the guard on duty.'
+    ],
+    'ob_arrived' => [
+        'subject' => 'OB Arrival Recorded',
+        'template' => 'Your Official Business arrival time has been recorded by the guard on duty.'
+    ],
+    'ob_coa_signed' => [
+        'subject' => 'OB Pass Slip Ready to Finalize',
+        'template' => 'The Certificate of Appearance has been signed. Your OB Pass Slip is ready to finalize.'
+    ],
+    'ob_finalized' => [
+        'subject' => 'OB Pass Slip Completed',
+        'template' => 'Your OB Pass Slip has been finalized. The PDF is now the complete record.'
+    ],
+
     // Default fallback template
     'default' => [
         'subject' => 'LOKA Notification',

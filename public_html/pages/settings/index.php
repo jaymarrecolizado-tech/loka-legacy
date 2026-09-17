@@ -53,6 +53,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'trip_overdue_renotify_hours' => $trackClamp('Overdue renotify (hours)', post('trip_overdue_renotify_hours', '24'), 1, 168, 24),
         'driver_evaluation_reminder_hours' => $trackClamp('Evaluation reminder (hours)', post('driver_evaluation_reminder_hours', '48'), 1, 720, 48),
         'driver_evaluation_expiry_days' => $trackClamp('Evaluation expiry (days)', post('driver_evaluation_expiry_days', '30'), 1, 90, 30),
+        // OB Pass Slip (Plan #22)
+        'allow_ob_attach_after_submit' => post('allow_ob_attach_after_submit', '0') === '1' ? '1' : '0',
+        'ob_coa_token_days' => $trackClamp('OB CoA token validity (days)', post('ob_coa_token_days', '7'), 1, 60, 7),
     ];
     
     foreach ($settingsToUpdate as $key => $value) {
@@ -161,6 +164,19 @@ require_once INCLUDES_PATH . '/header.php';
                                     <option value="1" <?= ($settings['require_travel_order_upload'] ?? '0') === '1' ? 'selected' : '' ?>>Yes — required during application</option>
                                 </select>
                                 <small class="text-muted form-help">When Yes, the application form blocks submission if no TO/OB Slip file is attached. Toggleable by Admin and All Father only.</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Attach OB After Vehicle Request Submit <span class="badge bg-warning text-dark ms-1 badge-keep">All Father</span></label>
+                                <select class="form-select" name="allow_ob_attach_after_submit">
+                                    <option value="0" <?= ($settings['allow_ob_attach_after_submit'] ?? '0') === '0' ? 'selected' : '' ?>>No — attach only during application</option>
+                                    <option value="1" <?= ($settings['allow_ob_attach_after_submit'] ?? '0') === '1' ? 'selected' : '' ?>>Yes — bind an approved OB later</option>
+                                </select>
+                                <small class="text-muted form-help">When Yes, an approved OB Pass Slip can be attached to a vehicle request after it was submitted (from the OB view).</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">OB CoA Client-Link Validity (days)</label>
+                                <input type="number" class="form-control" name="ob_coa_token_days" value="<?= e($settings['ob_coa_token_days'] ?? '7') ?>" min="1" max="60">
+                                <small class="text-muted form-help">How long the one-time public Certificate of Appearance link stays valid (default 7 days).</small>
                             </div>
                         </div>
                     </div>

@@ -176,10 +176,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Travel Order / OB Slip required check (toggled by admin / all_father)
+    // Attached OB Pass Slip (Plan #22) — must be the requester's approved slip on the trip date
+    $obRequestId = postInt('ob_request_id') ?: ($request->ob_request_id ?: null);
+    if ($obRequestId) {
+        $obError = obValidateBind((int) $obRequestId, (int) $request->user_id, $startDatetime, (int) $requestId);
+        if ($obError !== null) {
+            $errors[] = $obError;
+        }
+    }
+
+    // Travel document rule: approved OB OR TO file — one is enough, never both
     $hasExistingTravelOrderFile = !empty($request->travel_order_file);
-    if (requireTravelOrderUpload() && !$hasExistingTravelOrderFile && empty($_FILES['travel_order_file']['name'])) {
-        $errors[] = 'A Travel Order / Official Business Slip upload is required for this request.';
+    if ($obRequestId && (!empty($_FILES['travel_order_file']['name']))) {
+        $errors[] = 'Attach either an approved OB Pass Slip or a Travel Order file — not both.';
+    } elseif (requireTravelOrderUpload() && !$hasExistingTravelOrderFile && empty($_FILES['travel_order_file']['name']) && !$obRequestId) {
+        $errors[] = 'A Travel Order upload is required for this request (or attach your approved OB Pass Slip).';
     }
 
     if (empty($errors)) {
@@ -187,6 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             db()->beginTransaction();
 
             $oldData = (array) $request;
+            $previousObId = (int) ($request->ob_request_id ?? 0);
             
             // Initialize notification queue
             $deferredNotifications = [];
@@ -198,6 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'end_datetime' => $endDatetime,
                 'purpose' => $purpose,
                 'destination' => $destination,
+                'ob_request_id' => $obRequestId,
                 'notes' => $notes,
                 'vehicle_id' => $vehicleId,
                 'approver_id' => $approverId,
@@ -386,6 +399,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
 
             db()->commit();
+
+            if ($obRequestId && (int) $obRequestId !== $previousObId) {
+                obCopyTripTimesFromRequest((int) $obRequestId, (int) $requestId, userId());
+            }
             
             // =====================================================
             // SEND NOTIFICATIONS AFTER SUCCESSFUL COMMIT
@@ -677,12 +694,36 @@ require_once INCLUDES_PATH . '/header.php';
 
                         <hr class="my-4">
 
-                        <!-- Travel Order / Official Business Slip Upload -->
+                        <!-- Travel Order / Official Business Slip Upload + OB attach (Plan #22) -->
                         <div class="card border mb-4">
                             <div class="card-header bg-light py-2">
                                 <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Travel Order / Official Business Slip</h6>
                             </div>
                             <div class="card-body">
+                                <?php
+                                $obBindable = obBindableForRequest((int) $request->user_id);
+                                if ($request->ob_request_id) {
+                                    $boundOb = db()->fetch("SELECT id, pass_slip_no, ob_date FROM ob_requests WHERE id = ?", [$request->ob_request_id]);
+                                    if ($boundOb) {
+                                        $obBindable = array_values(array_filter($obBindable, fn($o) => (int) $o->id !== (int) $boundOb->id));
+                                        array_unshift($obBindable, $boundOb);
+                                    }
+                                }
+                                ?>
+                                <?php if (!empty($obBindable)): ?>
+                                <div class="mb-3">
+                                    <label class="form-label">Attach an approved OB Pass Slip <span class="text-muted">(instead of a TO file)</span></label>
+                                    <select class="form-select" name="ob_request_id">
+                                        <option value="">— None —</option>
+                                        <?php foreach ($obBindable as $obOpt): ?>
+                                        <option value="<?= (int) $obOpt->id ?>" <?= (int) ($request->ob_request_id ?? 0) === (int) $obOpt->id ? 'selected' : '' ?>>
+                                            <?= e($obOpt->pass_slip_no) ?> — <?= e(date('M j, Y', strtotime($obOpt->ob_date))) ?> (must match trip date)
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <small class="text-muted">1 OB = 1 vehicle request. If attached, no TO file is needed (and both together are not allowed).</small>
+                                </div>
+                                <?php endif; ?>
                                 <?php if (!empty($request->travel_order_file)): ?>
                                 <div class="mb-2">
                                     <div class="alert alert-success py-2 mb-2 d-flex align-items-center justify-content-between">

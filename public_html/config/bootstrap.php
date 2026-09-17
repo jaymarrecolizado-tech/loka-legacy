@@ -60,6 +60,7 @@ require_once __DIR__ . '/../includes/mail_delivery.php';
 require_once __DIR__ . '/../includes/badge_counts.php';
 require_once __DIR__ . '/../includes/vehicle_care.php';
 require_once __DIR__ . '/../includes/trip-enhancements.php';
+require_once __DIR__ . '/../includes/ob_requests.php';
 
 // Initialize Security
 $security = Security::getInstance();

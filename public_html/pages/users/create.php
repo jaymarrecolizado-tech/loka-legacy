@@ -64,6 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'phone' => $phone,
                 'role' => $role,
                 'department_id' => $departmentId,
+                'is_ob_approver' => post('is_ob_approver') === '1' ? 1 : 0,
                 'status' => USER_ACTIVE,
                 'failed_login_attempts' => 0,
                 'created_at' => date(DATETIME_FORMAT),
@@ -75,7 +76,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             db()->commit();
             clearUserCache(); // Clear user cache after creating user
-            redirectWith('/?page=users', 'success', 'User created successfully.');
+
+            // Specimen e-sign upload (Plan #23) — after commit; file writes cannot roll back
+            $esignError = null;
+            $res = obSaveUserEsignUpload($userId, $_FILES['signature_file'] ?? []);
+            if ($res['error'] !== null) {
+                $esignError = $res['error'];
+            }
+
+            redirectWith('/?page=users', 'success', 'User created successfully.'
+                . ($esignError !== null ? ' (Specimen e-sign failed: ' . $esignError . ')' : ''));
         } catch (Exception $e) {
             db()->rollback();
             $errors[] = 'Failed to create user.';
@@ -112,7 +122,7 @@ require_once INCLUDES_PATH . '/header.php';
                             </ul>
                         </div><?php endif; ?>
 
-                    <form method="POST">
+                    <form method="POST" enctype="multipart/form-data">
                         <?= csrfField() ?>
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -154,6 +164,21 @@ require_once INCLUDES_PATH . '/header.php';
                                         <option value="<?= $dept->id ?>" <?= post('department_id') == $dept->id ? 'selected' : '' ?>><?= e($dept->name) ?></option>
                                     <?php endforeach; ?>
                                 </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Specimen E-sign <span class="text-muted">(optional, PNG/JPG ≤ 1 MB)</span></label>
+                                <input type="file" class="form-control" name="signature_file" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
+                                <small class="text-muted">Used to stamp OB Pass Slips automatically when this user approves or a guard stamps departure.</small>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label d-block">OB Approver</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="is_ob_approver" value="1"
+                                        role="switch" id="obApproverChk" <?= post('is_ob_approver') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="obApproverChk">
+                                        Can act as <strong>Immediate Supervisor</strong> for OB Pass Slips
+                                    </label>
+                                </div>
                             </div>
                         </div>
                         <hr class="my-4">

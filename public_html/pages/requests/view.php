@@ -417,6 +417,61 @@ require_once INCLUDES_PATH . '/header.php';
                 </div>
             <?php endif; ?>
 
+            <!-- Attached OB Pass Slip (Plan #22) -->
+            <?php
+            $viewBoundOb = $request->ob_request_id
+                ? db()->fetch("SELECT o.*, u.name AS employee_name FROM ob_requests o JOIN users u ON o.user_id = u.id WHERE o.id = ? AND o.deleted_at IS NULL", [$request->ob_request_id])
+                : null;
+            $viewCanBindLate = obAttachAfterSubmitAllowed() && !$viewBoundOb
+                && ((int) $request->user_id === (int) userId() || isAdmin())
+                && !in_array($request->status, ['completed', 'cancelled'], true);
+            $viewBindable = $viewCanBindLate ? obBindableForRequest((int) $request->user_id, $request->start_datetime) : [];
+            ?>
+            <?php if ($viewBoundOb): ?>
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-file-earmark-ruled me-2"></i>Attached OB Pass Slip</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded flex-wrap gap-2">
+                            <div>
+                                <div class="fw-bold"><i class="bi bi-file-earmark-text me-1"></i><?= e($viewBoundOb->pass_slip_no) ?>
+                                    <span class="badge bg-<?= e(obStatusColor($viewBoundOb->status)) ?> ms-1"><?= e(obStatusLabel($viewBoundOb->status)) ?></span>
+                                </div>
+                                <small class="text-muted"><?= e($viewBoundOb->employee_name) ?> · <?= e(date('M j, Y', strtotime($viewBoundOb->ob_date))) ?> · satisfies the travel-document requirement (no TO file needed)</small>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <a href="<?= APP_URL ?>/?page=ob-requests&action=view&id=<?= (int) $viewBoundOb->id ?>" class="btn btn-sm btn-outline-primary">View OB</a>
+                                <?php if (in_array($viewBoundOb->status, ['approved', 'departed', 'coa_received', 'completed'], true)): ?>
+                                <a href="<?= APP_URL ?>/?page=ob-requests&action=print&id=<?= (int) $viewBoundOb->id ?>" target="_blank" class="btn btn-sm btn-outline-dark">Print</a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php elseif ($viewCanBindLate && !empty($viewBindable)): ?>
+                <div class="card mb-4 border-primary-subtle">
+                    <div class="card-body py-2">
+                        <form method="POST" action="<?= APP_URL ?>/?page=ob-requests&action=process" class="row g-2 align-items-end">
+                            <?= csrfField() ?>
+                            <div class="col-auto"><strong class="small">Attach approved OB:</strong></div>
+                            <div class="col-auto">
+                                <select class="form-select form-select-sm" name="ob_id" required>
+                                    <?php foreach ($viewBindable as $obOpt): ?>
+                                    <option value="<?= (int) $obOpt->id ?>"><?= e($obOpt->pass_slip_no) ?> — <?= e(date('M j, Y', strtotime($obOpt->ob_date))) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <input type="hidden" name="request_id" value="<?= (int) $request->id ?>">
+                            <div class="col-auto">
+                                <button type="submit" name="action" value="vehicle_bind" class="btn btn-sm btn-outline-primary">Attach</button>
+                            </div>
+                            <div class="col-auto"><small class="text-muted">Delayed attach is enabled (All Father setting). 1 OB = 1 request.</small></div>
+                        </form>
+                    </div>
+                </div>
+            <?php endif; ?>
+
             <!-- Vehicle & Driver Assignment -->
             <?php if ($request->vehicle_id || $request->driver_id): ?>
                 <div class="card mb-4">

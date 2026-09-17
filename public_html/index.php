@@ -83,6 +83,7 @@ require_once __DIR__ . '/includes/sms.php';
 require_once __DIR__ . '/includes/mail_delivery.php';
 require_once __DIR__ . '/includes/badge_counts.php';
 require_once __DIR__ . '/includes/trip-enhancements.php';
+require_once __DIR__ . '/includes/ob_requests.php';
 
 // Initialize Security and send headers
 $security = Security::getInstance();
@@ -139,8 +140,9 @@ $page = get('page', 'dashboard');
 $action = get('action', 'index');
 
 // Public pages (no auth required)
-// evaluations = anonymous token-gated submit page; index/rate re-gate inside the case below
-$publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'verify-ticket', 'cron', 'evaluations'];
+// evaluations + ob-requests: only the token-gated actions are public; the
+// case handlers re-gate everything else behind requireAuth().
+$publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'verify-ticket', 'cron', 'evaluations', 'ob-requests'];
 
 // Route handling
 if (!in_array($page, $publicPages)) {
@@ -531,6 +533,28 @@ switch ($page) {
         } else {
             requireReportsAccess();
             require_once PAGES_PATH . '/evaluations/index.php';
+        }
+        break;
+
+    case 'ob-requests':
+        if ($action === 'coa-sign') {
+            // Public Certificate of Appearance (one-time token, no login)
+            require_once PAGES_PATH . '/ob-requests/coa-sign.php';
+        } else {
+            requireAuth();
+            if ($action === 'create') {
+                require_once PAGES_PATH . '/ob-requests/create.php';
+            } elseif ($action === 'view') {
+                require_once PAGES_PATH . '/ob-requests/view.php';
+            } elseif ($action === 'process') {
+                require_once PAGES_PATH . '/ob-requests/process.php';
+            } elseif ($action === 'print') {
+                require_once PAGES_PATH . '/ob-requests/print.php';
+            } elseif ($action === 'coa') {
+                require_once PAGES_PATH . '/ob-requests/coa.php';
+            } else {
+                require_once PAGES_PATH . '/ob-requests/index.php';
+            }
         }
         break;
 

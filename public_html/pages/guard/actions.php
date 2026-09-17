@@ -73,6 +73,25 @@ switch ($action) {
         // Format the datetime
         $formattedDispatchTime = date('Y-m-d H:i:s', strtotime($dispatchTime));
 
+        // Bound OB Pass Slip (Plan #24): dispatching the vehicle stamps the
+        // slip's departure. The signature is resolved BEFORE the dispatch is
+        // recorded — an unresolvable signature blocks the dispatch.
+        $obBound = obBoundObForRequest((int) $requestId);
+        $obDepartSig = null;
+        if ($obBound !== null && empty($obBound->ob_departure_datetime)) {
+            $res = obResolveStaffSignature(
+                (int) $obBound->id,
+                'guard_departure',
+                (int) userId(),
+                (string) post('ob_guard_signature', ''),
+                post('ob_save_esign') === '1'
+            );
+            if ($res['error'] !== null) {
+                redirectWith('/?page=guard', 'danger', 'Dispatch blocked: ' . $res['error']);
+            }
+            $obDepartSig = $res['path'];
+        }
+
         // Odometer reading (skip gracefully when broken/unreadable)
         $vehicleBroken = vehicleOdometerIsBroken(
             (object) [
@@ -131,6 +150,18 @@ switch ($action) {
             cancelPendingTripConfirmations((int) $requestId, 'vehicle dispatched');
         }
 
+        // Bound OB Pass Slip (Plan #24): stamp departure with the vehicle's
+        // dispatch datetime. Already-stamped slips are skipped, never overwritten.
+        $obStampNote = '';
+        if ($obBound !== null) {
+            $stamp = obApplyGuardDepartureStamp($obBound, $formattedDispatchTime, (int) userId(), $obDepartSig);
+            if ($stamp['ok'] && !$stamp['skipped']) {
+                $obStampNote = ' Pass Slip ' . $obBound->pass_slip_no . ' stamped.';
+            } elseif (!$stamp['ok']) {
+                error_log('OB departure stamp failed after dispatch of request #' . $requestId . ': ' . $stamp['error']);
+            }
+        }
+
         // Keep vehicle odometer in sync
         if ($request->vehicle_id && $odo['mileage'] !== null) {
             db()->update('vehicles', [
@@ -179,9 +210,9 @@ switch ($action) {
         redirectWith(
             '/?page=guard',
             'success',
-            $odo['broken']
+            ($odo['broken']
                 ? "Dispatch recorded for request #{$requestId} (odometer reading skipped — broken/unreadable)."
-                : "Dispatch recorded for request #{$requestId}."
+                : "Dispatch recorded for request #{$requestId}.") . $obStampNote
         );
         break;
         
@@ -285,6 +316,19 @@ switch ($action) {
             cancelPendingTripConfirmations((int) $requestId, 'trip completed');
         }
 
+        // Bound OB Pass Slip (Plan #24): arrival writes the slip's arrival time
+        // (time only — the departure was stamped at dispatch). Never overwrites.
+        $obBound = obBoundObForRequest((int) $requestId);
+        $obStampNote = '';
+        if ($obBound !== null) {
+            $stamp = obStampGuardArrival($obBound, $formattedArrivalTime, (int) userId());
+            if ($stamp['ok'] && !$stamp['skipped']) {
+                $obStampNote = ' Pass Slip ' . $obBound->pass_slip_no . ' arrival recorded.';
+            } elseif (!$stamp['ok']) {
+                error_log('OB arrival stamp skipped for request #' . $requestId . ': ' . $stamp['error']);
+            }
+        }
+
         // Update vehicle and driver status back to available
         if ($request->vehicle_id) {
             $vehicleUpdateData = ['status' => 'available', 'updated_at' => $now];
@@ -361,7 +405,7 @@ switch ($action) {
         redirectWith(
             '/?page=guard',
             'success',
-            "Arrival recorded for request #{$requestId}. Trip marked as completed."
+            "Arrival recorded for request #{$requestId}. Trip marked as completed." . $obStampNote
         );
         break;
         

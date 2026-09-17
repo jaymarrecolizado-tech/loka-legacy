@@ -36,6 +36,14 @@
                 </a>
             </li>
 
+            <!-- OB Pass Slips (Official Business) -->
+            <li class="nav-item">
+                <a class="nav-link <?= activeMenu('ob-requests') ?>" href="<?= APP_URL ?>/?page=ob-requests">
+                    <i class="bi bi-file-earmark-ruled"></i>
+                    <span>OB Pass Slips</span>
+                </a>
+            </li>
+
             <?php if (function_exists('canAccessGasVouchers') && canAccessGasVouchers()): ?>
             <!-- Gas Vouchers -->
             <li class="nav-item">

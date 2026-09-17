@@ -60,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'phone' => $phone,
                     'role' => $role,
                     'department_id' => $departmentId,
+                    'is_ob_approver' => post('is_ob_approver') === '1' ? 1 : 0,
                     'updated_at' => date(DATETIME_FORMAT)
                 ];
 
@@ -72,7 +73,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 auditLog('user_updated', 'user', $userId);
                 db()->commit();
                 clearUserCache(); // Clear user cache after updating user
-                redirectWith('/?page=users', 'success', 'User updated successfully.');
+
+                // Specimen e-sign (Plan #23) — file writes after commit
+                $esignError = null;
+                if (post('clear_signature') === '1') {
+                    obClearUserEsign($userId);
+                }
+                $res = obSaveUserEsignUpload($userId, $_FILES['signature_file'] ?? []);
+                if ($res['error'] !== null) {
+                    $esignError = $res['error'];
+                }
+
+                redirectWith('/?page=users', 'success', 'User updated successfully.'
+                    . ($esignError !== null ? ' (Specimen e-sign failed: ' . $esignError . ')' : ''));
             }
         } catch (Exception $e) {
             db()->rollback();
@@ -112,7 +125,7 @@ require_once INCLUDES_PATH . '/header.php';
                             </ul>
                         </div><?php endif; ?>
 
-                    <form method="POST">
+                    <form method="POST" enctype="multipart/form-data">
                         <?= csrfField() ?>
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -152,6 +165,31 @@ require_once INCLUDES_PATH . '/header.php';
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Specimen E-sign <span class="text-muted">(PNG/JPG ≤ 1 MB)</span></label>
+                                <?php $esignPath = obUserEsignPath((int) $user->id); ?>
+                                <?php if ($esignPath !== null): ?>
+                                <div class="border rounded bg-white p-2 mb-2 d-flex align-items-center gap-3">
+                                    <img src="?page=file-view&file=<?= urlencode($esignPath) ?>" alt="Specimen e-sign" style="max-height:64px; max-width:200px; object-fit:contain;">
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input" type="checkbox" name="clear_signature" value="1" id="clearSigChk">
+                                        <label class="form-check-label small" for="clearSigChk">Remove saved e-sign</label>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                                <input type="file" class="form-control" name="signature_file" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
+                                <small class="text-muted"><?= $esignPath !== null ? 'Upload a new file to replace the specimen.' : 'Used to stamp OB Pass Slips automatically when this user approves or a guard stamps departure.' ?></small>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label d-block">OB Approver</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="is_ob_approver" value="1"
+                                        role="switch" id="obApproverChk" <?= post('is_ob_approver', $user->is_ob_approver ? '1' : '0') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="obApproverChk">
+                                        Can act as <strong>Immediate Supervisor</strong> for OB Pass Slips
+                                    </label>
+                                </div>
                             </div>
                         </div>
                         <hr class="my-4">

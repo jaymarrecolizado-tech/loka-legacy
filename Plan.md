@@ -25,6 +25,9 @@
 | #19 | Leftover UX Fixes, then VAPT, then Optional Features | OPEN (2026-09-10) |
 | #20 | Useful Role Dashboard | DONE (2026-09-10) |
 | #21 | Fair Driver Ranking + Trip Extract | DONE (2026-09-13; live `lokafleet.dictr2.cloud`) |
+| #22 | Official Business Pass Slip | DONE (2026-09-15; localhost QA done on `ob_integration` — NOT deployed) |
+| #23 | OB Saved E-sign (staff specimen) | DONE (2026-09-15; localhost QA on `ob_integration` — NOT deployed) |
+| #24 | OB Private vs Official Vehicle + Guard Bind | DONE (2026-09-17; localhost QA on `ob_integration` — NOT deployed) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -1536,5 +1539,377 @@ Trip rows default **off:** plate, invite/submitted counts, rank score repeated o
 ## Out of scope
 
 GPS. Changing the 4-star form. Naming who rated. Separate leagues by trip volume. One-row-per-driver extract (trip rows chosen instead).
+
+---
+
+# LOKA Plan #22: Official Business Pass Slip — ✅ DONE (2026-09-15, `ob_integration`, localhost only — do not deploy until sign-off)
+
+Branch: **`ob_integration`**. Paper source: [`Reference/PASS-SLIP-OB_revised (1).pdf`](Reference/PASS-SLIP-OB_revised%20(1).pdf) (DICT RO2 Pass Slip + Certificate of Appearance).
+
+## Goal
+
+A first-class **OB Pass Slip** application, parallel to vehicle requests, bound to the employee’s account. Own routing and timeline. Optional bind to a vehicle request. Canvas signatures. Certificate of Appearance signed by the receiving client (no LOKA account). PDF matches the paper template. Same `notify()` channel with **OB titles**, not vehicle-request titles.
+
+Do **not** store OB rows in `requests`. Do not touch ranking, Live Board, or `.env`. No live deploy until sign-off.
+
+## Two apps, optional bind
+
+| | Vehicle request | OB Pass Slip |
+|---|---|---|
+| Purpose | Book a fleet vehicle | Leave on official business |
+| Vehicle | Required | Plate optional |
+| Flow | Dept → motorpool → Guard dispatch/arrival | Official: Supervisor → motorpool → Guard. Private: Supervisor → Guard (no motorpool). CoA → requester finality. Guard-on-dispatch is Plan #24. |
+
+- Employee can file **OB only**, **vehicle only**, or **both**.
+- **Default:** Attach OB on a vehicle request only if the requester already has an **approved** slip (date overlapping the trip). Otherwise block submit and link to Apply OB.
+- **All Father toggle** `allow_ob_attach_after_submit` (Settings, default **off**): when on, submit the vehicle request first and bind the OB later once approved.
+- **TO file** stays on the vehicle request. If Settings require a travel document: **approved OB or TO** — one is enough, never both.
+- **1 OB = 1 vehicle request** (`requests.ob_request_id` unique). Passengers not enforced in v1.
+
+```mermaid
+flowchart LR
+  emp[Employee]
+  obApp[OB Pass Slip]
+  vehApp[Vehicle request]
+  emp --> obApp
+  emp --> vehApp
+  obApp -->|approved owned by user| bind[Attach]
+  vehApp --> bind
+  toFile[TO file] --> vehApp
+```
+
+## Routing
+
+```mermaid
+flowchart TD
+  submit[Employee submits — printed names, no canvas]
+  sup[Supervisor approves and signs]
+  mp[Motorpool approves and signs]
+  ok[Approved printable]
+  guardOut[Guard departure plus sign]
+  visit[Client CoA name purpose canvas]
+  guardIn[Guard arrival]
+  review[Requester Submit for finality]
+  done[Completed PDF]
+  submit --> sup
+  sup -->|reject or revision| submit
+  sup --> mp
+  mp --> ok
+  ok --> guardOut
+  guardOut --> visit
+  visit --> review
+  guardIn --> review
+  review --> done
+```
+
+- **Immediate Supervisor:** users tagged `users.is_ob_approver` (admin checkbox). Requester **selects** from that list (same UX as picking a department approver).
+- **Motorpool:** same `getMotorpoolHeads()` as vehicle requests. **Plan #24:** required only when Apply chooses an official DICT vehicle; private-vehicle OBs skip this step.
+- **Guard (v1 as shipped in #22):** any signed-in Guard stamps OB departure/arrival **separately** from vehicle dispatch. Departure needs a signature (saved e-sign in Plan #23); arrival is time only. **Plan #24** binds that stamp to vehicle dispatch when a fleet trip is attached.
+- Statuses: `pending_supervisor` → `pending_motorpool` → `approved` → `departed` → `coa_received` → `completed` (+ `rejected`, `revision`, `cancelled`).
+- Approvals: table **`ob_approvals`** (do not weaken `approvals.request_id` FK to vehicle requests).
+- CoA may be filled after `approved`. **Submit for finality** requires a signed CoA. Guard times print when present; missing times **warn** but do not block finality. After client signs → `coa_received`. Only the **requester** taps Submit for finality → `completed`. No extra supervisor/motorpool step.
+
+## Certificate of Appearance
+
+Paper: receiving office writes details and signs. Client has **no LOKA account**.
+
+**Both modes:**
+
+1. **On-device:** requester opens their approved OB (logged in) and hands the phone/tablet. Client types office/establishment, representative name, purpose, from/to, and signs a canvas.
+2. **Public link** (same idea as `pages/evaluations/submit.php`): requester taps **Allow client to sign** → token URL, no login. One-time; expires after submit or after `ob_coa_token_days`. Token is the capability; rate-limit by token.
+
+After CoA save: notify requester `ob_coa_signed` — “OB Pass Slip ready to finalize”.
+
+## Canvas signatures (v1 as shipped locally)
+
+PNG files under `uploads/ob_signatures/{id}/` (paths in columns, not base64 in SQL). Shared signature-pad JS (draw, clear, POST data URL; server writes file).
+
+Apply does **not** collect an employee canvas. Participants are users on the slip; the employee line **prints** as `J.Recolizado/D.Abad` (first initial + last name, slash-separated). No extra signatures for participants. Table `ob_request_participants` (migration 049).
+
+| Who | When (v1) | Plan #23 |
+|-----|-----------|----------|
+| Employee / participants | Printed names only | Unchanged — no e-sign on that line |
+| Immediate Supervisor | Canvas on approve | Saved e-sign if on file; else canvas once + optional save |
+| Motorpool Head | Canvas on approve | Same |
+| Guard | Canvas on departure | Same |
+| Receiving client | Canvas on CoA (always) | Unchanged — always a fresh canvas; never stored on a user |
+
+## PDF
+
+TCPDF matching the paper Pass Slip (Helvetica, ASCII). Filled: Pass Slip No. (`YYMMDD-NNN`, e.g. `260915-001` — year/month/day of the OB date, monthly series resetting to 001 next month), date, purpose, employee, optional plate, supervisor/motorpool names, guard times. Embed signature images in the matching boxes. CoA block filled only after client sign. Blank until each party has signed. Print/download from OB view after approval; after finality the PDF is the complete record.
+
+## Notifications
+
+Same `notify()` (in-app + email queue + SMS). New keys in `MAIL_TEMPLATES` and `SMS_DEFAULT_ALLOWLIST`. **Do not reuse** `request_submitted` / “New Vehicle Request…”.
+
+- `ob_submitted` / `ob_submitted_motorpool`
+- `ob_supervisor_approved` / `ob_fully_approved`
+- `ob_rejected` / `ob_revision` / `ob_cancelled`
+- `ob_departed` / `ob_arrived`
+- `ob_coa_signed` — requester: ready to finalize
+- `ob_finalized` — requester (and supervisor/motorpool FYI)
+
+Do not attach OB events to a vehicle `request_id` unless bound.
+
+## Pass Slip numbering
+
+Format: **`YYMMDD-NNN`** (example `260915-001`).
+
+- `26` = year, `09` = month, `15` = day of the **OB date** on the form
+- `-001` = series for that **calendar month**; October starts again at `001`
+- Same day examples: `260915-001`, `260915-002`; next day in September: `260916-003`; 1 Oct: `261001-001`
+
+**Why this, not `OB-2026-0001`:** the paper field is a short Pass Slip No.; date+series is readable at the gate.
+
+**Why monthly series (not daily):** you asked the counter to reset each month. The day stays in the prefix so two slips on the 15th still show `260915-…` while the running number is monthly.
+
+**Not chosen:** `2609-001` (month only) — shorter, but hides the day. Daily reset (`260915-001` then `260916-001`) would make `-001` mean “first of that day,” which is also fine if you later prefer it.
+
+Generator: `obGeneratePassSlipNo()` uses `MAX` of the month serial (including cancelled slips) so numbers are not reused. Unique-key retry on insert.
+
+## Schema — migration `048_ob_pass_slips.php`
+
+(`047` already exists.)
+
+- `users.is_ob_approver` TINYINT(1) NOT NULL DEFAULT 0
+- `ob_requests`: `pass_slip_no`, `user_id`, `department_id`, `purpose`, `ob_date`, `plate_number`, `supervisor_user_id`, `motorpool_head_id`, `status`, guard datetimes + guard user ids, signature path columns, CoA text + `coa_signature_path`, `coa_token_hash`, `coa_token_expires_at`, `finalized_at`, timestamps, `deleted_at`
+- `ob_approvals`: `ob_request_id`, `approver_user_id`, `approval_type`, `action`, `comments`, timestamps
+- `requests.ob_request_id` NULL unique FK
+- settings: `allow_ob_attach_after_submit` default `0`; `ob_coa_token_days`
+
+SQL only. No JSON file storage.
+
+## UI (keep files under ~300 lines)
+
+- Sidebar + nav search: **OB Pass Slips** (`/?page=ob-requests`)
+- `public_html/index.php` route `ob-requests`
+- `public_html/pages/ob-requests/` — `index.php`, `create.php`, `view.php`, `process.php`, `print.php` / PDF, `coa.php` (logged-in canvas), `coa-sign.php` (public token)
+- Guard partial for OB time stamps (do not bloat `guard/index.php`)
+- Users create/edit: **OB Approver** checkbox
+- Vehicle create/edit/view: Attach approved OB
+- Settings: delayed-attach toggle
+- Helpers: `public_html/includes/ob_requests.php`
+
+## Implementation checklist — ✅ DONE (2026-09-15)
+
+- [x] Migration 048 + `users.is_ob_approver` + `requests.ob_request_id` unique bind + settings (`allow_ob_attach_after_submit`=0, `ob_coa_token_days`=7) — applied to `old_loka_db`; `ob_requests`/`ob_approvals` added to the `Database` table allowlist.
+- [x] OB apply / list / view / approve-reject-revision / print — `pages/ob-requests/` (`index`, `create`, `view`, `process`, `print`, `coa`, `coa-sign`); Pass Slip No. `YYMMDD-NNN` (e.g. `260915-001`) with monthly series reset and unique-key retry.
+- [x] Supervisor then motorpool (each signs a canvas on approve); Guard out/in stamps in a dedicated partial (`pages/guard/partials/ob_section.php`) — departure requires canvas sign, arrival is time-only; statuses `pending_supervisor → pending_motorpool → approved → departed → coa_received → completed` (+ rejected/revision/cancelled; requester can resubmit a revision, cancel before completion).
+- [x] CoA on-device (`coa.php`, requester's device) + public token (`coa-sign.php`, no login; one-time, expires after `ob_coa_token_days`, per-session attempt cap); requester **Submit for finality** requires signed CoA; guard times warn-but-allow (logged).
+- [x] Vehicle attach dropdown in `requests/create.php` + `edit.php` (own approved slip, trip-date match, 1-per-OB enforced in PHP **and** by `uq_requests_ob`); TO **or** OB satisfies the travel-document setting, never both; delayed attach (`vehicle_bind`) gated by the All Father toggle, offered on `requests/view.php` and from the OB view.
+- [x] TCPDF Pass Slip matching the Reference template — office header + Pass Slip No./date, PASS SLIP title, purpose, employee/supervisor signature boxes (embedded PNGs), plate + approved-by, guard times + initials, CoA block; **two copies per page** (dashed separator) like the paper; blank until each party signs.
+- [x] `MAIL_TEMPLATES` + `SMS_DEFAULT_ALLOWLIST`: all 11 `ob_*` keys with OB titles (never "Vehicle Request"); OB notifications never tagged with a vehicle request id unless bound.
+- [x] Sidebar **OB Pass Slips** + nav search; signatures stored as PNG files under `uploads/ob_signatures/{id}/` (paths, not base64); shared canvas pad `assets/js/ob-signature.js` (mouse + touch).
+
+## QA — verified 2026-09-15 (`_deploy_tmp/verify_plan22_*`; rolled-back seed txns, fixtures removed after)
+
+- [x] Approve without CoA allowed; finalize without CoA blocked; with CoA → `coa_received` → requester finalize → `completed` (asserted in workflow smoke).
+- [x] Public token resolves → saves CoA → **invalid after submit** (one-time); on-device canvas save also works; invalid/expired token shows "Link Not Usable" (HTTP-verified).
+- [x] PDF renders with signatures embedded where present, blanks where not; both copies on one page; template matches the paper (browser-verified).
+- [x] One OB cannot attach to two vehicle requests — blocked in `obValidateBind()` and by the DB unique index (`23000` asserted).
+- [x] Toggle off: no bind-after-submit; attach requires own approved slip with matching date (foreign/dated/bound slips all rejected). Toggle on: delayed attach form renders on request + OB views.
+- [x] Notifications use OB titles (`ob_submitted`, `ob_supervisor_approved`, `ob_coa_signed`, …) — verified keys exist in `MAIL_TEMPLATES`; `notify()` called with `request_id = null` for unbound slips.
+- [x] `php -l` clean on all 17 touched files + full public_html sweep 0 errors; guard dashboard renders with the OB partial; create/view/coa/coa-sign render without PHP warnings; CoA page usable at phone width.
+- [ ] **NOT deployed to live** — deploy only after DICT sign-off.
+
+## Out of scope (v1)
+
+GPS. Passenger-level OB enforcement. Live VPS. Saved staff e-sign is Plan #23 (built). Merging Guard vehicle dispatch with OB times, and skipping Motorpool for private vehicles, is Plan #24.
+
+## Files (planned)
+
+- `public_html/migrations/048_ob_pass_slips.php`
+- `public_html/includes/ob_requests.php`
+- `public_html/pages/ob-requests/*`
+- `public_html/index.php`, `includes/sidebar.php`, `includes/nav_search.php`
+- `public_html/pages/users/create.php`, `pages/users/edit.php`
+- `public_html/pages/requests/create.php`, `edit.php`, `view.php`
+- `public_html/pages/settings/index.php`
+- `public_html/pages/guard/` (partial)
+- `public_html/config/mail.php`, `config/sms.php`
+
+---
+
+# LOKA Plan #23: OB Saved E-sign (staff specimen) — ✅ DONE (2026-09-15, `ob_integration`, localhost only — do not deploy until Plan #22 + this are signed off)
+
+Branch: **`ob_integration`**. Follow-on to Plan #22. Local `old_loka_db` only. No live deploy until Plan #22 + this are signed off.
+
+## Goal
+
+Staff who stamp many OB slips (Immediate Supervisor, Motorpool Head, Guard) should not draw a canvas every time. Admin uploads a specimen e-sign on the user record. Approve / Guard departure **copies** that PNG onto the slip. The receiving client (Certificate of Appearance) is the only party who still signs on a canvas every visit — they have no LOKA account.
+
+**Decisions (2026-09-15):**
+
+- **Who uploads:** Admin only, on User create/edit.
+- **If no specimen yet:** Canvas once, with optional **Save this as my e-sign for next time** (writes `users.signature_path` so the next action skips the pad). Admin can still replace it later.
+- **Employee / participants:** still printed names (`J.Recolizado/D.Abad`). No e-sign on that line.
+- **CoA:** always a fresh canvas. Never saved onto a user.
+
+```mermaid
+flowchart TD
+  admin[Admin uploads PNG on User edit]
+  store[users.signature_path]
+  act[Approve or Guard departure]
+  has{E-sign on file?}
+  stamp[Copy PNG onto this OB slip]
+  canvas[Canvas once]
+  save{Save for next time?}
+  admin --> store
+  act --> has
+  has -->|yes| stamp
+  has -->|no| canvas
+  canvas --> save
+  save -->|yes| store
+  canvas --> stamp
+```
+
+## Storage
+
+- Migration `050_user_esign.php`: `users.signature_path` VARCHAR(255) NULL. File at `uploads/user_signatures/{userId}.png`.
+- On approve/stamp: **copy** into `uploads/ob_signatures/{obId}/{who}.png` and keep writing existing OB columns (`supervisor_signature_path`, `motorpool_signature_path`, `guard_departure_signature_path`). Replacing the specimen later must not rewrite old slips.
+- Reuse `classes/FileUpload.php` (PNG/JPG, ~1MB). Preview via `?page=file-view`.
+
+## Admin UI
+
+`pages/users/create.php` and `pages/users/edit.php` (multipart):
+
+- File input for the specimen. Not required to create a user.
+- Edit: preview, replace, optional clear.
+
+## Approve / Guard
+
+Helpers (`ob_requests.php` or small `ob_esign.php`):
+
+- `obUserEsignPath($userId)`
+- `obStampSavedEsign($obId, $who, $userId)` — copy specimen onto the slip
+- `obResolveStaffSignature(...)` — saved copy **or** canvas; if canvas + save-for-next-time and they have none yet, write `users.signature_path`
+
+Wire in `pages/ob-requests/process.php` for `approve_supervisor`, `approve_motorpool`, `guard_departure`.
+
+- `pages/ob-requests/view.php` approve modal: thumbnail + Approve when an e-sign exists; otherwise canvas + checkbox.
+- `pages/guard/partials/ob_section.php` departure: same.
+- `coa.php` / `coa-sign.php`: canvas only.
+
+## Implementation checklist — ✅ DONE (2026-09-15)
+
+- [x] Migration `050_user_esign.php` — `users.signature_path` VARCHAR(255) NULL + `uploads/user_signatures/` (created by migration, also lazily on upload). Applied to `old_loka_db`.
+- [x] Admin upload / preview / replace / clear — `pages/users/create.php` + `edit.php` now multipart: optional file input on create; edit shows a thumbnail preview (`?page=file-view`), replace input and a **Remove saved e-sign** checkbox. `obSaveUserEsignUpload()` validates PNG/JPG ≤ 1 MB by content (`getimagesize`), stores `uploads/user_signatures/{userId}.{ext}`, clears the old extension on replace; `obClearUserEsign()` unlinks + nulls.
+- [x] Copy-on-stamp + optional first-time save — `obResolveStaffSignature($obId, $who, $userId, $canvas, $saveForNextTime)` in `includes/ob_requests.php`: canvas wins when drawn; otherwise the specimen is **copied** onto the slip (`obStampSavedEsign()` → `uploads/ob_signatures/{id}/{who}.png`; JPG specimens are converted to PNG so TCPDF can embed them). A canvas with "save for next time" also writes `users.signature_path` when the user has none. Wired into `process.php` for `approve_supervisor`, `approve_motorpool`, `guard_departure`.
+- [x] Skip canvas when e-sign exists — approve modal shows a thumbnail + "Approve (saved e-sign)" with no pad; with no specimen it shows the canvas + **Save this as my e-sign for next time** checkbox. Guard departure: plain confirm button when the guard has a specimen; modal + checkbox otherwise. `coa.php` / `coa-sign.php` untouched — always a fresh canvas, never saved to a user.
+
+## QA — verified 2026-09-15 (code + local `old_loka_db`; not deployed)
+
+- [x] Admin upload + preview on User edit (render check: preview + Remove control); upload helper validates type/size and fails gracefully outside HTTP.
+- [x] Approve with a saved e-sign: no canvas in the modal, specimen **copied** onto the slip (`supervisor_signature_path` etc.) as PNG (JPG specimens converted) — PDF embeds the per-slip copy.
+- [x] First-time canvas + "save for next time" writes `users.signature_path`; a second approve then skips the pad entirely.
+- [x] Replacing the admin specimen does not change already-stamped slips (byte-compared old slip copies) and new slips use the replacement.
+- [x] CoA still requires a fresh canvas — `coa.php`/`coa-sign.php` contain no e-sign resolution or save flag; no specimen is ever written from CoA.
+- [x] Missing/deleted specimen file on disk is treated as "no specimen"; canvas without the save flag does not create one.
+- [x] `php -l` clean on all touched files + full public_html sweep 0 errors; render checks pass for all four UI states (modal with e-sign / canvas+save, guard partial, user edit preview).
+- [ ] **NOT deployed to live** — deploy only after Plan #22 + #23 sign-off.
+
+## Out of scope
+
+PKI / PAdES digital certificates. E-sign on vehicle requests, trip tickets, or gas vouchers. Employee/participant e-sign on the printed-name line. Live VPS until sign-off.
+
+---
+
+# LOKA Plan #24: OB Private vs Official Vehicle + Guard Bind — ✅ DONE (2026-09-17, `ob_integration`, localhost only — do not deploy until Plan #22 + #23 + this are signed off)
+
+Branch: **`ob_integration`**. Follow-on to Plan #22 (Pass Slip) and Plan #23 (saved e-sign). Local `old_loka_db` only. No live deploy until sign-off.
+
+## Goal
+
+Two gaps found in localhost QA of #22/#23:
+
+1. **Private vehicle.** Some Official Business trips use the employee’s own car, not a DICT fleet unit. Those slips must **not** wait for Motorpool Head approval. Motorpool only applies when the slip uses an official vehicle.
+2. **Guard stamp vs vehicle out.** When the OB **is** bound to a fleet vehicle request, Guard signing the Pass Slip must happen **when the vehicle is dispatched** — one action at the gate — not a second stamp on a separate OB card. Private-vehicle OBs still have Guard stamp the Pass Slip itself at the gate (no fleet dispatch).
+
+Do **not** store OB rows in `requests`. Do not touch ranking, Live Board, or `.env`.
+
+## Decisions (2026-09-17)
+
+- **Apply** asks **Official DICT vehicle** or **Private vehicle** (required). Do not infer private from a blank plate.
+- **Official:** fleet plate dropdown + Motorpool Head, both required. Route: `pending_supervisor` → `pending_motorpool` → `approved`.
+- **Private:** hide fleet plate and Motorpool Head. `plate_number` and `motorpool_head_id` stay NULL. Route: `pending_supervisor` → `approved` (no Motorpool notify, no Motorpool e-sign).
+- **Guard + official fleet trip** (`requests.ob_request_id` set): recording **dispatch** stamps OB departure + Guard e-sign (or canvas if none saved). Recording **arrival** writes OB arrival time only. Use the vehicle’s dispatch/arrival datetime. If the slip is already stamped, skip (no overwrite). If stamp fails, **block** dispatch.
+- **Guard + private (no bound request):** Pass Slip stays on the Guard **OB Pass Slips** card. Stamp there, as today.
+- **Late attach:** still allowed when All Father `allow_ob_attach_after_submit` is on. Motorpool stays on the **vehicle request**, not a second OB Motorpool step. After bind, Guard uses the trip row. If the trip already left, copy existing times; copy a Guard signature only if that Guard has a saved e-sign. Do not invent a signature.
+- Existing slips (no `uses_official_vehicle` yet): treat as official (DEFAULT 1) so current Motorpool routing is unchanged.
+
+```mermaid
+flowchart TD
+  apply[Apply OB]
+  kind{Official or private vehicle?}
+  sup[Supervisor approves and signs]
+  mh[Motorpool Head approves and signs]
+  ok[Approved printable]
+  gate{Bound fleet trip?}
+  dispatch[Guard records vehicle dispatch]
+  obCard[Guard stamps OB card]
+  apply --> kind
+  kind -->|official| sup
+  kind -->|private| sup
+  sup -->|official| mh
+  mh --> ok
+  sup -->|private skip Motorpool| ok
+  ok --> gate
+  gate -->|yes| dispatch
+  gate -->|no private| obCard
+```
+
+## Schema — migration `051_ob_vehicle_source.php`
+
+(`050` already exists.)
+
+- `ob_requests.uses_official_vehicle` TINYINT(1) NOT NULL DEFAULT 1
+- No new tables. `motorpool_head_id` already nullable from 048.
+
+SQL only. No JSON file storage.
+
+## UI / code
+
+- `public_html/pages/ob-requests/create.php` — Official / Private radios; show plate + Motorpool only when official; skip `ob_submitted_motorpool` when private.
+- `public_html/pages/ob-requests/process.php` — supervisor approve: private → `approved` + `ob_fully_approved`; official → `pending_motorpool` as today. `vehicle_bind` copies trip times / e-sign when already dispatched.
+- `public_html/pages/ob-requests/view.php` + print — no Motorpool action or e-sign on private; print Motorpool line blank or “N/A — private vehicle”.
+- Helpers in `public_html/includes/ob_guard_bind.php` (loaded from `ob_requests.php`): `obStampGuardDeparture(...)`, `obStampGuardArrival(...)`, `obCopyTripTimesFromRequest(...)` (reuse `obResolveStaffSignature` and the same status rules as `guard_departure` / `guard_arrival`).
+- `public_html/pages/guard/actions.php` — after successful `record_dispatch` / `record_arrival`, stamp the bound OB when that side is still blank.
+- `public_html/pages/guard/index.php` + `partials/dispatch_modals.php` — if the trip has a bound OB, note “This will also stamp Pass Slip {no}”. Canvas on the dispatch form only when the Guard has no saved e-sign. Unbound trips: no extra pad.
+- `public_html/pages/guard/partials/ob_section.php` — hide OBs that already have a non-cancelled bound vehicle request.
+
+Keep files under ~300 lines. `php -l` + checklist before the next phase.
+
+## Implementation checklist — ✅ DONE (2026-09-17)
+
+- [x] Migration `051_ob_vehicle_source.php` — `ob_requests.uses_official_vehicle` TINYINT(1) NOT NULL DEFAULT 1 (existing slips = official, routing unchanged). Applied to `old_loka_db`.
+- [x] Apply form — required **Official DICT vehicle / Private vehicle** radios; Fleet Vehicle Plate (required, fleet dropdown with the busy-day modal) and Motorpool Head render only when Official (JS hides + disables + un-`required`s them; a posted private submit forces `plate_number`/`motorpool_head_id` to NULL server-side). Private skips the `ob_submitted_motorpool` notify. The choice is never inferred from a blank plate (missing radio → validation error).
+- [x] Private routing — `process.php` `approve_supervisor`: private → `approved` + `ob_fully_approved` (no Motorpool stage, no Motorpool canvas); official → `pending_motorpool` as before. `approve_motorpool` hard-rejects private slips. View + print show **"N/A — private vehicle"** / "Private vehicle" and no Motorpool e-sign block on private.
+- [x] Guard bind — helpers in `includes/ob_guard_bind.php`: `obUsesOfficialVehicle()`, `obBoundRequestForOb()`, `obBoundObForRequest()`, `obStampGuardDeparture()` (+ `obApplyGuardDepartureStamp()` two-phase so dispatch can be blocked on signature failure), `obStampGuardArrival()`, and `obCopyTripTimesFromRequest()`. `pages/guard/actions.php`: `record_dispatch` resolves the bound slip's signature **before** recording (fail → dispatch blocked), then stamps OB departure with the **vehicle dispatch datetime** after the update; `record_arrival` writes the OB arrival time (time only) after the update. Success flashes mention "Pass Slip {no} stamped." Already-stamped slips are skipped, never overwritten.
+- [x] Guard dashboard — dispatch modal (in `partials/dispatch_modals.php`) shows "This will also stamp Pass Slip {no}" when the trip has a bound OB; a Pass-Slip canvas (+ save-for-next-time) renders only when the trip is bound **and** the guard has no saved e-sign; unbound trips get no extra pad. `ob_section.php` hides OBs with a non-cancelled bound vehicle request from both card queries (private/unbound slips still appear).
+- [x] Late attach — `obCopyTripTimesFromRequest()` copies an already-recorded trip dispatch/arrival datetime onto the slip from `vehicle_bind`, vehicle-request create, and edit (when the bound slip changes). The Guard signature is copied only when that guard has a saved e-sign (time-only otherwise, never invented) and every copied side is logged (`late_bind_copied_trip_times`).
+
+## QA — verified 2026-09-17 (localhost on `ob_integration`; no mail leaves)
+
+- [x] Private: supervisor → `approved` (no Motorpool Head, no `ob_submitted_motorpool`, no Motorpool canvas); official: unchanged Supervisor → Motorpool with fleet plate + Motorpool Head required (server-side + radio toggle browser-verified both ways).
+- [x] Bound trip: Guard dispatch stamps OB departure + saved e-sign using the vehicle dispatch datetime; unresolvable signature (no specimen, no canvas) **blocks** the dispatch; canvas on the dispatch form resolves and "save for next time" persists.
+- [x] Second dispatch stamp skipped — original time intact (no overwrite). Arrival writes OB arrival time only.
+- [x] Unbound / private slips still on the Guard OB card; bound slips hidden from both card queries; cancelled request releases the slip back to the card.
+- [x] Late bind copies existing trip times; signature only from a saved e-sign — never invented (asserted with the specimen removed).
+- [x] Existing-style slips (no flag) treated as official via DEFAULT 1. Print/view labels: private → "Private vehicle" plate line and "N/A — private vehicle" Motorpool line.
+- [x] `php -l` clean on all touched files + full public_html sweep 0 errors; create + guard pages render without PHP warnings (CLI authed harness).
+- [ ] **NOT deployed to live** — deploy only after Plan #22 + #23 + this are signed off.
+
+## Out of scope
+
+GPS. Merging Guard vehicle observations into the Pass Slip PDF. Changing TO vs OB travel-document checkboxes. Forcing Motorpool onto an OB that was filed as private then later attached to a VRF. Live VPS until sign-off.
+
+## Files
+
+- `public_html/migrations/051_ob_vehicle_source.php`
+- `public_html/includes/ob_requests.php`, `ob_esign.php`, `ob_guard_bind.php`, `ob_participants.php`
+- `public_html/pages/ob-requests/create.php`, `process.php`, `view.php`, `print.php`
+- `public_html/pages/requests/create.php`, `edit.php` (late-bind copy on attach)
+- `public_html/pages/guard/actions.php`, `index.php`, `partials/ob_section.php`, `partials/dispatch_modals.php`, `partials/trip_list.php`
+
 
 

@@ -507,6 +507,12 @@ function initNotificationPolling() {
 function initPreventDoubleSubmit() {
     document.querySelectorAll('form').forEach(form => {
         form.addEventListener('submit', function(e) {
+            // Page scripts may cancel submit (empty canvas, etc.). Do not
+            // freeze the UI on a request that never leaves the browser.
+            if (e.defaultPrevented) {
+                return;
+            }
+
             // Check if form has HTML5 validation errors
             if (!form.checkValidity()) {
                 return;
