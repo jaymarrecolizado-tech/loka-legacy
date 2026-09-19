@@ -1,8 +1,13 @@
 <?php
 /**
- * LOKA - OB Pass Slip print (Plan #22)
- * Official DICT letterhead (same logos as the gas voucher) + paper Pass Slip layout.
- * Two copies per A4 page. Route: ?page=ob-requests&action=print&id=
+ * LOKA - OB Pass Slip print (Plan #22 + #25 A4)
+ * Official DICT letterhead + paper Pass Slip layout with Certificate of
+ * Appearance. TWO copies + dashed cut line on EXACTLY ONE A4 portrait sheet:
+ * the sheet is a fixed 284mm flex column (1mm slack under the 285mm print
+ * area of a 6mm-margin A4) and each copy is a flex item with overflow hidden,
+ * so long purposes / office names wrap inside the copy instead of spilling
+ * onto a second page.
+ * Route: ?page=ob-requests&action=print&id=
  */
 
 if (!function_exists('obFind')) {
@@ -81,55 +86,119 @@ $logoBp = APP_URL . '/assets/img/bp_logo.png';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pass Slip <?= e($ob->pass_slip_no) ?> — DICT RO2</title>
     <style>
+        /* ============================================================
+           One A4 portrait sheet: 210x297mm, 6mm @page margins
+           -> content box 198 x 285mm. The sheet is fixed at 284mm
+           (1mm slack so rounding never spawns a second page) and both
+           copies are flex items that can only wrap, never spill.
+           ============================================================ */
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; background: #fff; }
-        .sheet { width: 100%; max-width: 210mm; margin: 0 auto; }
-        .copy { padding: 5mm 8mm 3mm; }
-        .letterhead { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-        .header-logo { width: 48px; height: auto; flex-shrink: 0; object-fit: contain; mix-blend-mode: multiply; }
+        html, body { background: #fff; }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10pt;
+            color: #000;
+        }
+        .sheet {
+            width: 198mm;
+            height: 284mm;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .copy {
+            flex: 1 1 0;
+            min-height: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 2.5mm 3mm 1.5mm;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .cut {
+            flex: 0 0 auto;
+            text-align: center;
+            margin: 1.2mm 3mm;
+            padding: 0.6mm 0;
+            border-top: 1px dashed #888;
+            border-bottom: 1px dashed #888;
+            font-size: 7pt;
+            color: #666;
+            letter-spacing: 1px;
+        }
+
+        /* Letterhead */
+        .letterhead { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+        .header-logo { width: 38px; height: auto; flex-shrink: 0; object-fit: contain; mix-blend-mode: multiply; }
         .header-text { flex: 1; min-width: 0; text-align: center; font-family: 'Times New Roman', Times, serif; }
-        .header-text .republic { font-size: 10pt; }
-        .header-text .dept { font-size: 10.5pt; font-weight: bold; text-transform: uppercase; margin: 1px 0; line-height: 1.2; }
-        .header-text .office { font-size: 8.5pt; }
-        .header-right { flex-shrink: 0; text-align: center; min-width: 96px; }
+        .header-text .republic { font-size: 8pt; }
+        .header-text .dept { font-size: 8.5pt; font-weight: bold; text-transform: uppercase; margin: 1px 0; line-height: 1.15; }
+        .header-text .office { font-size: 6.8pt; }
+        .header-right { flex-shrink: 0; text-align: center; min-width: 92px; }
         .header-right .slip-no { margin-top: 2px; font-size: 8pt; }
-        .header-right .num { font-size: 11pt; font-weight: bold; letter-spacing: .3px; }
-        .title { font-size: 16pt; font-weight: bold; text-align: center; letter-spacing: 5px; margin: 4px 0 1px; }
-        .subtitle { text-align: center; font-size: 9pt; margin-bottom: 6px; }
-        .purpose { margin: 2px 0 8px; font-size: 10pt; overflow-wrap: anywhere; }
+        .header-right .num { font-size: 10.5pt; font-weight: bold; letter-spacing: .3px; }
+
+        /* Slip body */
+        .title { font-size: 13.5pt; font-weight: bold; text-align: center; letter-spacing: 5px; margin: 2px 0 1px; }
+        .subtitle { text-align: center; font-size: 8pt; margin-bottom: 3px; }
+        .purpose {
+            margin: 2px 0 3px;
+            font-size: 8.5pt;
+            line-height: 1.28;
+            overflow-wrap: anywhere;
+            max-height: 11mm;   /* ~4 wrapped lines — worst-case 200 chars */
+            overflow: hidden;
+        }
         .purpose strong { margin-right: 8px; }
-        .sig-row { display: flex; justify-content: space-between; gap: 20px; margin: 4px 0 6px; }
+
+        .sig-row { display: flex; justify-content: space-between; gap: 20px; margin: 1px 0 2px; }
         .sig-col { width: 48%; min-width: 0; }
         .sig-col.right { text-align: right; }
-        .sig-pad { height: 34px; display: flex; align-items: flex-end; }
+        .sig-pad { height: 26px; display: flex; align-items: flex-end; }
         .sig-col.right .sig-pad { justify-content: flex-end; }
-        .sig-pad img { max-height: 34px; max-width: 140px; object-fit: contain; }
-        .sig-name { font-weight: bold; font-size: 9.5pt; border-top: 1px solid #000; padding-top: 2px; min-height: 16px; overflow-wrap: anywhere; }
-        .sig-hint { font-size: 7.5pt; color: #333; }
-        .guard-row { display: flex; justify-content: space-between; gap: 16px; font-size: 10pt; margin: 2px 0; }
+        .sig-pad img { max-height: 26px; max-width: 120px; object-fit: contain; }
+        .sig-name { font-weight: bold; font-size: 8.5pt; border-top: 1px solid #000; padding-top: 1px; min-height: 13px; overflow-wrap: anywhere; }
+        .sig-hint { font-size: 6.6pt; color: #333; line-height: 1.2; }
+        .guard-row { display: flex; justify-content: space-between; gap: 16px; font-size: 9pt; margin: 1px 0; }
         .guard-row .lbl { font-weight: bold; margin-right: 6px; }
-        .coa-note { text-align: center; font-style: italic; font-size: 8pt; margin: 6px 0 2px; }
-        .coa-title { text-align: center; font-weight: bold; font-size: 12pt; letter-spacing: 1px; margin-bottom: 4px; }
-        .coa-body { font-size: 10pt; line-height: 1.4; overflow-wrap: anywhere; }
-        .coa-times { text-align: center; margin: 5px 0 6px; }
-        .cut { text-align: center; margin: 2mm 0; padding: 2px 0; border-top: 1px dashed #888; border-bottom: 1px dashed #888; font-size: 8pt; color: #666; letter-spacing: 1px; }
+
+        /* Certificate of Appearance — anchored to the bottom of the copy */
+        .coa {
+            margin-top: auto;
+            padding-top: 1mm;
+        }
+        .coa-note { text-align: center; font-style: italic; font-size: 7pt; margin: 1px 0 0; }
+        .coa-title { text-align: center; font-weight: bold; font-size: 10.5pt; letter-spacing: 1px; margin-bottom: 2px; }
+        .coa-body { font-size: 8.8pt; line-height: 1.28; overflow-wrap: anywhere; }
+        .coa-body .coa-office { max-height: 8mm; overflow: hidden; } /* ~2 wrapped lines */
+        .coa-times { text-align: center; margin: 2px 0 2px; }
+
+        /* Screen preview chrome */
+        @media screen {
+            body { background: #e9edf2; padding: 10mm 0; }
+            .sheet { background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,.25); }
+            .no-print {
+                position: sticky; top: 0; z-index: 5;
+                text-align: center; padding: 12px;
+                background: #f8f9fa; border-bottom: 1px solid #ddd;
+                margin-bottom: 10px; font-family: sans-serif;
+            }
+        }
+
+        /* Print */
         @media print {
             @page { size: A4 portrait; margin: 6mm; }
-            body { background: #fff; }
+            html, body { width: 198mm; height: 284mm; overflow: hidden; }
+            body { padding: 0; }
             .no-print { display: none !important; }
-            .sheet { width: 100%; max-width: none; }
-            .copy { padding: 1.5mm 2mm 1mm; page-break-inside: avoid; }
-            .header-logo { width: 40px !important; }
-            .header-text .republic { font-size: 8pt !important; }
-            .header-text .dept { font-size: 9pt !important; }
-            .header-text .office { font-size: 7.5pt !important; }
-            .title { font-size: 13pt !important; margin: 2px 0 !important; letter-spacing: 4px !important; }
-            .cut { margin: 1.5mm 0 !important; }
+            .sheet { box-shadow: none; }
         }
     </style>
 </head>
 <body>
-<div class="no-print" style="text-align:center;padding:12px;background:#f8f9fa;border-bottom:1px solid #ddd;margin-bottom:12px;font-family:sans-serif;">
+<div class="no-print">
     <button onclick="window.print()" style="background:#0d6efd;color:#fff;border:none;padding:8px 24px;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;">Print Pass Slip (A4)</button>
     <a href="<?= APP_URL ?>/?page=ob-requests&amp;action=view&amp;id=<?= (int) $ob->id ?>" style="margin-left:15px;color:#666;text-decoration:none;">← Back</a>
 </div>
@@ -137,7 +206,7 @@ $logoBp = APP_URL . '/assets/img/bp_logo.png';
 <div class="sheet">
 <?php for ($copy = 1; $copy <= 2; $copy++): ?>
 <?php if ($copy === 2): ?>
-    <div class="cut">CUT HERE — client copy</div>
+    <div class="cut">✂ — — — — — — — — — — — — CUT HERE — client copy — — — — — — — — — — — —</div>
 <?php endif; ?>
 <div class="copy">
     <div class="letterhead">
@@ -167,7 +236,7 @@ $logoBp = APP_URL . '/assets/img/bp_logo.png';
         <div class="sig-col right">
             <div class="sig-pad"><?php if ($sigs['supervisor']): ?><img src="<?= e($sigs['supervisor']) ?>" alt="Supervisor signature"><?php endif; ?></div>
             <div class="sig-name"><?= e($ob->supervisor_name ?: '') ?></div>
-            <div class="sig-hint">Immediate Supervisor<br>(Signature over printed name)</div>
+            <div class="sig-hint">Immediate Supervisor (signature over printed name)</div>
         </div>
     </div>
 
@@ -188,26 +257,28 @@ $logoBp = APP_URL . '/assets/img/bp_logo.png';
         <div class="sig-col">
             <div class="sig-pad"><?php if ($sigs['guard']): ?><img src="<?= e($sigs['guard']) ?>" alt="Guard signature"><?php endif; ?></div>
             <div class="sig-name"><?= e($ob->departure_guard_name ?: '') ?></div>
-            <div class="sig-hint">Guard on Duty<br>(Signature / initial)</div>
+            <div class="sig-hint">Guard on Duty (signature / initial)</div>
         </div>
         <div class="sig-col right">
             <div class="guard-row" style="justify-content:flex-end;"><span class="lbl">Time of Departure:</span><?= e($depTime) ?></div>
-            <div class="guard-row" style="justify-content:flex-end; margin-top:8px;"><span class="lbl">Time of Arrival:</span><?= e($arrTime) ?></div>
+            <div class="guard-row" style="justify-content:flex-end; margin-top:4px;"><span class="lbl">Time of Arrival:</span><?= e($arrTime) ?></div>
         </div>
     </div>
 
-    <div class="coa-note">(Official Business: Please Accomplish the following)</div>
-    <div class="coa-title">CERTIFICATE OF APPEARANCE</div>
-    <div class="coa-body">
-        <p><strong>OFFICE/ESTABLISHMENT:</strong> <?= e((string) ($ob->coa_office ?? '')) ?></p>
-        <p style="margin-top:5px;"><?= e($coaLine) ?></p>
-        <p class="coa-times">From <?= e($coaFrom) ?> to <?= e($coaTo) ?>.</p>
-    </div>
-    <div class="sig-row" style="justify-content:flex-end;">
-        <div class="sig-col right">
-            <div class="sig-pad"><?php if ($sigs['coa']): ?><img src="<?= e($sigs['coa']) ?>" alt="Certificate of Appearance signature"><?php endif; ?></div>
-            <div class="sig-name"><?= e($ob->coa_representative ?: '') ?></div>
-            <div class="sig-hint">(Representative name and signature)</div>
+    <div class="coa">
+        <div class="coa-note">(Official Business: Please Accomplish the following)</div>
+        <div class="coa-title">CERTIFICATE OF APPEARANCE</div>
+        <div class="coa-body">
+            <p class="coa-office"><strong>OFFICE/ESTABLISHMENT:</strong> <?= e((string) ($ob->coa_office ?? '')) ?></p>
+            <p style="margin-top:4px;"><?= e($coaLine) ?></p>
+            <p class="coa-times">From <?= e($coaFrom) ?> to <?= e($coaTo) ?>.</p>
+        </div>
+        <div class="sig-row" style="justify-content:flex-end;">
+            <div class="sig-col right">
+                <div class="sig-pad"><?php if ($sigs['coa']): ?><img src="<?= e($sigs['coa']) ?>" alt="Certificate of Appearance signature"><?php endif; ?></div>
+                <div class="sig-name"><?= e($ob->coa_representative ?: '') ?></div>
+                <div class="sig-hint">(Representative name and signature)</div>
+            </div>
         </div>
     </div>
 </div>

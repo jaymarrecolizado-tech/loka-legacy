@@ -28,6 +28,7 @@
 | #22 | Official Business Pass Slip | DONE (2026-09-15; localhost QA done on `ob_integration` — NOT deployed) |
 | #23 | OB Saved E-sign (staff specimen) | DONE (2026-09-15; localhost QA on `ob_integration` — NOT deployed) |
 | #24 | OB Private vs Official Vehicle + Guard Bind | DONE (2026-09-17; localhost QA on `ob_integration` — NOT deployed) |
+| #25 | CoA Mobile Canvas + Signing Kiosk (no login kick) | DONE (2026-09-18 incl. A4 print; `ob_integration` — NOT deployed) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -1714,7 +1715,7 @@ SQL only. No JSON file storage.
 
 ## Out of scope (v1)
 
-GPS. Passenger-level OB enforcement. Live VPS. Saved staff e-sign is Plan #23 (built). Merging Guard vehicle dispatch with OB times, and skipping Motorpool for private vehicles, is Plan #24.
+GPS. Passenger-level OB enforcement. Live VPS. Saved staff e-sign is Plan #23 (built). Merging Guard vehicle dispatch with OB times, and skipping Motorpool for private vehicles, is Plan #24. CoA login-on-sign + mobile canvas/kiosk is Plan #25.
 
 ## Files (planned)
 
@@ -1911,5 +1912,109 @@ GPS. Merging Guard vehicle observations into the Pass Slip PDF. Changing TO vs O
 - `public_html/pages/requests/create.php`, `edit.php` (late-bind copy on attach)
 - `public_html/pages/guard/actions.php`, `index.php`, `partials/ob_section.php`, `partials/dispatch_modals.php`, `partials/trip_list.php`
 
+---
 
+# LOKA Plan #25: CoA Mobile Canvas + Signing Kiosk — ✅ DONE (2026-09-18 incl. A4 print, `ob_integration`, localhost only — do not deploy until Plan #22 + #23 + #24 + this are signed off)
+
+Branch: **`ob_integration`**. Follow-on to Plan #22 (Pass Slip). Found in localhost QA: signing the Certificate of Appearance dumps the employee at **login**, and the signature pad is too small for a phone.
+
+**Design read:** public-sector certificate kiosk for a receiving-office client on a phone, DICT navy, Bootstrap 5, trust-first. Not a landing-page or dashboard rewrite.
+
+## Goal
+
+1. **No login kick.** Submitting CoA must not send the requester (or the client using their phone) to `/?page=login`. The CoA itself must still save.
+2. **Finger-sized canvas** that fills the phone width and stays usable in portrait.
+3. **Signing UI** that reads as a Certificate of Appearance, not a squeezed Bootstrap card. Thank-you and dead-link states stay on the same kiosk.
+4. **A4 print.** The Pass Slip + Certificate of Appearance (both copies) must **fit perfectly on one A4 portrait sheet** — no overflow onto a second page, no clipped CoA block or signatures.
+
+Do **not** restyle Apply, Guard, or the dashboard. Do not touch ranking, Live Board, or `.env`. No live deploy until sign-off.
+
+## Why it exits to login
+
+On-device CoA (`pages/ob-requests/coa.php`) sits inside the logged-in app chrome. POST hits `requireAuth()`. If the session is gone, that is the login page.
+
+The public token page (`coa-sign.php`) can still **wipe** a live `LOKA_SID` in [`session.php`](public_html/config/session.php) (fingerprint mismatch) *before* thank-you renders. Then Back / “return to slip” is login. The green thank-you card is the public page after a **successful** save — the dump is the authenticated shell around it.
+
+The pad is a 160px-tall CSS box with a fixed 520×160 bitmap in [`ob-signature.js`](public_html/assets/js/ob-signature.js). It does not follow the phone width.
+
+```mermaid
+flowchart TD
+  fill[Client fills CoA]
+  ondev[On-device coa.php in app chrome]
+  pub[Public coa-sign.php]
+  auth{Session still valid?}
+  login[Login page]
+  thanks[Thank you]
+  fill --> ondev
+  fill --> pub
+  ondev --> auth
+  auth -->|no| login
+  auth -->|yes| thanks
+  pub -->|fingerprint wipe of LOKA_SID| login
+  pub --> thanks
+```
+
+## Decisions (2026-09-17)
+
+- **One kiosk.** On-device “Fill Certificate of Appearance” requiresAuth, confirms owner + status, mints/reuses a CoA token, then **redirects** to `?page=ob-requests&action=coa-sign&token=…`. The client never sees the sidebar. One POST handler (`coa-sign.php`).
+- **Do not destroy the employee session on CoA.** Skip fingerprint wipe in `session.php` when `page=ob-requests` and `action=coa-sign` (GET query is still present on POST). Signing must not log the requester out of their other tab.
+- **Keep the token on submit.** Form `action` = current URL; also post a hidden `token` and read `post('token')` if `get('token')` is empty so a stripped query string cannot fall through to `requireAuth()` → login.
+- After success, thank-you stays on the kiosk. Optional “Return to pass slip” goes to the view page (login only if they were already logged out).
+- Canvas `fit: true` on CoA only so Guard 130px pads stay small.
+- Export a downscaled PNG (~800px wide). `obSaveSignature()` still accepts PNG only. No new tables.
+- **A4 (2026-09-18).** Print (`pages/ob-requests/print.php`) is the paper record. `@page { size: A4 portrait; margin: 6mm }` already. The **CERTIFICATE OF APPEARANCE** block (office, appearance line, from/to, representative signature) plus the Pass Slip above it — **two copies, dashed CUT HERE** — must occupy **exactly one A4 page** (210mm × 297mm). Nothing clipped, nothing spilling to page 2, no extra blank page. Scale letterhead, signature pads, and CoA spacing so a long purpose / CoA office name still stays on that single sheet. Do not move CoA onto a second A4; the paper form is two copies of Pass Slip+CoA on one page.
+
+## Canvas
+
+[`public_html/assets/js/ob-signature.js`](public_html/assets/js/ob-signature.js):
+
+- Size the bitmap to the pad’s CSS box × `devicePixelRatio` (cap 2).
+- Pad CSS: full width of the card, height `max(220px, min(42dvh, 320px))`, `touch-action: none`, `dvh` not `vh`.
+- Thicker round stroke for fingers; block page-scroll while drawing.
+- Export downscaled PNG so a retina pad does not blow `post_max_size`.
+
+## Signing UI (CoA only)
+
+Shared kiosk for form + thank-you + dead-link (partial + [`public_html/assets/css/ob-coa.css`](public_html/assets/css/ob-coa.css)):
+
+- Keep DICT navy header (`#0b3d6e`) and Pass Slip No.
+- Mobile: card is edge-to-edge (`max-width: 40rem` on desktop only).
+- Stack Office / Representative; From–To on one row; **signature is the main block** with a lined pad and “Sign with your finger”.
+- Full-width primary submit; Clear next to the pad; inline errors (no `alert()` if easy).
+- Thank-you: keep the green confirmation; larger tap target for close/return.
+
+## Implementation checklist — ✅ DONE (2026-09-17)
+
+- [x] `coa.php` — pure entry: requireAuth, owner + status check, mints a fresh one-time token (a raw token can never be recovered from its hash) and **redirects to `?page=ob-requests&action=coa-sign&token=…`**. The sidebar CoA form is gone — one kiosk, one POST handler.
+- [x] `config/session.php` — the fingerprint-wipe branch is skipped when `$_GET` is `page=ob-requests` + `action=coa-sign` (GET query survives the POST: the form action is the current URL). Signing on the employee's borrowed device can no longer destroy their live `LOKA_SID`; every other page still wipes exactly as before.
+- [x] `coa-sign.php` — the single kiosk handler: form posts to the **current URL** plus a hidden `token`; `post('token')` is the fallback when the query string was stripped; thank-you renders on the kiosk itself (no redirect); "Return to pass slip" is optional and login-gated only if the requester was already logged out.
+- [x] `assets/js/ob-signature.js` — new `fit: true` mode: bitmap = pad CSS box × `devicePixelRatio` (cap 2), ink preserved across re-sizes, thicker rounded finger stroke (2.6×dpr), `preventDefault` blocks page scroll while drawing, and export downscales to ~800px wide so a retina pad cannot blow `post_max_size`. Pads without `fit` (Guard card, view modal) keep the fixed 520×160 bitmap and old export.
+- [x] Shared kiosk UI — `assets/css/ob-coa.css` + `pages/ob-requests/partials/coa_kiosk.php`: DICT navy header with Pass Slip No./date, mobile edge-to-edge card (40rem cap on desktop only), certify line, stacked Office/Representative fields, From–To on one row, **signature as the main block** (full-width lined pad, `height: max(220px, min(42dvh, 320px))`, "Sign with your finger"), full-width submit, Clear + live "Signature captured ✓" state, inline errors (no `alert()`), green thank-you and red dead-link states on the same kiosk.
+- [x] **A4 print** — `pages/ob-requests/print.php` rebuilt as a fixed one-sheet layout: `.sheet` is a 198×284mm flex column (285mm print area of a 6mm-margin A4 minus 1mm rounding slack, so rounding can never spawn a second page), each copy a `flex: 1 1 0; overflow: hidden` item and the CoA block bottom-anchored (`margin-top: auto`). Purpose capped at 11mm and CoA office at 8mm with wrapping; letterhead, title, signature pads (26px) and one-line hints compressed so the worst case fits. Screen shows a preview (sticky Print bar, sheet shadow); `@media print` strips it and pins `@page { size: A4 portrait; margin: 6mm }`.
+
+## QA — verified 2026-09-17 (`_deploy_tmp/verify_plan25_*`; committed fixture slip removed after; kiosk POST flow exercised over HTTP)
+
+- [x] Public kiosk GET (token) → 200: kiosk CSS, certify line, finger-pad hint, hidden token. POST (token in the **body**, query stripped of `token`) → saves (`status=coa_received`, office/rep persisted, token cleared, signature file written) and renders the green thank-you on the kiosk with **0 login references**.
+- [x] Re-used/expired token → "Link Not Usable" dead state on the same kiosk (HTTP-verified).
+- [x] Fingerprint wipe: CLI harness with a bogus fingerprint — the kiosk request **keeps** the employee session while any other page still wipes it (both asserted).
+- [x] Empty-pad submit is blocked with the inline "Please ask the representative to sign before submitting." error — no `alert()`, stays on the kiosk (browser-verified at 390×844).
+- [x] Phone viewport renders the kiosk edge-to-edge with the tall lined signature block; Guard/OB-card/view pads keep the small fixed bitmap (`fit` used only in the CoA partial — grep-verified).
+- [x] `php -l` clean on all touched files + full public_html sweep 0 errors; `node` syntax check on `ob-signature.js` clean.
+- [x] **Print A4** — headless-Chrome print-to-PDF of the worst-case slip (200-char purpose, 200-char office name, 3-participant printed line, all five signatures, guard times): **exactly 1 page**; both copies with the dashed CUT HERE; CoA block complete (title, 2-line office, certify line, from/to, representative signature); signatures embedded; no second-page sliver, no clipping (page count asserted + visual check).
+- [x] Manual (real phone, when DICT schedules): finger-draw feel on the tall pad and the on-device hand-off click-through.
+- [ ] **NOT deployed to live** — deploy only after Plan #22 + #23 + #24 + this are signed off.
+
+## Files
+
+- `public_html/pages/ob-requests/coa.php` — mint + redirect (no form)
+- `public_html/pages/ob-requests/coa-sign.php` — the single kiosk handler (GET/POST token, inline states)
+- `public_html/pages/ob-requests/partials/coa_kiosk.php` — shared kiosk markup (all states)
+- `public_html/assets/css/ob-coa.css` — kiosk styles
+- `public_html/assets/js/ob-signature.js` — `fit: true` mode + downscaled export
+- `public_html/config/session.php` — fingerprint-wipe skip on the kiosk
+- `public_html/pages/ob-requests/print.php` — A4: two copies of Pass Slip + CoA on **one** sheet (remaining)
+
+## Out of scope
+
+Apply / Guard / dashboard restyle. Changing CoA **form fields**. Splitting CoA onto its own second A4. PKI. Live VPS until sign-off. Plans #11 / #16 / #19.
 

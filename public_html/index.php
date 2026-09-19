@@ -139,6 +139,18 @@ $auth->checkRememberMe();
 $page = get('page', 'dashboard');
 $action = get('action', 'index');
 
+// Plan #25 — CoA kiosk POST carries a hidden `token`. If the query string was
+// stripped, still send the request to the public coa-sign handler so it cannot
+// fall through to requireAuth() → login. Only the CoA form posts `name=token`.
+if (
+    ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+    && trim((string) post('token', '')) !== ''
+    && (isset($_POST['coa_office']) || isset($_POST['coa_representative']) || isset($_POST['coa_signature']))
+) {
+    $page = 'ob-requests';
+    $action = 'coa-sign';
+}
+
 // Public pages (no auth required)
 // evaluations + ob-requests: only the token-gated actions are public; the
 // case handlers re-gate everything else behind requireAuth().
