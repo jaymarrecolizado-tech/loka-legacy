@@ -7,7 +7,7 @@
  * - Arrival time (when vehicle returns)
  */
 
-requireRole(ROLE_GUARD);
+requireGuardDashboardAccess();
 
 $today = date('Y-m-d');
 $filter = get('filter', 'today'); // today, pending_dispatch, pending_arrival, completed
@@ -103,8 +103,6 @@ require_once INCLUDES_PATH . '/header.php';
             </span>
         </div>
     </div>
-
-    <?php require_once __DIR__ . '/partials/ob_section.php'; // OB Pass Slip time stamps (Plan #22) ?>
 
     <div class="row g-3 mb-4">
         <div class="col-md-3">

@@ -48,6 +48,13 @@
     margin: 0.35rem 0 0;
 }
 
+.coa-kiosk__header .coa-whonote {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.85);
+    margin: 0.3rem 0 0;
+    overflow-wrap: anywhere;
+}
+
 .coa-kiosk__body {
     padding: 1.25rem 1.1rem 1.5rem;
 }

@@ -117,6 +117,9 @@ $logoBp = APP_URL . '/assets/img/bp_logo.png';
             page-break-inside: avoid;
             break-inside: avoid;
         }
+        /* Fixed layout: children must wrap/clip at their own boxes, never be
+           flex-shrunk into mid-glyph overlaps (Plan #26). */
+        .copy > * { flex-shrink: 0; }
         .cut {
             flex: 0 0 auto;
             text-align: center;
@@ -148,17 +151,26 @@ $logoBp = APP_URL . '/assets/img/bp_logo.png';
             font-size: 8.5pt;
             line-height: 1.28;
             overflow-wrap: anywhere;
-            max-height: 11mm;   /* ~4 wrapped lines — worst-case 200 chars */
+            max-height: 7.7mm;  /* exactly 2 wrapped lines at 8.5pt/1.28 — mid-glyph clips look broken */
             overflow: hidden;
         }
         .purpose strong { margin-right: 8px; }
+        .personnel {
+            margin: 1px 0 4px;
+            font-size: 8.5pt;
+            line-height: 1.28;
+            overflow-wrap: anywhere;
+            max-height: 7.7mm;  /* exactly 2 lines — one sheet beats showing every name (Plan #26) */
+            overflow: hidden;
+        }
+        .personnel strong { margin-right: 8px; }
 
         .sig-row { display: flex; justify-content: space-between; gap: 20px; margin: 1px 0 2px; }
         .sig-col { width: 48%; min-width: 0; }
         .sig-col.right { text-align: right; }
-        .sig-pad { height: 26px; display: flex; align-items: flex-end; }
+        .sig-pad { height: 21px; display: flex; align-items: flex-end; }
         .sig-col.right .sig-pad { justify-content: flex-end; }
-        .sig-pad img { max-height: 26px; max-width: 120px; object-fit: contain; }
+        .sig-pad img { max-height: 21px; max-width: 120px; object-fit: contain; }
         .sig-name { font-weight: bold; font-size: 8.5pt; border-top: 1px solid #000; padding-top: 1px; min-height: 13px; overflow-wrap: anywhere; }
         .sig-hint { font-size: 6.6pt; color: #333; line-height: 1.2; }
         .guard-row { display: flex; justify-content: space-between; gap: 16px; font-size: 9pt; margin: 1px 0; }
@@ -226,6 +238,7 @@ $logoBp = APP_URL . '/assets/img/bp_logo.png';
     <div class="subtitle">Requesting permission to leave during office hours on Official Business</div>
 
     <div class="purpose"><strong>Purpose:</strong> <?= e((string) $ob->purpose) ?></div>
+    <div class="personnel"><strong>Personnel:</strong> <?= e(obJoinNames($participantNames)) ?></div>
 
     <div class="sig-row">
         <div class="sig-col">

@@ -98,7 +98,7 @@ require_once INCLUDES_PATH . '/header.php';
                         $partNames = $participants ? array_map(static fn($p) => (string) $p->name, $participants) : [(string) $ob->employee_name];
                         echo e(obJoinNames($partNames));
                         ?>
-                        <span class="text-muted">— prints as <?= e($printedLine) ?></span>
+                        <span class="text-muted">— signature line and CoA print as <?= e($printedLine) ?></span>
                     </p>
                     <p class="mb-1"><strong>Date of OB:</strong> <?= e(date('l, F j, Y', strtotime($ob->ob_date))) ?></p>
                     <p class="mb-1"><strong>Vehicle Plate No.:</strong> <?= obUsesOfficialVehicle($ob) ? e($ob->plate_number ?: '—') : 'Private vehicle' ?></p>

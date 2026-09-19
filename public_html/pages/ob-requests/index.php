@@ -1,8 +1,11 @@
 <?php
 /**
- * LOKA - OB Pass Slips list (Plan #22)
- * Employees see their own; supervisors also see slips awaiting them;
- * motorpool/admin see all. Route: ?page=ob-requests
+ * LOKA - OB Pass Slips list (Plans #22 + #27)
+ *
+ * Two workplaces (Plan #27):
+ *  - Guards: the unbound-OB STAMP QUEUE only (no Apply, no my-slips table).
+ *  - Admin / All Father: the gate stamp board on top of the full list + Apply.
+ *  - Employees / department approvers: their own slips (no gate board).
  */
 
 if (!function_exists('obFind')) {
@@ -11,32 +14,38 @@ if (!function_exists('obFind')) {
 requireAuth();
 
 $pageTitle = 'OB Pass Slips';
-$statusFilter = (string) get('status', '');
 
-$canSeeAll = isApprover(); // motorpool+ and admins
-$params = [];
-$where = 'o.deleted_at IS NULL';
+$isGuardQueue = isGuard() && !isAdmin();
+$showStampBoard = $isGuardQueue || isAdmin();
 
-if (!$canSeeAll) {
-    $where .= ' AND (o.user_id = ? OR o.supervisor_user_id = ?)';
-    $params[] = userId();
-    $params[] = userId();
+if (!$isGuardQueue) {
+    $statusFilter = (string) get('status', '');
+
+    $canSeeAll = isApprover(); // motorpool+ and admins
+    $params = [];
+    $where = 'o.deleted_at IS NULL';
+
+    if (!$canSeeAll) {
+        $where .= ' AND (o.user_id = ? OR o.supervisor_user_id = ?)';
+        $params[] = userId();
+        $params[] = userId();
+    }
+    if ($statusFilter !== '' && isset(OB_STATUSES[$statusFilter])) {
+        $where .= ' AND o.status = ?';
+        $params[] = $statusFilter;
+    }
+
+    $slips = db()->fetchAll(
+        "SELECT o.*, u.name AS employee_name
+         FROM ob_requests o
+         JOIN users u ON o.user_id = u.id
+         WHERE {$where}
+         ORDER BY o.created_at DESC
+         LIMIT 200",
+        $params
+    );
+    $printedByOb = obPrintedLinesForIds(array_map(static fn($s) => (int) $s->id, $slips));
 }
-if ($statusFilter !== '' && isset(OB_STATUSES[$statusFilter])) {
-    $where .= ' AND o.status = ?';
-    $params[] = $statusFilter;
-}
-
-$slips = db()->fetchAll(
-    "SELECT o.*, u.name AS employee_name
-     FROM ob_requests o
-     JOIN users u ON o.user_id = u.id
-     WHERE {$where}
-     ORDER BY o.created_at DESC
-     LIMIT 200",
-    $params
-);
-$printedByOb = obPrintedLinesForIds(array_map(static fn($s) => (int) $s->id, $slips));
 
 require_once INCLUDES_PATH . '/header.php';
 ?>
@@ -49,13 +58,24 @@ require_once INCLUDES_PATH . '/header.php';
                 <li class="breadcrumb-item"><a href="<?= APP_URL ?>">Dashboard</a></li>
                 <li class="breadcrumb-item active">OB Pass Slips</li>
             </ol></nav>
+            <?php if ($isGuardQueue): ?>
+            <small class="text-muted">Gate stamp queue — Official Business slips waiting for departure / arrival stamps. Bound fleet trips stamp from the Guard Dashboard instead.</small>
+            <?php else: ?>
             <small class="text-muted">Official Business Pass Slips — supervisor → motorpool → guard times → Certificate of Appearance.</small>
+            <?php endif; ?>
         </div>
+        <?php if (!$isGuardQueue): ?>
         <a href="<?= APP_URL ?>/?page=ob-requests&action=create" class="btn btn-primary">
             <i class="bi bi-plus-lg me-1"></i>Apply for OB
         </a>
+        <?php endif; ?>
     </div>
 
+    <?php if ($showStampBoard): ?>
+    <?php require PAGES_PATH . '/guard/partials/ob_section.php'; // gate stamp queue (Plans #22 + #27) ?>
+    <?php endif; ?>
+
+    <?php if (!$isGuardQueue): ?>
     <form method="GET" class="card mb-4">
         <input type="hidden" name="page" value="ob-requests">
         <div class="card-body py-2">
@@ -117,6 +137,7 @@ require_once INCLUDES_PATH . '/header.php';
             <?php endif; ?>
         </div>
     </div>
+    <?php endif; ?>
 </div>
 
 <?php require_once INCLUDES_PATH . '/footer.php'; ?>

@@ -63,6 +63,13 @@ switch ($action) {
         }
         obNotify((int) $ob->user_id, 'ob_fully_approved', 'OB Pass Slip Approved',
             'Pass Slip ' . $ob->pass_slip_no . ' is fully approved. Print it and have the guard on duty record your departure.', $link);
+
+        // Guard bell (Plan #27): unbound private slip is now stamp-ready at the gate
+        if (obBoundRequestForOb((int) $ob->id) === null) {
+            notifyRoleUsers([ROLE_GUARD], 'guard_ob_ready', 'OB Pass Slip Ready for the Gate',
+                'Pass Slip ' . $ob->pass_slip_no . ' (private vehicle) is approved and waiting for its departure stamp.',
+                '/?page=ob-requests');
+        }
         $finish('success', 'Slip approved — printable (private vehicle, no Motorpool step).');
     }
 
@@ -88,6 +95,13 @@ switch ($action) {
         obLog($ob->id, 'motorpool', 'approved', userId(), $comments ?: null);
         obNotify((int) $ob->user_id, 'ob_fully_approved', 'OB Pass Slip Approved',
             'Pass Slip ' . $ob->pass_slip_no . ' is fully approved. Print it and have the guard on duty record your departure.', $link);
+
+        // Guard bell (Plan #27): unbound official slip is now stamp-ready at the gate
+        if (obBoundRequestForOb((int) $ob->id) === null) {
+            notifyRoleUsers([ROLE_GUARD], 'guard_ob_ready', 'OB Pass Slip Ready for the Gate',
+                'Pass Slip ' . $ob->pass_slip_no . ' is approved and waiting for its departure stamp.',
+                '/?page=ob-requests');
+        }
         $finish('success', 'Slip fully approved — printable.');
     }
 
@@ -145,7 +159,7 @@ switch ($action) {
     // ------------------------------------------------------------------
     case 'guard_departure':
     {
-        if (!isGuard()) {
+        if (!canAccessGuardDashboard()) {
             redirectWith($link, 'danger', 'Only guards can stamp departures.');
         }
         $stamp = obStampGuardDeparture($ob, $now, (int) userId(), $signature, post('save_esign') === '1', true);
@@ -158,7 +172,7 @@ switch ($action) {
     // ------------------------------------------------------------------
     case 'guard_arrival':
     {
-        if (!isGuard()) {
+        if (!canAccessGuardDashboard()) {
             redirectWith($link, 'danger', 'Only guards can record arrivals.');
         }
         $stamp = obStampGuardArrival($ob, $now, (int) userId());

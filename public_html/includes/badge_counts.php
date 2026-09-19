@@ -29,6 +29,16 @@ function badgeCountGuardOps(): int
     return badgeUnseenCount('guard', badgePendingIdsGuard());
 }
 
+/**
+ * Unbound OB Pass Slips waiting at the gate: departure stamp or arrival time.
+ * Bound official-vehicle slips are excluded — they stamp from the vehicle row
+ * (Plan #24) and are covered by the Guard Dashboard badge.
+ */
+function badgeCountObGuardStamps(): int
+{
+    return badgeUnseenCount('ob_guard_stamps', badgePendingIdsObGuard());
+}
+
 function badgeCountRequestsNeedingRevision(): int
 {
     return badgeUnseenCount('requests_revision', badgePendingIdsRequestsRevision());
@@ -136,7 +146,7 @@ function badgePendingIdsMaintenance(): array
 function badgePendingIdsGuard(): array
 {
     try {
-        if (!isGuard()) {
+        if (!canAccessGuardDashboard()) {
             return [];
         }
         return badgeFetchIds(
@@ -149,6 +159,43 @@ function badgePendingIdsGuard(): array
         );
     } catch (Throwable $e) {
         error_log('badgePendingIdsGuard: ' . $e->getMessage());
+    }
+    return [];
+}
+
+/**
+ * Unbound OB slips waiting for a guard stamp (Plan #27): departure stamp on
+ * approved slips, or the arrival time on slips already out. Mirrors the two
+ * queries in pages/guard/partials/ob_section.php. Bound official-vehicle
+ * slips are excluded (they stamp from the vehicle row).
+ *
+ * @return list<int>
+ */
+function badgePendingIdsObGuard(): array
+{
+    try {
+        if (!canAccessGuardDashboard()) {
+            return [];
+        }
+        return badgeFetchIds(
+            "SELECT o.id FROM ob_requests o
+             WHERE o.deleted_at IS NULL
+               AND (
+                 (o.ob_departure_datetime IS NULL
+                   AND o.status IN ('approved','coa_received','completed'))
+                 OR (o.ob_departure_datetime IS NOT NULL
+                   AND o.ob_arrival_datetime IS NULL
+                   AND o.status IN ('departed','coa_received','completed'))
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM requests r
+                 WHERE r.ob_request_id = o.id
+                   AND r.deleted_at IS NULL
+                   AND r.status <> 'cancelled'
+               )"
+        );
+    } catch (Throwable $e) {
+        error_log('badgePendingIdsObGuard: ' . $e->getMessage());
     }
     return [];
 }
@@ -292,6 +339,7 @@ function badgeMarkSeen(string $key, array $ids): void
 
 /**
  * Mark badges as seen for the current page visit.
+ * Called from public_html/index.php after auth (Plan #27).
  */
 function badgeMarkSeenForCurrentPage(string $page, string $action = 'index'): void
 {
@@ -306,6 +354,7 @@ function badgeMarkSeenForCurrentPage(string $page, string $action = 'index'): vo
         'trip-tickets' => ['trip_tickets', badgePendingIdsTripTickets()],
         'maintenance' => $action === 'schedule' ? null : ['maintenance', badgePendingIdsMaintenance()],
         'guard' => ['guard', badgePendingIdsGuard()],
+        'ob-requests' => ['ob_guard_stamps', badgePendingIdsObGuard()],
         'requests' => ['requests_revision', badgePendingIdsRequestsRevision()],
         'vehicles' => ['vehicles', badgePendingIdsVehiclesAttention()],
         'security' => ['security_lockouts', badgePendingIdsSecurityLockouts()],

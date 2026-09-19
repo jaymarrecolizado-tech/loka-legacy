@@ -53,7 +53,7 @@ function getNavSearchItems(): array
         $add('My Trips', '/?page=my-trips', 'bi-truck', 'Main', 'my trips driver trips');
     }
     $add('Completed Trips', '/?page=completed-trips', 'bi-check-all', 'Main', 'completed trips history');
-    $add('OB Pass Slips', '/?page=ob-requests', 'bi-file-earmark-ruled', 'Main', 'official business pass slip OB certificate of appearance CoA');
+    $add('OB Pass Slips', '/?page=ob-requests', 'bi-file-earmark-ruled', 'Main', 'official business pass slip OB certificate of appearance CoA gate stamp queue departure arrival');
     if (function_exists('canAccessGasVouchers') && canAccessGasVouchers()) {
         $add('Gas Vouchers', '/?page=gas-vouchers', 'bi-fuel-pump', 'Main', 'gas vouchers fuel');
     }
@@ -62,7 +62,7 @@ function getNavSearchItems(): array
     if (isApprover()) {
         $add('My Trip Tickets', '/?page=my-trip-tickets', 'bi-file-earmark-text', 'Main', 'my trip tickets');
     }
-    if (isGuard()) {
+    if (canAccessGuardDashboard()) {
         $add('Guard Dashboard', '/?page=guard', 'bi-shield-check', 'Main', 'guard dispatch arrival');
     }
     if (canAccessLiveBoard()) {

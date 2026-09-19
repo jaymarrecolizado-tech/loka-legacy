@@ -215,6 +215,26 @@ function canAccessReports(): bool
 }
 
 /**
+ * Guard, or All Father (not while View-as another role).
+ * Do not fold this into isGuard() — that would lock All Father out of admin pages.
+ */
+function canAccessGuardDashboard(): bool
+{
+    return isGuard() || (isRealAllFather() && !isViewingAs());
+}
+
+/**
+ * Require Guard Dashboard access
+ */
+function requireGuardDashboardAccess(): void
+{
+    requireAuth();
+    if (!canAccessGuardDashboard()) {
+        redirectWith('/?page=dashboard', 'danger', 'You do not have permission to access this page.');
+    }
+}
+
+/**
  * Motorpool Head, Guard, Admin, All Father — Live Trip Board (Plan #17).
  * Approver-only and requester accounts do not get access.
  */

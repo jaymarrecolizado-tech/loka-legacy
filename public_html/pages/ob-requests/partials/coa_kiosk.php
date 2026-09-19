@@ -49,6 +49,9 @@ $h = static fn($v): string => htmlspecialchars((string) $v, ENT_QUOTES);
         <?php if ($kioskOb !== null): ?>
         <p class="coa-slipno">Pass Slip No. <?= $h($kioskOb->pass_slip_no) ?> · <?= $h(date('M j, Y', strtotime($kioskOb->ob_date))) ?></p>
         <?php endif; ?>
+        <?php if ($kioskWhoNote !== ''): ?>
+        <p class="coa-whonote">Personnel: <?= $kioskWhoNote ?></p>
+        <?php endif; ?>
     </div>
     <div class="coa-kiosk__body">
 

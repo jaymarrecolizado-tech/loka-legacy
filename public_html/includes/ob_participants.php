@@ -1,7 +1,9 @@
 <?php
 /**
  * OB Pass Slip participants — users on the same Official Business.
- * No extra signatures. Printed employee line: J.Recolizado/D.Abad
+ * No extra signatures.
+ * Printed employee line: J.Recolizado / D.Abad (slash, Plan #26).
+ * CoA certify sentence: S.Admin and J.Recolizado (short names, Plan #26).
  */
 
 if (defined('OB_PARTICIPANTS_LOADED')) {
@@ -33,6 +35,9 @@ function obShortPrintedName(string $fullName): string
 }
 
 /**
+ * Employee signature line: short names joined with " / " (Plan #26).
+ * "Jaymar Recolizado, Daryl Abad" -> "J.Recolizado / D.Abad".
+ *
  * @param list<string> $fullNames
  */
 function obPrintedEmployeeLine(array $fullNames): string
@@ -44,7 +49,26 @@ function obPrintedEmployeeLine(array $fullNames): string
             $shorts[] = $short;
         }
     }
-    return implode('/', $shorts);
+    return implode(' / ', $shorts);
+}
+
+/**
+ * Oxford-and join of the SHORT names ("S.Admin and J.Recolizado") — used by
+ * the CoA certify sentence so the "latter part" of the certificate stays
+ * compact. Full names live in the Personnel block of the printed slip.
+ *
+ * @param list<string> $fullNames
+ */
+function obJoinShortNames(array $fullNames): string
+{
+    $shorts = [];
+    foreach ($fullNames as $name) {
+        $short = obShortPrintedName((string) $name);
+        if ($short !== '') {
+            $shorts[] = $short;
+        }
+    }
+    return obJoinNames($shorts);
 }
 
 /**
@@ -90,13 +114,16 @@ function obJoinNames(array $fullNames): string
 
 /**
  * Certificate of Appearance body. Grammar follows 1 vs 2+ names.
+ * Names are the SHORT form (Plan #26): "… that J.Recolizado has appeared …"
+ * / "… the following personnel have appeared …: S.Admin and J.Recolizado."
+ * Full names print in the Personnel block of the slip.
  *
  * @param list<string> $fullNames
  */
 function obCoaAppearanceLine(array $fullNames, string $onDate): string
 {
     $names = obNameList($fullNames);
-    $who = obJoinNames($names);
+    $who = obJoinShortNames($names);
     if ($who === '') {
         $who = 'the employee';
     }

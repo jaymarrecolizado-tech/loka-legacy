@@ -161,6 +161,12 @@ if (!in_array($page, $publicPages)) {
     requireAuth();
 }
 
+// Sidebar badge acks (Plan #27): mark the current page's pending IDs seen so
+// the pill clears until new work appears. Skip the public CoA kiosk.
+if (isLoggedIn() && !($page === 'ob-requests' && $action === 'coa-sign')) {
+    badgeMarkSeenForCurrentPage($page, $action);
+}
+
 // Page routing
 $pageFile = PAGES_PATH . '/' . $page . '/' . $action . '.php';
 $pageIndex = PAGES_PATH . '/' . $page . '/index.php';
@@ -555,6 +561,10 @@ switch ($page) {
         } else {
             requireAuth();
             if ($action === 'create') {
+                if (isGuard() && !isAdmin()) {
+                    redirectWith('/?page=ob-requests', 'warning',
+                        'Guards use the stamp queue. Apply for an OB from an employee account.');
+                }
                 require_once PAGES_PATH . '/ob-requests/create.php';
             } elseif ($action === 'view') {
                 require_once PAGES_PATH . '/ob-requests/view.php';
@@ -575,7 +585,7 @@ switch ($page) {
         break;
 
     case 'guard':
-        requireRole(ROLE_GUARD);
+        requireGuardDashboardAccess();
         if ($action === 'completed') {
             require_once PAGES_PATH . '/guard/completed.php';
         } elseif ($action === 'record_dispatch' || $action === 'record_arrival') {

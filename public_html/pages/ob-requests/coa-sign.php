@@ -101,6 +101,11 @@ $kioskAppearance = $ob !== null
         date('l, F j, Y', strtotime($ob->ob_date))
     ))
     : '';
+// Full personnel under the kiosk header (Plan #26) — the certify sentence
+// below uses the short names.
+$kioskWhoNote = $ob !== null
+    ? e(obJoinNames(obParticipantFullNames((int) $ob->id, (string) $ob->employee_name)))
+    : '';
 // "Return to pass slip" — the employee's view; login only if they were
 // already logged out (never forced here)
 $kioskReturnUrl = $ob !== null ? APP_URL . '/?page=ob-requests&action=view&id=' . (int) $ob->id : null;

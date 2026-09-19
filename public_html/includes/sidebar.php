@@ -41,6 +41,12 @@
                 <a class="nav-link <?= activeMenu('ob-requests') ?>" href="<?= APP_URL ?>/?page=ob-requests">
                     <i class="bi bi-file-earmark-ruled"></i>
                     <span>OB Pass Slips</span>
+                    <?php if (canAccessGuardDashboard()):
+                        $pendingObStamps = badgeCountObGuardStamps(); ?>
+                    <?php if ($pendingObStamps > 0): ?>
+                    <?= sidebarBadgeHtml($pendingObStamps) ?>
+                    <?php endif; ?>
+                    <?php endif; ?>
                 </a>
             </li>
 
@@ -84,12 +90,16 @@
             </li>
             <?php endif; ?>
             
-            <?php if (isGuard()): ?>
+            <?php if (canAccessGuardDashboard()): ?>
             <!-- Guard Dashboard -->
             <li class="nav-item">
                 <a class="nav-link <?= activeMenu('guard') ?>" href="<?= APP_URL ?>/?page=guard">
                     <i class="bi bi-shield-check"></i>
                     <span>Guard Dashboard</span>
+                    <?php $pendingGuardOps = badgeCountGuardOps(); ?>
+                    <?php if ($pendingGuardOps > 0): ?>
+                    <?= sidebarBadgeHtml($pendingGuardOps) ?>
+                    <?php endif; ?>
                 </a>
             </li>
             <?php endif; ?>

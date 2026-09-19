@@ -523,11 +523,14 @@ function initPreventDoubleSubmit() {
             
             submitBtns.forEach(btn => {
                 if (!btn.disabled) {
-                    // Retain width to prevent layout shift
+                    // Keep the original width as a floor, but never freeze it
+                    // smaller than "Processing..." or the label wraps (ugly
+                    // "C Processin g..." on short Submit buttons).
                     const width = btn.offsetWidth;
                     if (width > 0) {
-                        btn.style.width = width + 'px';
+                        btn.style.minWidth = width + 'px';
                     }
+                    btn.style.whiteSpace = 'nowrap';
                     
                     // Create hidden input to preserve the button's name/value in POST data
                     if (btn.name) {

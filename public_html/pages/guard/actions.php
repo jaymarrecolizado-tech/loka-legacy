@@ -5,7 +5,7 @@
  * Handles recording of dispatch and arrival times
  */
 
-requireRole(ROLE_GUARD);
+requireGuardDashboardAccess();
 requireCsrf();
 
 require_once INCLUDES_PATH . '/odometer.php';

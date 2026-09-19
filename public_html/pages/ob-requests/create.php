@@ -10,6 +10,11 @@ if (!function_exists('obFind')) {
 }
 requireAuth();
 
+if (isGuard() && !isAdmin()) {
+    redirectWith('/?page=ob-requests', 'warning',
+        'Guards use the stamp queue. Apply for an OB from an employee account.');
+}
+
 $pageTitle = 'Apply for OB Pass Slip';
 $supervisors = obGetSupervisors();
 $motorpoolHeads = getMotorpoolHeads();
@@ -176,6 +181,13 @@ require_once INCLUDES_PATH . '/header.php';
     <div class="card shadow-sm">
         <div class="card-header bg-white"><strong>Pass Slip details</strong></div>
         <div class="card-body">
+            <style>
+                #obForm .ts-wrapper.multi .ts-control { gap: 0.25rem; }
+                #obForm .ts-wrapper.multi .ts-control > .item {
+                    max-width: 100%;
+                    white-space: nowrap;
+                }
+            </style>
             <form method="POST" id="obForm">
                 <?= csrfField() ?>
                 <div class="row g-3">
@@ -259,27 +271,31 @@ require_once INCLUDES_PATH . '/header.php';
                             foreach ($employees as $emp):
                                 $empName = (string) $emp->name;
                                 $dept = trim((string) ($emp->department_name ?? ''));
-                                $optLabel = $dept !== '' ? $empName . ' — ' . $dept : $empName;
                                 $isMe = (int) $emp->id === $meId;
                             ?>
                             <option value="<?= (int) $emp->id ?>"
                                 data-short="<?= e(obShortPrintedName($empName)) ?>"
+                                data-full="<?= e($empName) ?>"
+                                data-dept="<?= e($dept) ?>"
                                 <?= in_array((string) $emp->id, $selectedIds, true) ? 'selected' : '' ?>>
-                                <?= e($optLabel) ?><?= $isMe ? ' (you)' : '' ?>
+                                <?= e($empName) ?><?= $isMe ? ' (you)' : '' ?>
                             </option>
                             <?php endforeach; ?>
                         </select>
-                        <small class="text-muted d-block mt-1">
-                            Pick employees from the user list. You stay on the slip; others do not sign.
-                            Prints as <strong id="obPrintedLine"><?= e($meShort) ?></strong>
-                            <span class="text-muted" id="obEmpHint">(printed name of employee / employees)</span>
-                        </small>
+                        <small class="text-muted d-block mt-1">You stay on the slip; others do not sign. Search shows department; chips show names only.</small>
+                        <div class="ob-name-preview border rounded bg-light px-3 py-2 mt-2 small">
+                            <div class="text-uppercase text-muted" style="font-size:.68rem;letter-spacing:.04em;">How this prints</div>
+                            <div class="mt-1"><span class="text-muted">Personnel</span> — <strong id="obFullLine"><?= e($meName) ?></strong></div>
+                            <div><span class="text-muted">Signature / CoA</span> — <strong id="obPrintedLine"><?= e($meShort) ?></strong></div>
+                        </div>
                     </div>
                 </div>
 
                 <hr class="my-4">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i>Submit</button>
-                <a href="<?= APP_URL ?>/?page=ob-requests" class="btn btn-outline-secondary">Cancel</a>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-primary text-nowrap"><i class="bi bi-send me-1"></i>Submit</button>
+                    <a href="<?= APP_URL ?>/?page=ob-requests" class="btn btn-outline-secondary text-nowrap">Cancel</a>
+                </div>
             </form>
         </div>
     </div>
@@ -331,8 +347,10 @@ document.addEventListener("DOMContentLoaded", function () {
     ObParticipants.init({
         select: "#obParticipants",
         line: "#obPrintedLine",
+        fullLine: "#obFullLine",
         requesterId: ' . json_encode((string) $meId) . ',
-        requesterShort: ' . json_encode($meShort, JSON_UNESCAPED_UNICODE) . '
+        requesterShort: ' . json_encode($meShort, JSON_UNESCAPED_UNICODE) . ',
+        requesterFull: ' . json_encode($meName, JSON_UNESCAPED_UNICODE) . '
     });
     var officialRadio = document.getElementById("obOfficial");
     var privateRadio = document.getElementById("obPrivate");

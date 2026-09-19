@@ -29,6 +29,8 @@
 | #23 | OB Saved E-sign (staff specimen) | DONE (2026-09-15; localhost QA on `ob_integration` — NOT deployed) |
 | #24 | OB Private vs Official Vehicle + Guard Bind | DONE (2026-09-17; localhost QA on `ob_integration` — NOT deployed) |
 | #25 | CoA Mobile Canvas + Signing Kiosk (no login kick) | DONE (2026-09-18 incl. A4 print; `ob_integration` — NOT deployed) |
+| #26 | OB Print: Full Personnel Names + Initialled CoA | DONE (2026-09-19; `main`, localhost QA — NOT deployed) |
+| #27 | Guard Nav Badges + Separate OB Stamp Queue | DONE (2026-09-19; `main`, localhost QA — NOT deployed) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -2017,4 +2019,245 @@ Shared kiosk for form + thank-you + dead-link (partial + [`public_html/assets/cs
 ## Out of scope
 
 Apply / Guard / dashboard restyle. Changing CoA **form fields**. Splitting CoA onto its own second A4. PKI. Live VPS until sign-off. Plans #11 / #16 / #19.
+
+---
+
+# LOKA Plan #26: OB Print — Full Personnel Names + Initialled CoA — ✅ DONE (2026-09-19, `main`, localhost only — do not deploy until Plan #22–#25 + this are signed off)
+
+Branch: **`main`** (Plans #22–#25 already merged). Follow-on to Plan #22 print + Plan #25 one-sheet A4. Found in localhost QA of slip `260918-006`: the **employee line** is only initials (`S.Admin/J.Recolizado` — `S.Admin` is unreadable), while the **Certificate of Appearance** repeats full names and wraps (`System Admin and Jaymar Recolizado`).
+
+**Design read:** paper Pass Slip first, then CoA. Identify who is going on the OB in full. Keep the signature line and the CoA sentence short with `J.Recolizado`. Not a kiosk restyle. Not a new form.
+
+Do **not** restyle Apply, Guard, or the dashboard. Do not touch ranking, Live Board, or `.env`. No live deploy until Plan #22–#25 + this are signed off. Do not start Plans #11 / #16 / #19.
+
+## Goal
+
+1. **See the full names** of everyone on the requested OB on the printed Pass Slip (Personnel), immediately under Purpose.
+2. **Latter part uses initials only.** Employee signature line and CoA certify sentence use `FirstInitial.Surname` (`Jaymar Recolizado` → `J.Recolizado`).
+3. Stay on Plan #25’s **one A4 portrait sheet, two copies, CUT HERE**. Adding Personnel must not spawn a second page.
+4. Create-form preview and the CoA kiosk must match the paper (full names visible; CoA sentence initialled).
+
+## What is wrong today
+
+| Block | Today | Problem |
+|---|---|---|
+| Left signature line | `S.Admin/J.Recolizado` | Initials-only; demo name `System Admin` becomes `S.Admin` |
+| CoA body | `…personnel have appeared …: System Admin and Jaymar Recolizado.` | Full names wrap; “latter part” is the longest block on the sheet |
+| Create preview | Initials only | Filer cannot see how full names will read |
+| CoA kiosk | Same full-name `obCoaAppearanceLine()` | Client sees a long wrap; `$kioskWhoNote` exists in the partial and is never set |
+
+Helpers already in [`public_html/includes/ob_participants.php`](public_html/includes/ob_participants.php): `obShortPrintedName()`, `obPrintedEmployeeLine()`, `obJoinNames()`, `obCoaAppearanceLine()`.
+
+## Name rules (keep the existing shortener)
+
+`obShortPrintedName()` stays the single mapping:
+
+- Trim and collapse spaces.
+- Drop a trailing `Jr` / `Jr.` / `Sr` / `Sr.` / `II` / `III` / `IV` before taking the surname.
+- **First given name, first letter, uppercase + `.` + last remaining token.** `Jaymar Recolizado` → `J.Recolizado`. `Maria Clara Santos` → `M.Santos`. One-token names stay as-is.
+- `System Admin` → `S.Admin` is correct for that mapping (first word + last word). Real DICT accounts are Given + Surname.
+
+Do **not** invent middle-initial formats (`J.M.Recolizado`) or ALL-CAPS surnames.
+
+**Join styles (do not mix):**
+
+| Surface | Join |
+|---|---|
+| Personnel (full names) | Oxford-and via `obJoinNames()`: `A and B`; `A, B, and C` |
+| Signature line (initials) | Slash with spaces: `J.Recolizado / D.Abad` (`implode(' / ', …)`) |
+| CoA / kiosk certify (initials) | Oxford-and of the **short** names: `S.Admin and J.Recolizado` |
+
+```mermaid
+flowchart TD
+  purpose[Purpose]
+  personnel[Personnel: full names]
+  sigLine[Employee signature line: J.Recolizado slash list]
+  coa[CoA certify: initials with and]
+  purpose --> personnel --> sigLine --> coa
+```
+
+Full legal names still appear **on the same sheet** in Personnel, so the CoA does not need to repeat them.
+
+## Print layout (each of the two copies)
+
+1. **Purpose** — unchanged text; slightly tighter clip if needed (see A4 budget).
+2. **Personnel** (new, under Purpose) — `Personnel: System Admin and Jaymar Recolizado`.
+3. **Left signature line** — `S.Admin / J.Recolizado` plus the existing hint (`Printed names of employees` / signature over printed name).
+4. **CoA** — `I hereby certify that the following personnel have appeared in this office/establishment on September 18, 2026: S.Admin and J.Recolizado.` One person: `… that J.Recolizado has appeared … on DATE.`
+
+Supervisor, Motorpool, Guard, plate, and times stay as they are.
+
+## A4 budget (Plan #25 lock)
+
+`.sheet` is still 198×284mm, two `flex: 1` copies, CoA `margin-top: auto`, overflow hidden.
+
+Personnel **adds a row**. Pay for it:
+
+- `.personnel`: `font-size: 8.5pt`, `max-height: 8mm`, `overflow: hidden`, `overflow-wrap: anywhere` (same clip idea as Purpose / CoA office).
+- If the two copies still risk a second page, drop Purpose `max-height` from **11mm → 9mm**. Do not drop letterhead or CoA signature.
+- Twenty participants will clip. That is the same honest trade as a 200-character purpose: **one sheet beats showing every name**.
+
+## Kiosk (Plan #25)
+
+Same helper, two lines:
+
+- Set `$kioskWhoNote` to the **full** `obJoinNames()` list under the header (this variable is documented on `coa_kiosk.php` and unused).
+- `$kioskAppearance` stays `obCoaAppearanceLine()` after that function switches to **short** names.
+
+Do not restyle the kiosk CSS beyond showing the who-note.
+
+## Screens that stay compact
+
+Guard OB card and OB index already use `obPrintedLinesForIds()` (initials). Keep that density. Do not dump full names into those lists.
+
+## Implementation checklist — ✅ DONE (2026-09-19)
+
+- [x] `ob_participants.php` — new `obJoinShortNames($fullNames)` (maps through the unchanged `obShortPrintedName()`, Oxford-and via `obJoinNames()`); `obCoaAppearanceLine()` now certifies the **short** names (`… that J.Recolizado has appeared …` / `… the following personnel have appeared …: S.Admin and J.Recolizado.`); `obPrintedEmployeeLine()` separator is `' / '`. `obJoinNames()` (full names) untouched.
+- [x] `print.php` — **Personnel** row under Purpose (`Personnel: System Admin, Danmark R. Jose, and Test Requester` — full `obJoinNames()`); `.personnel` clip CSS (8.5pt, `max-height`, `overflow-wrap: anywhere`); `$printedLine` (slash) and `$coaLine` (initials) flow from the updated helpers.
+- [x] `create.php` + `ob-participants.js` — options carry `data-full`; the live preview shows **Personnel: full names · Prints as initials** (JS Oxford-and mirrors `obJoinNames()`: 1 / `and` / commas + `and`); filer stays first and locked (existing TomSelect lock kept).
+- [x] `view.php` — Participants stay full names; caption now "signature line and CoA print as S.Admin / J.Recolizado".
+- [x] `coa-sign.php` + `coa_kiosk.php` — `$kioskWhoNote` (full `obJoinNames()` list) renders under the kiosk header (`.coa-whonote` rule in `ob-coa.css`); the certify sentence on the kiosk is initialled via the same helper.
+- [x] Guard OB card + OB index keep the compact initials line (`obPrintedLinesForIds()` untouched — inherits the spaced slash only). No migration. No `APP_VERSION` bump needed (print CSS is inline).
+
+## QA — verified 2026-09-19 (`_deploy_tmp/verify_plan26_*`; fixture slip + signatures removed after)
+
+- [x] Helper strings asserted for 1/2/3 people: slash signature line with spaces, short Oxford-and, `has appeared` (1) vs `the following personnel have appeared … :` (2+); `M.Santos`, suffix drop, one-token name all per the kept shortener; full-name `obJoinNames()` unchanged.
+- [x] Two-person print: Personnel shows `System Admin and Jaymar Recolizado`-style full names; signature line `S.Admin / D.Jose / T.Requester`; CoA uses initials and never wraps a full given name (render-verified).
+- [x] Three-person worst case (200-char purpose + 200-char office + 3 participants + all five signatures): still **exactly 1 A4 page**, two copies, CUT HERE, CoA complete (headless-Chrome print-to-PDF page count asserted + magnified visual of both copies).
+- [x] A4 fit mechanics: `.copy` children are now `flex-shrink: 0` and Purpose/Personnel clip at **exact line boundaries** (7.7mm = 2 lines at 8.5pt/1.28) — the first cut showed mid-glyph clips caused by flex-shrink; fixed by disabling child shrink and paying the budget out of the signature-pad height (26px → 21px).
+- [x] Create form renders the dual preview (`obFullLine` + `data-full` present); kiosk renders the who-note + initialled certify line; view caption updated; guard card/index stay compact.
+- [x] `php -l` clean on every touched file + full public_html sweep 0 errors; `node` syntax check on `ob-participants.js` clean.
+- [ ] **NOT deployed to live** — deploy only after Plan #22–#25 + this are signed off.
+
+## Files
+
+- `public_html/includes/ob_participants.php` — `obJoinShortNames()`, initialled CoA line, `' / '` signature separator
+- `public_html/pages/ob-requests/print.php` — Personnel row + `.personnel` clip + one-A4 flex fixes (`flex-shrink: 0`, line-boundary clips, 21px pads)
+- `public_html/pages/ob-requests/create.php` — `data-full` + dual preview
+- `public_html/assets/js/ob-participants.js` — full + initials live preview (Oxford-and matching PHP)
+- `public_html/pages/ob-requests/view.php` — caption
+- `public_html/pages/ob-requests/coa-sign.php` — `$kioskWhoNote`
+- `public_html/pages/ob-requests/partials/coa_kiosk.php` + `public_html/assets/css/ob-coa.css` — who-note render
+
+## Files
+
+- `public_html/includes/ob_participants.php` — short-name CoA join + slash spacing
+- `public_html/pages/ob-requests/print.php` — Personnel row + clip CSS
+- `public_html/pages/ob-requests/create.php` — `data-full` + preview copy
+- `public_html/assets/js/ob-participants.js` — full + short live preview
+- `public_html/pages/ob-requests/view.php` — caption
+- `public_html/pages/ob-requests/coa-sign.php` — `$kioskWhoNote`
+- `public_html/pages/ob-requests/partials/coa_kiosk.php` — render who-note if set
+
+## Out of scope
+
+New tables or stored display names. Middle-initial / ALL-CAPS surname formats. Extra participant signatures. Splitting CoA onto a second A4. Changing CoA form fields (office, representative, from/to). Apply / Guard / dashboard restyle. Live VPS. Plans #11 / #16 / #19.
+
+---
+
+# LOKA Plan #27: Guard Nav Badges + Separate OB Stamp Queue — ✅ DONE (2026-09-19, `main`, localhost only — do not deploy until Plan #22–#26 + this are signed off)
+
+Branch: **`main`**. Follow-on to Plans #22–#24 (OB + Guard bind). Found in localhost QA on a Guard login: **OB Pass Slips — Official Business Times** (4 waiting) sits on the same page as vehicle KPIs (Pending Dispatch 5 / On Trip 7). Sidebar has **no** counts. Header bell is empty because Guards are never notified when stamp work appears.
+
+**Design read:** two Guard workplaces, two sidebar pills, plus a bell to every `role=guard` account. Public-sector gate UI. Not a dashboard restyle.
+
+Do **not** restyle Apply / Live Board. Do not touch ranking or `.env`. No live deploy until Plan #22–#26 + this are signed off. Do not start Plans #11 / #16 / #19.
+
+## Decisions (2026-09-19)
+
+- **Nav:** sidebar pills **and** in-app bell (notify all Guard-role accounts).
+- **OB Pass Slips for a Guard:** stamp queue only. No Apply, no “my slips.”
+
+## Goal
+
+1. **Do not merge** OB departure/arrival with vehicle dispatch/arrival on Guard Dashboard.
+2. **Guard → OB Pass Slips** is the unbound-OB time-stamp queue (requester slips waiting at the gate).
+3. **Sidebar counts** on Guard Dashboard (vehicles waiting) and OB Pass Slips (OB stamps waiting).
+4. **Bell** every Guard-role user when a fleet trip is approved or an unbound OB becomes stamp-ready.
+
+## What was wrong (before this plan)
+
+- Guard Dashboard mixed the OB stamp card with vehicle KPIs.
+- Sidebar **OB Pass Slips** listed a Guard’s own filed slips, not the stamp queue.
+- `badgeCountGuardOps()` existed but was not rendered on Guard Dashboard. OB waiting stamps had no nav badge.
+- Header bell was empty for Guards (`notifyRoleUsers([ROLE_GUARD])` was never called).
+
+```mermaid
+flowchart LR
+  approved[Approved unbound OB]
+  fleet[Approved fleet trip]
+  obMenu[OB Pass Slips queue plus badge]
+  guardDash[Guard Dashboard vehicles plus badge]
+  bell[Bell every Guard account]
+  approved --> obMenu
+  approved --> bell
+  fleet --> guardDash
+  fleet --> bell
+```
+
+## IA
+
+| Menu | Guard sees | Badge |
+|---|---|---|
+| **Guard Dashboard** | Vehicle leave/return only | Pending dispatch + on-trip (`badgeCountGuardOps()`) |
+| **OB Pass Slips** | Unbound OB waiting departure / waiting arrival. No Apply. No my-slips table. | Waiting stamps |
+
+Plan #24 stays: **bound** official-vehicle OBs stamp from the **vehicle** row and stay off the OB queue (`NOT EXISTS` bound request). Private / OB-only slips live on **OB Pass Slips**.
+
+**All Father / Admin:** not a Guard account. They keep the current full OB list (and Apply). Put the same stamp board **on top** of that list so they can still stamp after it leaves Guard Dashboard. Sidebar OB badge for them uses the same waiting-stamp count.
+
+A Guard who must file their own OB is **out of v1** on this menu (use another role/account). Do not sneak Apply back onto the queue.
+
+## Bell (Guard role only)
+
+Use existing `notifyRoleUsers([ROLE_GUARD], …)` (in-app + email via `notify()`). Add `MAIL_TEMPLATES` keys so the type is not rewritten to `default`.
+
+| Event | Link | Do not fire when |
+|---|---|---|
+| Vehicle request becomes `approved` | `/?page=guard` | Already dispatched |
+| Unbound OB becomes stamp-ready (`approved`, no bound `requests` row) | `/?page=ob-requests` | Still waiting supervisor or motorpool; **bound** OB (vehicle bell covers it) |
+
+Respect existing `notify()` 5-minute duplicate skip and 20/hour cap. Do not bell All Father unless `users.role = guard`.
+
+## Implementation checklist — ✅ DONE (2026-09-19)
+
+- [x] `sidebar.php` — Guard Dashboard renders `sidebarBadgeHtml(badgeCountGuardOps())`; OB Pass Slips renders the waiting-stamp badge `badgeCountObGuardStamps()` gated by `canAccessGuardDashboard()` (guards + real All Father).
+- [x] `badge_counts.php` — `badgePendingIdsObGuard()` mirrors the two `ob_section` queries (departure-waiting + arrival-waiting, unbound via `NOT EXISTS` bound non-cancelled request) ids-only; `badgeCountObGuardStamps()` wraps it with the unseen-ack mechanism (key `ob_guard_stamps`); `ob-requests` mapped in `badgeMarkSeenForCurrentPage` so the pill clears on view and returns with new work.
+- [x] `guard/index.php` — `ob_section.php` include removed; the page is vehicle dispatch/arrival only (KPIs + trip modals unchanged).
+- [x] `ob-requests/index.php` — Guard (`isGuard() && !isAdmin()`): **stamp queue only** — the `ob_section` board, page copy, no Apply, no status filter, no my-slips table. **Admin / All Father only** (`isAdmin()`): stamp board on top + existing list + Apply. Department supervisors and Motorpool do **not** get the gate board. Employees: their own list only. Bound official-vehicle slips stay off the queue (`NOT EXISTS`, Plan #24 preserved).
+- [x] `index.php` + `create.php` — Guard cannot open Apply (`/?page=ob-requests&action=create` redirects to the stamp queue).
+- [x] `index.php` — `badgeMarkSeenForCurrentPage($page, $action)` runs for logged-in users (skips public CoA kiosk) so mapped pills actually clear after viewing.
+- [x] Bells — `pages/approvals/process.php`: after commit, when a request becomes `approved` and has **not** dispatched, `notifyRoleUsers([ROLE_GUARD], 'guard_trip_approved', …)` (link `/?page=guard`, Control No. threaded). `pages/ob-requests/process.php`: when a slip becomes `approved` and is **unbound** (`obBoundRequestForOb() === null` — private path and motorpool path both), `notifyRoleUsers([ROLE_GUARD], 'guard_ob_ready', …)` (link `/?page=ob-requests`). `config/mail.php` gained both `guard_*` keys (no `default` rewrite). Existing `notify()` 5-minute duplicate skip + 20/hour cap respected; All Father is only belled if their account is actually `role=guard`.
+- [x] `nav_search.php` — OB Pass Slips keywords extended with "gate stamp queue departure arrival".
+- [x] No migration. `php -l` clean on every touched file.
+
+## QA — verified 2026-09-19 in source (split, badges, bells). Gaps closed 2026-09-19: seen-ack wired, Guard Apply blocked, stamp board limited to Guard + Admin/All Father. Do **not** cite `_deploy_tmp/verify_plan27_*` (not in the repo).
+
+- [x] Guard: Guard Dashboard has **no** OB card; vehicle stamps untouched; sidebar badge count for waiting trips via `badgeCountGuardOps()`.
+- [x] Guard: OB Pass Slips renders **only** the stamp queue — no Apply, no status filter, no my-slips table; `action=create` redirects to the queue.
+- [x] Bound official-vehicle OB: excluded from the OB badge and the queue; no separate OB bell (bind check gates the bell).
+- [x] Bell: `guard_trip_approved` + `guard_ob_ready` keys exist; `notifyRoleUsers([ROLE_GUARD])` on the two events.
+- [x] All Father / Admin: full OB list + stamp board on top. Department approvers and Motorpool: list/own slips only, **no** gate board. Stamp sidebar badge stays `canAccessGuardDashboard()` (Guard + real All Father).
+- [x] Stamp / Guard pills: `badgeMarkSeenForCurrentPage` is called from `index.php` after auth; CoA kiosk skipped.
+- [x] `php -l` on touched files.
+- [ ] **NOT deployed to live** — do not run `deploy_prod.py` until Plan #22–#26 + this are signed off.
+
+## Files
+
+- `public_html/includes/sidebar.php` — both Guard badges
+- `public_html/includes/badge_counts.php` — `badgePendingIdsObGuard()` / `badgeCountObGuardStamps()` / seen map
+- `public_html/includes/nav_search.php` — gate-stamp keywords
+- `public_html/index.php` — `badgeMarkSeenForCurrentPage` hook; Guard Apply redirect
+- `public_html/pages/guard/index.php` — OB card removed
+- `public_html/pages/guard/partials/ob_section.php` — reused from the OB page
+- `public_html/pages/ob-requests/index.php` — guard queue-only / admin board-on-top
+- `public_html/pages/ob-requests/create.php` — Guard blocked
+- `public_html/pages/ob-requests/process.php` — unbound-OB guard bell
+- `public_html/pages/approvals/process.php` — approved-trip guard bell
+- `public_html/config/mail.php` — `guard_trip_approved` / `guard_ob_ready`
+
+## Out of scope
+
+New tables. Guard Apply-for-OB on this menu. Belling All Father (unless `role=guard`). Restyling Apply / Live Board / dashboard chrome. Changing Plan #24 bind rules. Live VPS. Plans #11 / #16 / #19.
+
 

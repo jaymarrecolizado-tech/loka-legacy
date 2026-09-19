@@ -286,6 +286,16 @@ define('MAIL_TEMPLATES', [
         'template' => 'Your OB Pass Slip has been finalized. The PDF is now the complete record.'
     ],
 
+    // Guard gate bells (Plan #27) — stamp work appeared
+    'guard_trip_approved' => [
+        'subject' => 'Vehicle Trip Ready for the Gate',
+        'template' => 'An approved vehicle trip is waiting for dispatch at the gate.'
+    ],
+    'guard_ob_ready' => [
+        'subject' => 'OB Pass Slip Ready for the Gate',
+        'template' => 'An approved Official Business Pass Slip is waiting for its departure stamp.'
+    ],
+
     // Default fallback template
     'default' => [
         'subject' => 'LOKA Notification',
