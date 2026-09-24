@@ -141,23 +141,40 @@
         
         <!-- Main Content -->
         <main class="main-content" id="main-content">
-            <!-- Pending driver evaluation nag (anonymous rating, booking never blocked) -->
+            <!-- Pending driver evaluation nag (Plan #14 + #28 soft-block at threshold) -->
             <?php if (isLoggedIn() && function_exists('pendingDriverEvaluationsForUser') && !isViewingAs()):
                 $pendingEvals = pendingDriverEvaluationsForUser(userId());
-                if (!empty($pendingEvals)): ?>
-                <div class="alert alert-warning alert-dismissible fade show m-3 mb-0" role="alert">
+                if (!empty($pendingEvals)):
+                    $pendingCount = function_exists('pendingDriverEvaluationCount')
+                        ? pendingDriverEvaluationCount(userId())
+                        : count($pendingEvals);
+                    $blockAt = function_exists('driverEvaluationBlockAt') ? driverEvaluationBlockAt() : 3;
+                    $blocked = function_exists('userMustClearDriverEvaluations') && userMustClearDriverEvaluations();
+                    $alertClass = $blocked ? 'alert-danger' : 'alert-warning';
+                ?>
+                <div class="alert <?= $alertClass ?> <?= $blocked ? '' : 'alert-dismissible' ?> fade show m-3 mb-0" role="alert">
                     <div class="d-flex flex-wrap align-items-center gap-2">
                         <div class="me-auto">
                             <i class="bi bi-star-half me-1"></i>
-                            <strong>You have <?= count($pendingEvals) ?> driver evaluation<?= count($pendingEvals) > 1 ? 's' : '' ?> to complete.</strong>
+                            <?php if ($blocked): ?>
+                            <strong>Trip requests are blocked — finish all <?= (int) $pendingCount ?> pending driver evaluation<?= $pendingCount > 1 ? 's' : '' ?>.</strong>
+                            <span class="text-muted small ms-1">Threshold is <?= (int) $blockAt ?>. Your feedback is anonymous.</span>
+                            <?php elseif ($pendingCount >= max(1, $blockAt - 1)): ?>
+                            <strong>You have <?= (int) $pendingCount ?> of <?= (int) $blockAt ?> pending driver evaluation<?= $pendingCount > 1 ? 's' : '' ?>.</strong>
+                            <span class="text-muted small ms-1">At <?= (int) $blockAt ?>, new trip requests are blocked. Feedback is anonymous.</span>
+                            <?php else: ?>
+                            <strong>You have <?= (int) $pendingCount ?> driver evaluation<?= $pendingCount > 1 ? 's' : '' ?> to complete.</strong>
                             <span class="text-muted small ms-1">Your feedback is anonymous.</span>
+                            <?php endif; ?>
                         </div>
                         <?php foreach ($pendingEvals as $pe): ?>
                         <a class="btn btn-sm btn-primary text-nowrap" href="<?= APP_URL ?>/?page=evaluations&action=rate&id=<?= (int) $pe->request_id ?>">
                             Rate now — Trip #<?= (int) $pe->request_id ?>
                         </a>
                         <?php endforeach; ?>
+                        <?php if (!$blocked): ?>
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php endif; endif; ?>

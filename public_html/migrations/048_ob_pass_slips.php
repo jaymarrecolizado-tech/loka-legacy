@@ -138,8 +138,9 @@ try {
     );
     foreach (
         [
-            ['allow_ob_attach_after_submit', '0', 'bool', 'trips'],
-            ['ob_coa_token_days', '7', 'int', 'trips'],
+            // settings.type ENUM('string','integer','boolean','float')
+            ['allow_ob_attach_after_submit', '0', 'boolean', 'trips'],
+            ['ob_coa_token_days', '7', 'integer', 'trips'],
         ] as [$key, $value, $type, $category]
     ) {
         $stmt->execute([$key, $value, $type, $category, $now, $now, $key]);

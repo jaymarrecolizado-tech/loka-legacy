@@ -5,6 +5,18 @@
 
 $pageTitle = 'New Request';
 $errors = [];
+
+// Plan #28: soft-block create when the rider has too many unfinished driver ratings
+// (Admin / All Father are never gated — see userExemptFromDriverEvalCreateBlock)
+if (function_exists('userMustClearDriverEvaluations') && userMustClearDriverEvaluations()) {
+    $pendingCount = pendingDriverEvaluationCount(userId());
+    redirectWith(
+        '/?page=requests',
+        'danger',
+        "You have {$pendingCount} unfinished driver evaluation(s). Complete all of them before requesting a new trip. Use Rate now in the banner above."
+    );
+}
+
 $bookingSettings = getBookingRules();
 
 // Get available vehicles for selection (cached)

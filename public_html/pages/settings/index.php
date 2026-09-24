@@ -53,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'trip_overdue_renotify_hours' => $trackClamp('Overdue renotify (hours)', post('trip_overdue_renotify_hours', '24'), 1, 168, 24),
         'driver_evaluation_reminder_hours' => $trackClamp('Evaluation reminder (hours)', post('driver_evaluation_reminder_hours', '48'), 1, 720, 48),
         'driver_evaluation_expiry_days' => $trackClamp('Evaluation expiry (days)', post('driver_evaluation_expiry_days', '30'), 1, 90, 30),
+        'driver_evaluation_block_at' => $trackClamp('Evaluation trip-create block at', post('driver_evaluation_block_at', '3'), 1, 20, 3),
         // OB Pass Slip (Plan #22)
         'allow_ob_attach_after_submit' => post('allow_ob_attach_after_submit', '0') === '1' ? '1' : '0',
         'ob_coa_token_days' => $trackClamp('OB CoA token validity (days)', post('ob_coa_token_days', '7'), 1, 60, 7),
@@ -233,6 +234,11 @@ require_once INCLUDES_PATH . '/header.php';
                                 <label class="form-label">Evaluation Link Expiry (days)</label>
                                 <input type="number" class="form-control" name="driver_evaluation_expiry_days" value="<?= e($settings['driver_evaluation_expiry_days'] ?? '30') ?>" min="1" max="90">
                                 <small class="text-muted form-help">Token expiry for anonymous evaluation</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Block New Trip At (pending evals)</label>
+                                <input type="number" class="form-control" name="driver_evaluation_block_at" value="<?= e($settings['driver_evaluation_block_at'] ?? '3') ?>" min="1" max="20">
+                                <small class="text-muted form-help">Block new trip requests when the user has this many unfinished ratings (must clear all). Admin exempt.</small>
                             </div>
                         </div>
                     </div>

@@ -86,6 +86,24 @@
                         }
                     },
                     onChange: updateLine,
+                    onItemAdd: function () {
+                        // Clear leftover search text after each pick (TomSelect can
+                        // re-apply lastQuery synchronously; clear again on next tick).
+                        var self = this;
+                        self.setTextboxValue('');
+                        self.lastQuery = '';
+                        if (self.control_input) {
+                            self.control_input.value = '';
+                        }
+                        setTimeout(function () {
+                            self.setTextboxValue('');
+                            self.lastQuery = '';
+                            if (self.control_input) {
+                                self.control_input.value = '';
+                            }
+                            self.refreshOptions(false);
+                        }, 0);
+                    },
                     onItemRemove: function (value) {
                         if (String(value) === requesterId) {
                             var self = this;

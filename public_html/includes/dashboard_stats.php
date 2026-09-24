@@ -246,9 +246,12 @@ function dashboardStatsForUser(): array
 
 function dashboardOverdueTripCount(): int
 {
+    // Match Live Board "Overdue": still out (dispatched, no arrival) past end.
+    // Approved-but-never-dispatched trips are not overdue on the board.
     return (int) db()->fetchColumn(
         "SELECT COUNT(*) FROM requests
          WHERE status = 'approved'
+           AND actual_dispatch_datetime IS NOT NULL
            AND end_datetime < NOW()
            AND actual_arrival_datetime IS NULL
            AND deleted_at IS NULL"

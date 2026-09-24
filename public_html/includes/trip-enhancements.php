@@ -118,6 +118,142 @@ if (!defined('TRIP_ENHANCEMENTS_LOADED')) {
     }
 
     /**
+     * Pending-eval count that blocks new trip create (Plan #28). Default 3.
+     */
+    function driverEvaluationBlockAt(): int
+    {
+        return max(1, min(20, (int) tripSetting('driver_evaluation_block_at', '3')));
+    }
+
+    /**
+     * Count unsubmitted, non-expired driver evaluation invites for a user.
+     */
+    function pendingDriverEvaluationCount(?int $userId): int
+    {
+        if (!$userId) {
+            return 0;
+        }
+        $days = driverEvaluationExpiryDays();
+        try {
+            return (int) db()->fetchColumn(
+                "SELECT COUNT(*)
+                 FROM driver_evaluations de
+                 JOIN requests r ON r.id = de.request_id AND r.deleted_at IS NULL
+                 WHERE de.evaluator_user_id = ?
+                   AND de.submitted_at IS NULL
+                   AND r.status = ?
+                   AND de.created_at >= DATE_SUB(NOW(), INTERVAL {$days} DAY)",
+                [$userId, STATUS_COMPLETED]
+            );
+        } catch (Throwable $e) {
+            error_log('pendingDriverEvaluationCount: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Admin / All Father break-glass — never soft-block trip create (Plan #28).
+     * View-as also skips the gate (same as the nag banner).
+     */
+    function userExemptFromDriverEvalCreateBlock(?int $userId = null): bool
+    {
+        if (function_exists('isViewingAs') && isViewingAs()) {
+            return true;
+        }
+        if (function_exists('isAllFather') && isAllFather()) {
+            return true;
+        }
+        if (function_exists('isRealAllFather') && isRealAllFather()) {
+            return true;
+        }
+        if (function_exists('isAdmin') && isAdmin()) {
+            return true;
+        }
+
+        $uid = $userId ?? (function_exists('userId') ? userId() : null);
+        if (!$uid) {
+            return false;
+        }
+        try {
+            $role = (string) db()->fetchColumn(
+                "SELECT role FROM users WHERE id = ? AND deleted_at IS NULL",
+                [(int) $uid]
+            );
+            if ($role === ROLE_ALL_FATHER || $role === ROLE_ADMIN) {
+                return true;
+            }
+        } catch (Throwable $e) {
+            error_log('userExemptFromDriverEvalCreateBlock: ' . $e->getMessage());
+        }
+        return false;
+    }
+
+    /**
+     * Soft-block new trip create when pending evals hit the threshold (Plan #28).
+     * Once the threshold is crossed, stays blocked until ALL pending are cleared
+     * (count → 0), not merely until count drops below the threshold.
+     * Admin / All Father exempt; View-as never gated.
+     * Sticky flag: users.eval_create_blocked (migration 053).
+     */
+    function userMustClearDriverEvaluations(?int $userId = null): bool
+    {
+        $uid = $userId ?? (function_exists('userId') ? userId() : null);
+        if (!$uid) {
+            return false;
+        }
+        $uid = (int) $uid;
+
+        if (userExemptFromDriverEvalCreateBlock($uid)) {
+            // Clear any leftover sticky flag on break-glass accounts
+            setUserEvalCreateBlocked($uid, false);
+            return false;
+        }
+
+        $count = pendingDriverEvaluationCount($uid);
+        $at = driverEvaluationBlockAt();
+
+        if ($count <= 0) {
+            setUserEvalCreateBlocked($uid, false);
+            return false;
+        }
+        if ($count >= $at) {
+            setUserEvalCreateBlocked($uid, true);
+            return true;
+        }
+        // Below threshold but sticky from an earlier cross → still blocked
+        return userHasEvalCreateBlocked($uid);
+    }
+
+    function userHasEvalCreateBlocked(int $userId): bool
+    {
+        try {
+            $val = db()->fetchColumn(
+                "SELECT eval_create_blocked FROM users WHERE id = ? AND deleted_at IS NULL",
+                [$userId]
+            );
+            return (int) $val === 1;
+        } catch (Throwable $e) {
+            // Column missing until migration 053 — fall back to threshold-only
+            error_log('userHasEvalCreateBlocked: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    function setUserEvalCreateBlocked(int $userId, bool $blocked): void
+    {
+        try {
+            db()->update(
+                'users',
+                ['eval_create_blocked' => $blocked ? 1 : 0],
+                'id = ?',
+                [$userId]
+            );
+        } catch (Throwable $e) {
+            error_log('setUserEvalCreateBlocked: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Whether a request may still receive / answer a pre-trip confirmation email.
      * False once dispatched (on trip), past start, completed, cancelled, etc.
      */
