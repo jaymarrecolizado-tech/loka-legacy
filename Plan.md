@@ -31,6 +31,9 @@
 | #25 | CoA Mobile Canvas + Signing Kiosk (no login kick) | DONE (2026-09-18 incl. A4 print; `ob_integration` — NOT deployed) |
 | #26 | OB Print: Full Personnel Names + Initialled CoA | DONE (2026-09-19; `main`, localhost QA — NOT deployed) |
 | #27 | Guard Nav Badges + Separate OB Stamp Queue | DONE (2026-09-19; `main`, localhost QA — NOT deployed) |
+| #28 | Soft Nag + 3-Pending Trip-Create Gate | DONE (2026-09-19; run migrations 052+053 on each env) |
+| #29 | Vehicle Trip Ticket — Full Purpose + No PDF Scrollbars | DONE (2026-09-26; live `lokafleet.dictr2.cloud`) |
+| #30 | All-Trip Visibility for Motorpool Head + Department Approver | DONE (2026-09-27; live `lokafleet.dictr2.cloud`) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -2260,4 +2263,221 @@ Respect existing `notify()` 5-minute duplicate skip and 20/hour cap. Do not bell
 
 New tables. Guard Apply-for-OB on this menu. Belling All Father (unless `role=guard`). Restyling Apply / Live Board / dashboard chrome. Changing Plan #24 bind rules. Live VPS. Plans #11 / #16 / #19.
 
+---
+
+# LOKA Plan #28: Soft Nag + 3-Pending Trip-Create Gate — ✅ DONE (2026-09-19)
+
+## Goal
+
+Keep Plan #14 soft nagging (banner + invite/reminder email), but stop chronic skippers from stacking unfinished ratings: when a logged-in passenger has **3 or more** unsubmitted, non-expired driver evaluations, **new trip create is blocked** until **all** of those pending ratings are submitted.
+
+## Policy
+
+| Rule | Choice |
+|------|--------|
+| Count | Unsubmitted, non-expired invites (`pendingDriverEvaluationCount`) |
+| Threshold | Setting `driver_evaluation_block_at` (default **3**, clamp 1–20) |
+| Clear condition | Must finish **all** pending (count → 0), not merely get under 3 |
+| Blocked | `/?page=requests&action=create` only |
+| Not blocked | OB, gas vouchers, reports, viewing trips, Rate now / submit |
+| Exempt | **Admin + All Father** (`userExemptFromDriverEvalCreateBlock()` — session role, `isAllFather`/`isRealAllFather`/`isAdmin`, plus DB role fallback). View-as never gated. Sticky flags auto-cleared on exempt accounts. |
+| Guests | Unchanged (email forward only; no account to gate) |
+| Driver | Still never invited to rate their own trip |
+
+## Implementation — ✅ DONE (2026-09-19)
+
+- [x] `trip-enhancements.php` — `driverEvaluationBlockAt()`, `pendingDriverEvaluationCount()`, `userMustClearDriverEvaluations()`, `userExemptFromDriverEvalCreateBlock()` (explicit All Father + Admin), sticky helpers
+- [x] Sticky clear-all: once pending ≥ threshold, `users.eval_create_blocked=1` until pending count → 0 (not merely under threshold)
+- [x] `pages/requests/create.php` — early `redirectWith` when gated
+- [x] `includes/header.php` — count-vs-threshold copy; non-dismissible danger banner when gated
+- [x] `pages/settings/index.php` — `driver_evaluation_block_at` field
+- [x] `migrations/052_eval_block_at.php` — setting default `3`
+- [x] `migrations/053_eval_create_blocked.php` — `users.eval_create_blocked`
+- [x] Plan index row #28
+
+## Audit (2026-09-19)
+
+**Initial review found a policy gap:** gate used `count >= 3` only, so submitting one of three (count → 2) re-opened create. That violated “must finish **all** pending.” Fixed with sticky `users.eval_create_blocked` (migration 053).
+
+## QA checklist — ✅ re-verified 2026-09-19 (`_deploy_tmp/verify_plan28.php`; migrations 052+053 on local `old_loka_db`)
+
+- [x] Helpers + setting + create gate + banner copy present
+- [x] Sticky flag set/clear works on `users.eval_create_blocked`
+- [x] Clear-all sticky branch present in `userMustClearDriverEvaluations()`
+- [x] Admin / View-as exempt in helper (isAdmin / isViewingAs)
+- [ ] Manual browser: 3 pending → create blocked; submit 1 → still blocked; submit all → create allowed
+- [ ] Staging + live: run `052` + `053` on deploy
+
+## Files
+
+- `public_html/includes/trip-enhancements.php`
+- `public_html/pages/requests/create.php`
+- `public_html/includes/header.php`
+- `public_html/pages/settings/index.php`
+- `public_html/migrations/052_eval_block_at.php`
+- `public_html/migrations/053_eval_create_blocked.php`
+- `Plan.md`
+
+## Out of scope
+
+Hard-gating the whole app. Blocking OB / gas vouchers. Guest enforcement. Changing anonymity / 4-star form / PDF. Extra reminder cron cadence.
+
+---
+
+# LOKA Plan #29: Vehicle Trip Ticket — Full Purpose + No PDF Scrollbars — ✅ DONE (2026-09-26, live `lokafleet.dictr2.cloud`)
+
+## Goal
+
+Fix the **Vehicle Trip Ticket** browser print / Save-as-PDF so Purpose (and Destination) show the **full task text** and **no vertical scrollbar** appears in the generated PDF.
+
+Reported live sample: `Vehicle Trip Ticket – DICT Region II.pdf` (BAF 5366, Sept 2026 trips) — purpose clipped mid-phrase (`S ki C`, `Fib O i C bl`) and scrollbar chrome visible in PDF.
+
+## Confirmed source
+
+This is **`/?page=my-trip-tickets&action=generate-summary`** → [`summary-print.php`](public_html/pages/my-trip-tickets/summary-print.php) (multi-day trip log + Fuel Refilling), **not** TCPDF [`trip-tickets/export-pdf.php`](public_html/pages/trip-tickets/export-pdf.php).
+
+Purpose cell:
+
+```php
+<textarea class="left auto-expand" ... rows="<?= tripTicketTextareaRows($t->purpose, 26) ?>"><?= e($t->purpose) ?></textarea>
+```
+
+## Root causes
+
+1. **Clipped purpose** — `tripTicketTextareaRows()` in `includes/functions.php` caps at **max 12 rows** (`charsPerLine=26`). Long purposes exceed that; CSS `overflow: hidden` clips the rest.
+2. **Scrollbar in PDF** — Chrome “Save as PDF” paints the textarea scrollbar when content is taller than the box. Print CSS uses `overflow: visible` but never hides scrollbar chrome; JS `beforeprint` resize can race.
+
+## Fix plan
+
+### 1. Row helper
+
+- In `tripTicketTextareaRows()`: raise `$max` from `12` → **40**
+- Purpose/destination call sites: use tighter `charsPerLine` (**22**) to match the narrow Purpose column
+
+### 2. Print / screen CSS (`summary-print.php` + `summary-print-travelorder.php`)
+
+- On `.tbl-trip textarea.auto-expand`:
+  - `overflow: hidden !important`
+  - `scrollbar-width: none; -ms-overflow-style: none`
+  - `::-webkit-scrollbar { width: 0; height: 0; display: none }`
+- `@media print`:
+  - `height: auto !important; max-height: none !important`
+  - `overflow: hidden !important` (prefer over `visible` for Chromium PDF)
+  - `white-space: pre-wrap; word-break: break-word`
+  - `field-sizing: content` where supported
+
+### 3. JS resize
+
+- Run `resizeTripTextareas()` on `DOMContentLoaded` (not only `load`)
+- On Print click: resize → `requestAnimationFrame` → `window.print()`
+- Keep `beforeprint` resize as backup
+
+## Implementation checklist — ✅ DONE (2026-09-26)
+
+- [x] `includes/functions.php` — `tripTicketTextareaRows()` default `$max` raised **12 → 40**.
+- [x] `summary-print.php` — Destination/Purpose call sites pass `charsPerLine = 22` (was 26); base `.tbl-trip textarea.auto-expand` CSS gains `overflow: hidden !important`, `scrollbar-width: none`, `-ms-overflow-style: none` and a `::-webkit-scrollbar { width:0; height:0; display:none }` rule; `@media print` switches from `overflow: visible` to **`overflow: hidden !important`**, adds `height: auto !important; max-height: none !important; white-space: pre-wrap; word-break: break-word; scrollbar-width/-ms none; field-sizing: content`, plus the webkit-scrollbar kill; Print button now runs `resizeTripTextareas()` → `requestAnimationFrame` → `window.print()`; `resizeTripTextareas()` also fires on `DOMContentLoaded` (was `load` only), `beforeprint` kept as backup.
+- [x] `summary-print-travelorder.php` — mirrors: Purpose call site `charsPerLine = 22`; `.tbl-itinerary textarea` scrollbar-hiding CSS (screen + webkit + print, `overflow: hidden`, `height: auto`, `max-height: none`, `field-sizing: content`); Print button resize → rAF → print; `DOMContentLoaded` resize added.
+- [x] No DB/storage changes; create-form length limits untouched; TCPDF `trip-tickets/export-pdf.php` untouched.
+
+## QA — verified 2026-09-26 (`_deploy_tmp/verify_plan29_print.php` + worst-case fixture; slip rows removed after)
+
+- [x] Rows math: 300-char purpose @ 22 cpl → **14 rows**, 310-char → **15 rows** (both above the old 12 cap — no more clipping), 1000-char → capped at 40, short → min 2, hard newlines respected.
+- [x] Live render: `?page=my-trip-tickets&action=generate-summary&print=1&template=vehicle` with a seeded vehicle + 3 Sept-2026 completed trips (300-char / 310-char / short purposes) — emitted textareas carry rows 14/15, `overflow: hidden !important` and the scrollbar-kill CSS (grep + render PASS).
+- [x] Headless-Chrome print-to-PDF: **no scrollbar chrome anywhere** in the Purpose/Destination cells; both long purposes render **complete to their final words** ("…turn-over of communication equipment." / "…project management office.") — the reported `S ki C` / `Fib O i C bl` clipping is gone (browser screenshots of both PDF pages).
+- [x] Mixed render sanity: the ticket also included pre-existing live rows — everything renders fully alongside the smoke rows.
+- [x] Travelorder variant: mirrored CSS/JS in place, render PASS, purpose call site tightened.
+- [x] `php -l` clean on `functions.php` + both print templates + full public_html sweep 0 errors; `ob-signature.js` unchanged-size pads unaffected (fit flag only on CoA).
+- [x] **Deployed to live** `lokafleet.dictr2.cloud` on 2026-09-26 — surgical upload of the 3 Plan #29 files into `/home/lokafleet_main/htdocs/lokafleet.dictr2.cloud/public_html/`; backup `/home/lokafleet_main/backups/pre_plan29_20260926_095849/`; health 200; live grep confirms `max = 40`, scrollbar-kill CSS, DOMContentLoaded resize.
+
+## Files
+
+- `public_html/includes/functions.php` — `tripTicketTextareaRows()`
+- `public_html/pages/my-trip-tickets/summary-print.php`
+- `public_html/pages/my-trip-tickets/summary-print-travelorder.php`
+- `Plan.md`
+
+## Out of scope
+
+Rewriting TCPDF `trip-tickets/export-pdf.php`. Changing Purpose DB/storage or create-form length limits.
+
+---
+
+# LOKA Plan #30: All-Trip Visibility for Motorpool Head + Department Approver — ✅ DONE (2026-09-27, live `lokafleet.dictr2.cloud`)
+
+## Goal
+
+Let **Motorpool Head** and **Department Approver** accounts see **all vehicle trip requests from every department**, matching the trip visibility intended for Administrator / All Father accounts.
+
+This is a visibility change, not a blanket permission increase: seeing another department's trip must not by itself grant edit, cancel, rollback, override, dispatch, completion, or approval rights.
+
+## Current behavior and gaps
+
+- `pages/requests/index.php` shows all non-deleted requests only when `isAdmin()` is true. Motorpool Head and Department Approver therefore see only requests they personally created.
+- `pages/requests/view.php` and `pages/requests/print.php` already allow `isApprover()` users to open/print any request. The missing piece is discoverability from the list.
+- `pages/completed-trips/index.php` gives Motorpool Head all completed trips, but Department Approver is limited to their department.
+- Completed-trip filtering compares exact role names and checks driver status first. As a result, an Approver/Motorpool/Admin account that is also tagged as a driver can be reduced to its own driver trips, and an All Father role can fall through to requester-only results.
+- The **Approvals** page is intentionally a work queue. Department Approvers must continue to approve only eligible requests in their department; Motorpool Heads continue to process the motorpool stage.
+
+## Decisions
+
+1. **All trips means all departments and all request statuses** on `/?page=requests`, excluding soft-deleted rows.
+2. **Completed Trips also becomes system-wide** for Department Approver, Motorpool Head, Administrator, and All Father.
+3. Add one explicit visibility helper, e.g. `canViewAllTripRequests()`, instead of repeating exact role comparisons. It should follow the existing role hierarchy and View-as behavior; in this codebase `isApprover()` covers Approver, Motorpool, Admin, and real All Father at or above the approver level.
+4. A privileged account that is also a driver gets the privileged all-trip view. Driver-only accounts remain scoped to their assigned/requested trips.
+5. Keep revision alerts and unread-notification badges personal to the logged-in user; do not present another requester's alerts as the viewer's work.
+6. On the expanded Requests list, unrelated rows expose **View** only. Owner actions stay owner-scoped, while existing Admin/All Father and Motorpool operational controls remain available only where their current server-side checks permit them.
+7. Keep the sidebar route as **Requests**. Use role-aware page copy such as **All Trip Requests** for users with system-wide visibility and **My Requests** for scoped users.
+8. No database migration, new role, duplicated trip page, or change to soft-delete behavior.
+
+## Implementation checklist — ✅ DONE (2026-09-27)
+
+- [x] `public_html/includes/functions.php` — added `canViewAllTripRequests(): bool` after `isApprover()`: Approver+ (Department Approver, Motorpool Head, Administrator, All Father) with a policy comment (visibility only, no action rights). View-as handled explicitly — `isApprover()`/`hasRole()` read the **raw** session role, so without the guard, View-as Requester/Driver/Guard would inherit the real All Father account's level-99 hierarchy; the helper maps View-as Approver/Motorpool/Admin to the global view and every other View-as role to scoped.
+- [x] `public_html/pages/requests/index.php` — all-row condition swapped from `isAdmin()` to `!canViewAllTripRequests()`; requester scoping kept for all other users.
+- [x] `public_html/pages/requests/index.php` — role-aware copy (`$pageTitle` + heading + breadcrumb stay "Requests"; heading **All Trip Requests** vs **My Requests**; role-aware empty state); a **Requester/Department column** appears only in the global view; revision alert and unread-notification badges are strictly personal (`user_id = userId()`) and notification links are parsed by exact `id` query parameter; row actions owner-scoped — unrelated rows get **View only**, owner keeps Edit/Cancel, Administrator/All Father keep their server-side edit/cancel reach.
+- [x] `public_html/pages/requests/cancel.php` — server-side cancellation is owner or `isAdmin()` only. Department Approver and Motorpool all-trip visibility cannot be converted into cancellation rights through a direct URL.
+- [x] `public_html/pages/completed-trips/index.php` — filtering order is now **all-trip → driver → guard → requester**; the department-scoped `ROLE_APPROVER` branch and the exact-match `ROLE_MOTORPOOL/ROLE_ADMIN` branch were removed in favour of `canViewAllTripRequests()`, evaluated before the driver scope so a driver-tagged privileged account keeps the system-wide view (QA item). Dispatch/Arrival columns stay Motorpool/Admin-only (operational info, per decision 6).
+- [x] `public_html/pages/completed-trips/index.php` — explanatory copy is now `canViewAllTripRequests()`-first: Approver, Motorpool, Admin, and All Father see "All completed trips in the system."
+- [x] Reviewed `pages/requests/view.php` + `print.php` — both already gate any-request access on `isApprover()`; reusing the helper would change nothing, so left untouched per plan.
+- [x] Confirmed `pages/approvals/index.php` + `process.php` — queue is **assignment-scoped** (`approver_id` / `motorpool_head_id`) with its own server-side eligibility checks; no reference to the new helper, so the approval queue remains a department/stage work queue.
+- [x] `php -l` clean on all four touched PHP files; harness QA below.
+
+## Post-implementation review closure — fixed 2026-09-27
+
+- [x] Closed the direct-URL permission gap: `cancel.php` previously allowed any `isApprover()` / `isMotorpool()` account to cancel unrelated requests even though the global list exposed View only. The endpoint now enforces owner or Administrator/All Father.
+- [x] Replaced substring notification matching (`id=5` incorrectly matching `id=50`) with exact URL query parsing and removed the request-count-sized SQL `OR ... LIKE` list.
+- [x] Removed trailing whitespace found by `git diff --check`.
+- [x] `php -l`, IDE diagnostics, and `git diff --check` clean on the Plan #30 PHP files.
+
+## QA role matrix — verified 2026-09-27 via render harness `_deploy_tmp/verify_plan30.php` (persona session injection, page include inside a rolled-back transaction, rendered request-ID sets diffed against DB expectations; run once per persona so static caches reset)
+
+- [x] Department Approver (user 3): Requests renders the **full 631-row global set** (pending/approved/rejected/cancelled/completed, multi-department); Completed Trips page 1 rows are all system-wide members with "All completed trips in the system" copy. Rows open via View (view/print.php `isApprover()` access unchanged).
+- [x] Department Approver: Approvals queue untouched — assignment-scoped by code review; unrelated trip #545 (pending, other owner) exposes **View only** — no edit/cancel buttons — and the approval/process server-side gates were not modified.
+- [x] Motorpool Head (user 14): Requests + Completed Trips system-wide; motorpool-stage/vehicle/driver controls live on other pages behind their own checks (untouched).
+- [x] Administrator (115) and All Father (1): full global Requests set + system-wide Completed Trips — behaviour retained.
+- [x] Driver-tagged privileged accounts: Approver user 3 (driver 12) and Motorpool user 14 (driver 14) both get the **all-trip** view on Completed Trips — the all-trip branch now evaluates before the driver scope.
+- [x] Driver-only account (user 15, driver 5): Completed Trips rows exactly `driver_id/requested_driver_id`-scoped (25 on page 1); My Requests scoped by user_id.
+- [x] Guard (user 32): Completed Trips rows exactly `dispatch_guard_id/arrival_guard_id`-scoped; copy "Trips you tracked at the gate".
+- [x] Requester/driver-tagged requester (15), Chief/OIC Chief Admin & Finance (43): own-record scoped on both pages — no other role rule leaked.
+- [x] View-as: `va_requester`/`va_guard`/`va_approver` harness personas — View-as Requester/Guard see scoped lists (heading "My Requests", own-records rows); View-as Approver gets the global view. The real All Father global list does **not** leak (explicit View-as branch in the helper).
+- [x] Soft-delete: `--softdelete-only` run soft-deletes request #49 inside the transaction — absent from **both** lists for Approver and View-as Requester; DB verified unchanged after rollback.
+
+## Files
+
+- `public_html/includes/functions.php`
+- `public_html/pages/requests/index.php`
+- `public_html/pages/requests/cancel.php`
+- `public_html/pages/completed-trips/index.php`
+- Review only unless needed: `public_html/pages/requests/view.php`
+- Review only unless needed: `public_html/pages/requests/print.php`
+- Review only: `public_html/pages/approvals/index.php`
+- Review only: `public_html/pages/approvals/process.php`
+- `Plan.md`
+
+## Out of scope
+
+Changing approval authority, department ownership, request workflow statuses, Live Trip Board access, Guard operations, trip-ticket review, reports/exports, OB Pass Slips, notifications, or database schema.
+
+## Deployment
+
+- [x] Deployed to live `lokafleet.dictr2.cloud` on 2026-09-27 — surgical upload of Plan #30 PHP files; prod DB/uploads/`.env` untouched; no migrations.
 

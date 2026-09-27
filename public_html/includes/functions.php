@@ -285,6 +285,22 @@ function isApprover(): bool
 }
 
 /**
+ * Plan #30 — system-wide trip visibility: Approver and above (Department
+ * Approver, Motorpool Head, Administrator, All Father) may LIST all vehicle
+ * trip requests/completed trips from every department. Visibility only —
+ * seeing another department's trip grants no edit, cancel, approval, or
+ * dispatch rights. View-as follows the effective role so the real All Father
+ * account's global list does not leak into Requester/Driver/Guard views.
+ */
+function canViewAllTripRequests(): bool
+{
+    if (isViewingAs()) {
+        return in_array(getViewAsRole(), [ROLE_APPROVER, ROLE_MOTORPOOL, ROLE_ADMIN], true);
+    }
+    return hasRole(ROLE_APPROVER);
+}
+
+/**
  * Generate CSRF token
  */
 function csrfToken(): string
@@ -425,7 +441,7 @@ function formatDestinationChain(?string $destination): string
 /**
  * Rows so generated trip-ticket destination/purpose cells wrap instead of clipping.
  */
-function tripTicketTextareaRows(?string $text, int $charsPerLine = 28, int $min = 2, int $max = 12): int
+function tripTicketTextareaRows(?string $text, int $charsPerLine = 28, int $min = 2, int $max = 40): int
 {
     $text = trim((string) $text);
     if ($text === '' || $text === '-') {
