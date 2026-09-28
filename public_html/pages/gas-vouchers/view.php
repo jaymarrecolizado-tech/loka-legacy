@@ -115,7 +115,7 @@ require_once INCLUDES_PATH . '/header.php';
 
                 <!-- Voucher Details -->
                 <div class="card mb-4">
-                    <div class="card-header">
+                    <div class="card-header bg-white">
                         <h3 class="card-title mb-0"><i class="bi bi-file-earmark-text me-2"></i>Voucher Details</h3>
                     </div>
                     <div class="card-body">
@@ -138,7 +138,7 @@ require_once INCLUDES_PATH . '/header.php';
 
                 <!-- Vehicle & Driver -->
                 <div class="card mb-4">
-                    <div class="card-header">
+                    <div class="card-header bg-white">
                         <h3 class="card-title mb-0"><i class="bi bi-car-front me-2"></i>Vehicle & Driver</h3>
                     </div>
                     <div class="card-body">
@@ -157,7 +157,7 @@ require_once INCLUDES_PATH . '/header.php';
 
                 <!-- Articles / Fuel -->
                 <div class="card mb-4">
-                    <div class="card-header bg-warning text-dark">
+                    <div class="card-header bg-white">
                         <h3 class="card-title mb-0"><i class="bi bi-fuel-pump me-2"></i>Articles Requested</h3>
                     </div>
                     <div class="card-body p-0">
@@ -191,7 +191,7 @@ require_once INCLUDES_PATH . '/header.php';
 
                 <!-- Purpose & Fund -->
                 <div class="card mb-4">
-                    <div class="card-header">
+                    <div class="card-header bg-white">
                         <h3 class="card-title mb-0"><i class="bi bi-clipboard-data me-2"></i>Fund & Purpose</h3>
                     </div>
                     <div class="card-body">
@@ -229,7 +229,7 @@ require_once INCLUDES_PATH . '/header.php';
 
                 <!-- Approval Workflow -->
                 <div class="card mb-4">
-                    <div class="card-header">
+                    <div class="card-header bg-white">
                         <h3 class="card-title mb-0"><i class="bi bi-diagram-3 me-2"></i>Approval Workflow</h3>
                     </div>
                     <div class="card-body p-0">
@@ -368,7 +368,7 @@ require_once INCLUDES_PATH . '/header.php';
 
                 <!-- Payment Status -->
                 <div class="card mb-4">
-                    <div class="card-header">
+                    <div class="card-header bg-white">
                         <h3 class="card-title mb-0"><i class="bi bi-cash me-2"></i>Payment Status</h3>
                     </div>
                     <div class="card-body text-center">

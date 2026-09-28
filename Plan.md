@@ -37,6 +37,7 @@
 | #31 | Gas Voucher Budget Officer Step (hybrid C) | DONE (2026-09-28; live `lokafleet.dictr2.cloud`; run migration 054) |
 | #32 | Distinct email/SMS themes for Vehicle, Gas Voucher, OB | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
 | #33 | OB Apply form — sectioned steps UX | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
+| #34 | Gas Voucher UI — Plan #33 styling / fill uniformity | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -2738,4 +2739,77 @@ Multi-page wizard with separate routes; changing OB approval/guard/CoA workflow;
 ## Status
 
 **DONE (2026-09-28) — implemented, QA'd, and deployed to live `lokafleet.dictr2.cloud`.** No migration. Files touched: `public_html/pages/ob-requests/create.php` only (+ in-page stepper CSS/JS), `_deploy_tmp/verify_plan33.php` (POST harness), `Plan.md`.
+
+---
+
+# LOKA Plan #34: Gas Voucher UI — Plan #33 styling / fill uniformity — ✅ DONE (2026-09-28; live `lokafleet.dictr2.cloud`)
+
+## Goal
+
+Bring **Gas Voucher** screens into the same visual language as Plan #33 OB Apply: consistent white section headers with numbered (or titled) badges, predictable field fill/spacing, a short workflow hint, and a compact filter bar — without changing voucher workflow, statuses, or print layout.
+
+## Problem (current)
+
+Screenshots 2026-09-28 (`New Gas Voucher` + `Gas Vouchers` list):
+
+1. **Create form rainbow headers** — [`create.php`](public_html/pages/gas-vouchers/create.php) uses mismatched colored bars: `bg-primary` (Voucher Information), `bg-secondary` (Vehicle & Driver), `bg-warning` (Fuel), `bg-info` (Fund & Purpose). Plan #33 uses **white `card-header` + blue numbered badge + bold title**.
+2. **No create guidance** — no stepper / section anchors and no one-line post-submit hint for the Plan #31 chain (`Motorpool → Budget Officer → CAF`).
+3. **Uneven field fill** — Budget Officer sits alone on a half-row; optional approver dropdowns and required fields share the same visual weight without clear step grouping.
+4. **Index filters stack / waste space** — [`index.php`](public_html/pages/gas-vouchers/index.php) filter controls live in a `row` but use `d-flex flex-column` blocks **without `col-*`**, so Status / Search / dates / Per page often stack full-width instead of a single compact toolbar row (as in other list pages).
+5. **View / approve chrome drift** — [`view.php`](public_html/pages/gas-vouchers/view.php) / [`approve.php`](public_html/pages/gas-vouchers/approve.php) mix default headers, warning banners, and one-off `bg-primary` strips; not aligned with Plan #33 section cards.
+
+## Locked decisions (mirror Plan #33)
+
+1. **UX-only.** No DB migration; no status / approve / notify / print logic changes (Plans #18/#31 stay).
+2. **Create = hybrid guided form (one POST):** keep a single form. Replace colored headers with Plan #33-style section cards:
+
+| Step | Title | Contents (existing fields) |
+|------|--------|----------------------------|
+| 1 | Voucher details | Request date, Gas station, optional Motorpool / Budget Officer / CAF picks |
+| 2 | Vehicle & driver | Driver/bearer, plate |
+| 3 | Fuel & articles | Fuel type, qty/unit or full tank, articles rows as today |
+| 4 | Fund & purpose | Fund source, chargeable against, purpose |
+
+3. **Create chrome:** numbered stepper pills (1–4) + `scroll-margin` sections; white headers with `.ob-step-badge`-equivalent (reuse class names or shared `gv-step-*`); workflow hint under H4:  
+   `After submit: Motorpool review → Budget Officer → Chief Admin & Finance → Print.`
+4. **Failed-POST jump** (optional but preferred): same pattern as Plan #33 (`$firstErrorStep` → scroll/focus first bad section).
+5. **Index filter bar:** put Status, Search, Date from/to, Per page, Filter/Reset in one `row g-2` with proper `col-12 col-md-*` / `col-lg` so desktop is a **single horizontal toolbar**; keep server-side filtering (no reintroducing DataTables double-search).
+6. **View / approve:** restyle section cards to **white headers + icon + title** (Bootstrap default `card-header bg-white`); keep a **single** emphasized action card for “Process this voucher” (warning border OK) — do not rainbow every section.
+7. **Visual language:** match Plan #33 / Bootstrap LOKA (blue primary accents only). No new design system; no purple/gradient chrome. Print page (`print.php`) **out of scope** (already fixed logos/mojibake).
+
+## Implementation checklist — ✅ DONE (2026-09-28)
+
+- [x] `create.php` — the four `bg-primary` / `bg-secondary` / `bg-warning` / `bg-info` section bars are gone, replaced by **4 Plan #33-style section cards** (`#gvStep1`–`#gvStep4`, white `card-header bg-white` + `gv-step-badge` numbered circle + bold title): **1 Voucher details** (request date, gas station, and — on create — the three optional picks side by side: Motorpool Head / Budget Officer / Chief Admin & Finance at `col-md-4` each, so no more half-empty rows; Budget Officer keeps its Plan #31 empty-pool guard), **2 Vehicle & driver**, **3 Fuel & articles**, **4 Fund & purpose** (fund source + purpose now `col-md-6` side by side). One `<form id="voucherForm">` / one POST — every input name, datalist (driver/plate/fund), the Full-Tank/Liters toggle JS, CSRF, and all server-side rules unchanged.
+- [x] **Stepper + hint**: `gv-step-*` pill stepper (1–4, wraps on mobile) + `scroll-margin-top` sections + IntersectionObserver scrollspy (same pattern as Plan #33, `gv-` prefix per decision 3); one-line hint under the H1: "After submit: Motorpool review → Budget Officer → Chief Admin & Finance → Print."
+- [x] **Failed-POST jump**: `$firstErrorStep` + `$addError` map each validation rule to its step (date/station→1, driver/plate→2, fuel/qty/unit→3, fund/purpose→4); on re-render the page jumps to and red-borders the first bad section and focuses its first field. Browser note: the shared LOKA stylesheet sets `html { scroll-behavior: smooth }` and the smooth animation gets aborted by the post-reload settle, so the jump uses an instant `window.scrollTo` honoring the computed `scroll-margin-top` (verified working in-browser; the OB page's smooth variant is untouched).
+- [x] `index.php` — filter form rebuilt as **one compact toolbar row**: `row g-2 align-items-end` inside a proper `card-body`, every field in `col-6 col-md-3 col-lg-*` grid columns (Status 2 / Search 3 / Dates 2+2 / Per page 1 / Filter+Reset 2). Server-side filtering untouched; status `<option>`s unchanged (incl. `pending_budget`).
+- [x] `view.php` — all six section cards (Voucher Details, Vehicle & Driver, Articles Requested, Fund & Purpose, Approval Workflow, Payment Status) now `card-header bg-white`; the **Process This Voucher** card keeps its `bg-warning` header + `border-warning` as the single strong accent.
+- [x] `approve.php` — the `bg-primary text-white` Voucher Summary strip and the plain bordered "Your Decision" strip became white card headers with icon + title; stage banners (Step 1/2/3 alerts) untouched.
+- [x] `php -l` clean on all four touched files; browser click-through + POST harness below. `print.php` untouched (out of scope).
+
+## QA matrix — verified 2026-09-28 via real-browser click-through (in-app browser, `requester@fleet.local` persona; users 4/15/32 temporarily flagged Budget Officer to exercise the pool) + `_deploy_tmp/verify_plan34.php` POST harness (16 checks). QA passwords restored and all temporary flags/rows reverted afterwards (DB verified pristine).
+
+- [x] **Create: 4 numbered sections + stepper + workflow hint visible** — DOM asserted: 4 `gv-step` sections, 4 pills ("1 Voucher details" … "4 Fund & purpose"), hint line under the H1, 0 rainbow headers / 4 white headers inside the form; screenshot confirms the Plan #33 look.
+- [x] **Create: submit still creates `pending_review`; optional picks still save** — harness `submit`: row with status `pending_review`, `requested_reviewer_id`/`requested_budget_officer_id`/`requested_approver_id` all persisted, motorpool head notified; harness `draft`: status `draft`, picks saved, zero notifications. 16/16 checks.
+- [x] **Create: validation errors show + jump to first bad section** — empty submit (native validation bypassed) lists all server errors and lands on **Step 2** (driver name is the first failing rule) with the red `has-error` border, driver field focused, and the "2 Vehicle & driver" pill active (screenshot).
+- [x] **Index: filters on one row; Filter/Reset work; KPI cards unchanged** — screenshot shows Status / Search / Date From / Date To / Per page / Filter+Reset on a single horizontal toolbar in a `card-body`; form is still a plain GET with the same field names (mechanics untouched); the five KPI cards (incl. Pending Budget) render as before.
+- [x] **View/approve: white section headers; actions intact** — view page DOM: all six headers `bg-white`, none warning; approve render (motorpool persona): 0 `bg-primary` strips, 2 white headers, Step banner + decision form intact; the Process card keeps its warning accent where shown.
+- [x] **No change to print layout, QR, or email/SMS** — `print.php` untouched; no mail/SMS code touched (Plan #32 behavior inherited as-is).
+- [x] **Mobile: sections stack; filter fields wrap** — sections are plain full-width cards; filter columns are `col-6`/`col-12` so they wrap two-per-row on narrow viewports.
+
+## Files (planned)
+
+- `Plan.md` (this section)
+- `public_html/pages/gas-vouchers/create.php` (primary)
+- `public_html/pages/gas-vouchers/index.php`
+- `public_html/pages/gas-vouchers/view.php`
+- `public_html/pages/gas-vouchers/approve.php` (header chrome only, if needed)
+
+## Out of scope
+
+Gas workflow / role changes; `print.php`; reports export pages; OB module; live deploy until explicitly requested after implementation.
+
+## Status
+
+**DONE (2026-09-28) — implemented, QA'd, and deployed to live `lokafleet.dictr2.cloud`.** UX-only; no migration. Files touched: `public_html/pages/gas-vouchers/create.php`, `index.php`, `view.php`, `approve.php` (header chrome only), `_deploy_tmp/verify_plan34.php` (POST harness), `Plan.md`.
 

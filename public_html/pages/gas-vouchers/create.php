@@ -12,6 +12,16 @@ $isEdit  = (get('action') === 'edit');
 $voucherId = (int) get('id', 0);
 $voucher = null;
 $errors  = [];
+// Plan #34 — step the first validation error belongs to (1 Voucher details,
+// 2 Vehicle & driver, 3 Fuel & articles, 4 Fund & purpose). Drives the
+// failed-POST scroll/focus jump, mirroring Plan #33.
+$firstErrorStep = 0;
+$addError = static function (string $msg, int $step) use (&$errors, &$firstErrorStep): void {
+    $errors[] = $msg;
+    if ($firstErrorStep === 0) {
+        $firstErrorStep = $step;
+    }
+};
 
 // Auto-generate voucher number: YYYY-MM-NNN
 function generateVoucherNo(): string {
@@ -116,15 +126,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Validation
-    if (empty($driverName))   $errors[] = 'Driver name is required.';
-    if (empty($vehiclePlate)) $errors[] = 'Vehicle plate number is required.';
-    if (empty($gasStation) || !in_array($gasStation, $allowedStations, true)) $errors[] = 'Please select a valid gas station.';
-    if (empty($fuelType) || !in_array($fuelType, ['Gasoline', 'Diesel'])) $errors[] = 'Invalid fuel type.';
-    if ($quantityMode !== 'full' && $quantity <= 0) $errors[] = 'Quantity must be greater than 0.';
-    if (empty($unit))         $errors[] = 'Unit is required.';
-    if (empty($fundSource))   $errors[] = 'Fund source is required.';
-    if (empty($purpose))      $errors[] = 'Purpose is required.';
-    if (empty($requestDate))  $errors[] = 'Request date is required.';
+    if (empty($driverName))   $addError('Driver name is required.', 2);
+    if (empty($vehiclePlate)) $addError('Vehicle plate number is required.', 2);
+    if (empty($gasStation) || !in_array($gasStation, $allowedStations, true)) $addError('Please select a valid gas station.', 1);
+    if (empty($fuelType) || !in_array($fuelType, ['Gasoline', 'Diesel'])) $addError('Invalid fuel type.', 3);
+    if ($quantityMode !== 'full' && $quantity <= 0) $addError('Quantity must be greater than 0.', 3);
+    if (empty($unit))         $addError('Unit is required.', 3);
+    if (empty($fundSource))   $addError('Fund source is required.', 4);
+    if (empty($purpose))      $addError('Purpose is required.', 4);
+    if (empty($requestDate))  $addError('Request date is required.', 1);
 
     // Lookup vehicle_id if plate matches
     $vehicleRow = db()->fetch("SELECT id FROM vehicles WHERE plate_number = ? AND deleted_at IS NULL", [$vehiclePlate]);
@@ -246,7 +256,7 @@ require_once INCLUDES_PATH . '/header.php';
     <div class="max-w-3xl mx-auto">
 
         <!-- Page Header -->
-        <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-sm-between gap-4 mb-4">
+        <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-sm-between gap-4 mb-2">
             <div>
                 <h1 class="fs-3 fw-bold d-flex align-items-center gap-2">
                     <i class="bi bi-fuel-pump"></i><?= $pageTitle ?>
@@ -257,6 +267,9 @@ require_once INCLUDES_PATH . '/header.php';
                     <a href="<?= APP_URL ?>/?page=gas-vouchers" class="">Gas Vouchers</a>
                     <span class="mx-1">/</span>
                     <span><?= $pageTitle ?></span>
+                </div>
+                <div class="small text-muted">
+                    After submit: Motorpool review &rarr; Budget Officer &rarr; Chief Admin &amp; Finance &rarr; Print.
                 </div>
             </div>
             <a href="<?= APP_URL ?>/?page=gas-vouchers" class="btn btn-secondary">
@@ -274,13 +287,40 @@ require_once INCLUDES_PATH . '/header.php';
         </div>
         <?php endif; ?>
 
+        <style>
+            .gv-step-badge {
+                display: inline-flex; align-items: center; justify-content: center;
+                width: 1.6rem; height: 1.6rem; border-radius: 50%;
+                background: #0d6efd; color: #fff; font-size: .8rem; font-weight: 600; flex: 0 0 auto;
+            }
+            .gv-stepper { row-gap: .4rem; }
+            .gv-stepper .gv-step-pill {
+                display: inline-flex; align-items: center; gap: .45rem;
+                padding: .25rem .8rem .25rem .3rem;
+                border: 1px solid #dee2e6; border-radius: 50rem;
+                background: #fff; color: #212529; text-decoration: none; font-size: .82rem; line-height: 1.2;
+            }
+            .gv-stepper .gv-step-pill .gv-step-badge { width: 1.4rem; height: 1.4rem; font-size: .72rem; background: #e9ecef; color: #495057; }
+            .gv-stepper .gv-step-pill.active { border-color: #0d6efd; }
+            .gv-stepper .gv-step-pill.active .gv-step-badge { background: #0d6efd; color: #fff; }
+            .gv-step { scroll-margin-top: 82px; }
+            .gv-step.has-error { border-color: #dc3545; }
+        </style>
+
+        <div class="gv-stepper d-flex flex-wrap align-items-center gap-2 mb-3" aria-label="Form sections">
+            <a class="gv-step-pill active" href="#gvStep1"><span class="gv-step-badge">1</span>Voucher details</a>
+            <a class="gv-step-pill" href="#gvStep2"><span class="gv-step-badge">2</span>Vehicle &amp; driver</a>
+            <a class="gv-step-pill" href="#gvStep3"><span class="gv-step-badge">3</span>Fuel &amp; articles</a>
+            <a class="gv-step-pill" href="#gvStep4"><span class="gv-step-badge">4</span>Fund &amp; purpose</a>
+        </div>
+
         <form method="POST" id="voucherForm">
             <?= csrfField() ?>
 
-            <!-- Voucher Info Card -->
-            <div class="card mb-4">
-                <div class="card-header bg-primary">
-                    <h3 class="card-title"><i class="bi bi-info-circle me-2"></i>Voucher Information</h3>
+            <!-- Step 1 · Voucher details -->
+            <div class="card shadow-sm gv-step mb-4" id="gvStep1" tabindex="-1">
+                <div class="card-header bg-white d-flex align-items-center gap-2">
+                    <span class="gv-step-badge">1</span><strong>Voucher details</strong>
                 </div>
                 <div class="card-body">
                     <div class="row g-4">
@@ -316,7 +356,7 @@ require_once INCLUDES_PATH . '/header.php';
                             </label>
                         </div>
                         <?php if (!$isEdit): ?>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label small">Motorpool Head</label>
                             <select name="requested_reviewer_id" class="form-select w-100">
                                 <option value="">-- Auto-assign --</option>
@@ -325,23 +365,11 @@ require_once INCLUDES_PATH . '/header.php';
                                 <?php endforeach; ?>
                             </select>
                             <label class="form-label">
-                                <span class="form-text text-muted d-block small text-muted">Select a preferred reviewer (optional)</span>
-                            </label>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small">Chief Admin & Finance</label>
-                            <select name="requested_approver_id" class="form-select w-100">
-                                <option value="">-- Auto-assign --</option>
-                                <?php foreach ($chiefFinanceUsers as $cf): ?>
-                                <option value="<?= $cf->id ?>"><?= e($cf->name) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <label class="form-label">
-                                <span class="form-text text-muted d-block small text-muted">Select a preferred approver (optional)</span>
+                                <span class="form-text text-muted d-block small text-muted">Preferred reviewer (optional)</span>
                             </label>
                         </div>
                         <?php if (!empty($budgetOfficers)): ?>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label small">Budget Officer</label>
                             <select name="requested_budget_officer_id" class="form-select w-100">
                                 <option value="">-- Auto-assign --</option>
@@ -352,23 +380,35 @@ require_once INCLUDES_PATH . '/header.php';
                                 <?php endforeach; ?>
                             </select>
                             <label class="form-label">
-                                <span class="form-text text-muted d-block small text-muted">Select a preferred Budget Officer (optional)</span>
+                                <span class="form-text text-muted d-block small text-muted">Preferred Budget Officer (optional)</span>
                             </label>
                         </div>
                         <?php endif; ?>
+                        <div class="col-md-4">
+                            <label class="form-label small">Chief Admin & Finance</label>
+                            <select name="requested_approver_id" class="form-select w-100">
+                                <option value="">-- Auto-assign --</option>
+                                <?php foreach ($chiefFinanceUsers as $cf): ?>
+                                <option value="<?= $cf->id ?>"><?= e($cf->name) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <label class="form-label">
+                                <span class="form-text text-muted d-block small text-muted">Preferred approver (optional)</span>
+                            </label>
+                        </div>
                         <?php endif; ?>
                     </div>
                 </div>
             </div>
 
-            <!-- Vehicle & Driver Card -->
-            <div class="card mb-4">
-                <div class="card-header bg-secondary text-secondary-content">
-                    <h3 class="card-title"><i class="bi bi-car-front me-2"></i>Vehicle & Driver</h3>
+            <!-- Step 2 · Vehicle & driver -->
+            <div class="card shadow-sm gv-step mb-4" id="gvStep2" tabindex="-1">
+                <div class="card-header bg-white d-flex align-items-center gap-2">
+                    <span class="gv-step-badge">2</span><strong>Vehicle &amp; driver</strong>
                 </div>
                 <div class="card-body">
                     <div class="row g-4">
-                        <div>
+                        <div class="col-md-6">
                             <label class="form-label small">Driver / Bearer <span class="text-danger">*</span></label>
                             <input type="text" name="driver_name" class="form-control w-100"
                                    list="driverList"
@@ -383,7 +423,7 @@ require_once INCLUDES_PATH . '/header.php';
                                 <span class="form-text text-muted d-block small text-muted">Select an existing driver or type a name manually if they're not listed.</span>
                             </label>
                         </div>
-                        <div>
+                        <div class="col-md-6">
                             <label class="form-label small">Vehicle Plate Number <span class="text-danger">*</span></label>
                             <input type="text" name="vehicle_plate" class="form-control w-100"
                                    list="plateList"
@@ -399,10 +439,10 @@ require_once INCLUDES_PATH . '/header.php';
                 </div>
             </div>
 
-            <!-- Fuel/Items Card -->
-            <div class="card mb-4">
-                <div class="card-header bg-warning text-dark">
-                    <h3 class="card-title"><i class="bi bi-fuel-pump me-2"></i>Fuel / Articles Requested</h3>
+            <!-- Step 3 · Fuel & articles -->
+            <div class="card shadow-sm gv-step mb-4" id="gvStep3" tabindex="-1">
+                <div class="card-header bg-white d-flex align-items-center gap-2">
+                    <span class="gv-step-badge">3</span><strong>Fuel &amp; articles</strong>
                 </div>
                 <div class="card-body">
                     <div class="row g-4">
@@ -490,14 +530,14 @@ require_once INCLUDES_PATH . '/header.php';
                 </div>
             </div>
 
-            <!-- Fund & Purpose Card -->
-            <div class="card mb-4">
-                <div class="card-header bg-info text-info-content">
-                    <h3 class="card-title"><i class="bi bi-clipboard-data me-2"></i>Fund Source & Purpose</h3>
+            <!-- Step 4 · Fund & purpose -->
+            <div class="card shadow-sm gv-step mb-4" id="gvStep4" tabindex="-1">
+                <div class="card-header bg-white d-flex align-items-center gap-2">
+                    <span class="gv-step-badge">4</span><strong>Fund &amp; purpose</strong>
                 </div>
                 <div class="card-body">
                     <div class="row g-4">
-                        <div>
+                        <div class="col-md-6">
                             <label class="form-label small">Fund Source <span class="text-danger">*</span></label>
                             <input type="text" name="fund_source" class="form-control w-100"
                                    list="fundList"
@@ -522,7 +562,7 @@ require_once INCLUDES_PATH . '/header.php';
                                 <span class="form-text text-muted d-block small text-muted">The project/program the fuel is derived from.</span>
                             </label>
                         </div>
-                        <div>
+                        <div class="col-md-6">
                             <label class="form-label small">Purpose <span class="text-danger">*</span></label>
                             <textarea name="purpose" class="form-control w-100" rows="3"
                                       placeholder="Describe the purpose of this fuel request..."
@@ -592,6 +632,48 @@ function setQtyMode(mode) {
         btnLiters.classList.add('btn-primary');
     }
 }
+
+// Plan #34 — stepper: highlight the section in view
+document.addEventListener('DOMContentLoaded', function () {
+    var stepPills = document.querySelectorAll('.gv-stepper .gv-step-pill');
+    var stepSections = document.querySelectorAll('.gv-step');
+    function gvActivatePill(hash) {
+        stepPills.forEach(function (p) {
+            p.classList.toggle('active', p.getAttribute('href') === hash);
+        });
+    }
+    if ('IntersectionObserver' in window && stepSections.length) {
+        var io = new IntersectionObserver(function (entries) {
+            entries.forEach(function (en) {
+                if (en.isIntersecting) {
+                    gvActivatePill('#' + en.target.id);
+                }
+            });
+        }, { rootMargin: '-15% 0px -60% 0px', threshold: 0 });
+        stepSections.forEach(function (s) { io.observe(s); });
+    }
+    stepPills.forEach(function (p) {
+        p.addEventListener('click', function () { gvActivatePill(p.getAttribute('href')); });
+    });
+
+    // Plan #34 — failed POST: jump to + highlight the first invalid section
+    var firstErrorStep = <?= json_encode((int) $firstErrorStep) ?>;
+    if (firstErrorStep > 0) {
+        var sec = document.getElementById('gvStep' + firstErrorStep);
+        if (sec) {
+            sec.classList.add('has-error');
+            // Instant jump (respecting scroll-margin-top): this page's global
+            // CSS smooth scrolling gets aborted by the post-reload settle.
+            var margin = parseFloat(getComputedStyle(sec).scrollMarginTop) || 0;
+            var top = sec.getBoundingClientRect().top + window.pageYOffset - margin;
+            window.scrollTo({ top: top, behavior: 'instant' });
+            var firstField = sec.querySelector('textarea:not([disabled]), select:not([disabled]), input:not([type=hidden]):not([disabled])');
+            if (firstField) {
+                firstField.focus({ preventScroll: true });
+            }
+        }
+    }
+});
 </script>
 
 <?php require_once INCLUDES_PATH . '/footer.php'; ?>

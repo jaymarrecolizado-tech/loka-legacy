@@ -387,8 +387,8 @@ require_once INCLUDES_PATH . '/header.php';
 
             <!-- Voucher Summary Card -->
             <div class="card mb-4 border-primary">
-                <div class="px-6 py-4 border-b border-base-200 bg-primary text-white">
-                    <h6 class="mb-0"><i class="bi bi-fuel-pump me-2"></i>Voucher Summary</h6>
+                <div class="card-header bg-white d-flex align-items-center gap-2">
+                    <i class="bi bi-fuel-pump text-primary"></i><strong>Voucher Summary</strong>
                 </div>
                 <div class="p-4">
                     <div class="row g-3">
@@ -459,8 +459,8 @@ require_once INCLUDES_PATH . '/header.php';
 
             <!-- Decision Form -->
             <div class="card">
-                <div class="px-6 py-4 border-b border-base-200">
-                    <h6 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Your Decision</h6>
+                <div class="card-header bg-white d-flex align-items-center gap-2">
+                    <i class="bi bi-clipboard-check text-primary"></i><strong>Your Decision</strong>
                 </div>
                 <div class="p-4">
                     <?php if (!$canBudget): ?>

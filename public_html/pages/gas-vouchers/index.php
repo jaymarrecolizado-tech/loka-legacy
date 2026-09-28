@@ -159,43 +159,49 @@ require_once INCLUDES_PATH . '/header.php';
 
     <!-- Filters -->
     <div class="card mb-4">
-        <form method="GET" class="row g-3 mb-3">
-            <input type="hidden" name="page" value="gas-vouchers">
+        <div class="card-body">
+            <form method="GET" class="row g-2 align-items-end">
+                <input type="hidden" name="page" value="gas-vouchers">
 
-            <div class="d-flex flex-column gap-2 min-w-140">
-                <label class="form-label small fw-semibold text-muted text-uppercase">Status</label>
-                <select name="status" class="form-select form-select-sm">
-                    <option value="">All</option>
-                    <option value="draft" <?= $statusFilter === 'draft' ? 'selected' : '' ?>>Draft</option>
-                    <option value="pending_review" <?= $statusFilter === 'pending_review' ? 'selected' : '' ?>>Pending Review</option>
-                    <option value="pending_budget" <?= $statusFilter === 'pending_budget' ? 'selected' : '' ?>>Pending Budget</option>
-                    <option value="pending_approval" <?= $statusFilter === 'pending_approval' ? 'selected' : '' ?>>Pending Approval</option>
-                    <option value="approved" <?= $statusFilter === 'approved' ? 'selected' : '' ?>>Approved</option>
-                    <option value="rejected" <?= $statusFilter === 'rejected' ? 'selected' : '' ?>>Rejected</option>
-                    <option value="cancelled" <?= $statusFilter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
-                </select>
-            </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label small fw-semibold text-muted text-uppercase">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="draft" <?= $statusFilter === 'draft' ? 'selected' : '' ?>>Draft</option>
+                        <option value="pending_review" <?= $statusFilter === 'pending_review' ? 'selected' : '' ?>>Pending Review</option>
+                        <option value="pending_budget" <?= $statusFilter === 'pending_budget' ? 'selected' : '' ?>>Pending Budget</option>
+                        <option value="pending_approval" <?= $statusFilter === 'pending_approval' ? 'selected' : '' ?>>Pending Approval</option>
+                        <option value="approved" <?= $statusFilter === 'approved' ? 'selected' : '' ?>>Approved</option>
+                        <option value="rejected" <?= $statusFilter === 'rejected' ? 'selected' : '' ?>>Rejected</option>
+                        <option value="cancelled" <?= $statusFilter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                    </select>
+                </div>
 
-            <?= listSearchFieldHtml($searchFilter, 'Voucher no, plate, driver, purpose...') ?>
+                <div class="col-12 col-md-6 col-lg-3">
+                    <?= listSearchFieldHtml($searchFilter, 'Voucher no, plate, driver, purpose...') ?>
+                </div>
 
-            <div class="d-flex flex-column gap-2 min-w-140">
-                <label class="form-label small fw-semibold text-muted text-uppercase">Date From</label>
-                <input type="date" name="date_from" class="form-control form-control-sm" value="<?= e($dateFrom) ?>">
-            </div>
-            <div class="d-flex flex-column gap-2 min-w-140">
-                <label class="form-label small fw-semibold text-muted text-uppercase">Date To</label>
-                <input type="date" name="date_to" class="form-control form-control-sm" value="<?= e($dateTo) ?>">
-            </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label small fw-semibold text-muted text-uppercase">Date From</label>
+                    <input type="date" name="date_from" class="form-control form-control-sm" value="<?= e($dateFrom) ?>">
+                </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label small fw-semibold text-muted text-uppercase">Date To</label>
+                    <input type="date" name="date_to" class="form-control form-control-sm" value="<?= e($dateTo) ?>">
+                </div>
 
-            <?= perPageFieldHtml($pag['perPage']) ?>
+                <div class="col-6 col-md-3 col-lg-1">
+                    <?= perPageFieldHtml($pag['perPage']) ?>
+                </div>
 
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary btn-sm">
-                    <i class="bi bi-search me-1"></i>Filter
-                </button>
-                <a href="<?= APP_URL ?>/?page=gas-vouchers" class="btn btn-secondary btn-sm">Reset</a>
-            </div>
-        </form>
+                <div class="col-6 col-md-3 col-lg-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+                        <i class="bi bi-search me-1"></i>Filter
+                    </button>
+                    <a href="<?= APP_URL ?>/?page=gas-vouchers" class="btn btn-secondary btn-sm">Reset</a>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Vouchers Table -->
