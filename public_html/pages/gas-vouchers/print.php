@@ -125,20 +125,25 @@ if ($qrHtml === '') {
             position: relative;
         }
 
-        /* Header block */
+        /* Header block — logos left/right, agency text centered */
         .grid-header {
-            display: d-flex;
+            display: flex;
             align-items: center;
+            justify-content: space-between;
+            gap: 12px;
             margin-bottom: 20px;
         }
         .header-logo {
             width: 100px;
+            height: auto;
+            flex-shrink: 0;
             object-fit: contain;
             mix-blend-mode: multiply; /* Fixes transparency/white background issues on print */
         }
         .header-text {
-            d-flex: 1;
+            flex: 1;
             text-align: center;
+            min-width: 0;
         }
         .header-text .republic {
             font-size: 10pt;
@@ -303,8 +308,9 @@ if ($qrHtml === '') {
                 break-inside: avoid;
             }
             .no-print { display: none !important; }
-            .grid-header { margin-bottom: 2px !important; }
-            .header-logo { width: 48px !important; }
+            .grid-header { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 6px !important; margin-bottom: 2px !important; }
+            .header-logo { width: 48px !important; height: auto !important; flex-shrink: 0 !important; }
+            .header-text { flex: 1 !important; }
             .header-text .republic { font-size: 8pt !important; }
             .header-text .dept { font-size: 9pt !important; margin: 1px 0 !important; }
             .header-text .office { font-size: 7.5pt !important; }
@@ -334,7 +340,7 @@ if ($qrHtml === '') {
             .qr-block .qr-sub { font-size: 6.5pt !important; }
             .qr-container { margin-top: 0 !important; }
             .cut-line-separator { padding: 2px 0 !important; margin: 1.5mm 0 !important; font-size: 7pt !important; page-break-inside: avoid; }
-            .footer-row { display: d-flex; justify-content: space-between; align-items: d-flex-end; gap: 8px; margin-top: 3px !important; }
+            .footer-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; margin-top: 3px !important; }
             body.layout-single .page { page-break-after: always; break-after: page; }
             body.layout-single .page:last-of-type { page-break-after: auto; break-after: auto; }
             body.layout-single .cut-line-separator { display: none !important; }
@@ -412,13 +418,13 @@ if ($qrHtml === '') {
 
     <!-- Formal Header -->
     <div class="grid-header">
-        <img src="<?= APP_URL ?>/assets/img/dict_logo.png" class="header-logo" alt="DICT Logo" onerror="this.style.display='none'" style="margin-right:15px;">
+        <img src="<?= APP_URL ?>/assets/img/dict_logo.png" class="header-logo" alt="DICT Logo" onerror="this.style.display='none'">
         <div class="header-text">
             <div class="republic">Republic of the Philippines</div>
             <div class="dept">Department of Information and Communications Technology</div>
             <div class="office">Regional Office 02, 02 Bagay Road, San Gabriel, Tuguegarao City, Cagayan 3500</div>
         </div>
-        <img src="<?= APP_URL ?>/assets/img/bp_logo.png" class="header-logo" alt="BP Logo" onerror="this.style.display='none'" style="margin-left:15px;">
+        <img src="<?= APP_URL ?>/assets/img/bp_logo.png" class="header-logo" alt="BP Logo" onerror="this.style.display='none'">
     </div>
 
     <div class="header-title">G A S &nbsp; V O U C H E R</div>
@@ -514,7 +520,7 @@ if ($qrHtml === '') {
     </table>
 
     
-    <div class="footer-row" style="display: d-flex; justify-content: space-between; align-items: d-flex-end; margin-top: 10px;">
+    <div class="footer-row" style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px;">
         <div class="distribution" style="margin-top: 0;">
             
         <strong>Distribution:</strong> Prepare three (3) copies.<br>
