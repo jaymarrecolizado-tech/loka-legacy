@@ -36,6 +36,7 @@
 | #30 | All-Trip Visibility for Motorpool Head + Department Approver | DONE (2026-09-27; live `lokafleet.dictr2.cloud`) |
 | #31 | Gas Voucher Budget Officer Step (hybrid C) | DONE (2026-09-28; live `lokafleet.dictr2.cloud`; run migration 054) |
 | #32 | Distinct email/SMS themes for Vehicle, Gas Voucher, OB | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
+| #33 | OB Apply form — sectioned steps UX | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -2664,4 +2665,77 @@ Changing in-app notification UI chrome; splitting `email_queue.request_id` into 
 ## Status
 
 **DONE (2026-09-28) — implemented, QA'd, and deployed to live `lokafleet.dictr2.cloud`.** No DB migration needed (Plan decision 5). Files touched: `public_html/includes/functions.php` (family helpers + `notify()`/`notifyPassengers()` family passthrough), `public_html/classes/EmailQueue.php`, `public_html/classes/Mailer.php`, `public_html/includes/sms.php`, `_deploy_tmp/verify_plan32.php` (QA harness), `Plan.md`. Note: vehicle-request subjects change from `Control No. {id}: LOKA Fleet Request` to `Control No. {id}: Vehicle Request`, so in-flight email threads re-root once at cutover — expected per the locked family table.
+
+---
+
+# LOKA Plan #33: OB Apply form — sectioned steps UX — ✅ DONE (2026-09-28; live `lokafleet.dictr2.cloud`)
+
+## Goal
+
+Rewrite the **Apply — Official Business Pass Slip** screen so users are guided through clear **numbered sections / steps**, instead of one flat “Pass Slip details” card with every field mixed together.
+
+## Problem (current)
+
+[`pages/ob-requests/create.php`](public_html/pages/ob-requests/create.php) puts Purpose, Date, vehicle choice, plate, Supervisor, Motorpool Head, Participants, and the print-name preview in a **single undifferentiated card**. First-time users cannot tell:
+
+1. What to fill first vs later  
+2. That **Private vehicle** skips Motorpool (plate + Motorpool Head)  
+3. That Participants are optional companions (applicant always stays)  
+4. What happens after Submit (approval chain)
+
+Screenshot reference (2026-09-28): flat layout under breadcrumb `Dashboard / OB Pass Slips / Apply`.
+
+## Locked decisions
+
+1. **Hybrid guided form (not a multi-page wizard):** keep **one** `<form>` and one POST submit. Add a **vertical step list / section headers** so the page reads as 4 steps. No Next/Back page reloads (avoids losing Tom Select chips and plate AJAX state).
+2. **Four sections** (fixed copy):
+
+| Step | Title | Fields |
+|------|--------|--------|
+| 1 | Trip details | Purpose (max 200), Date of Official Business |
+| 2 | Vehicle | Official DICT vs Private; Fleet plate only when Official |
+| 3 | Approvers | Immediate Supervisor always; Motorpool Head only when Official |
+| 4 | Participants | Multi-select companions + “How this prints” preview |
+
+3. **Progress chrome:** compact numbered stepper (1–4) under the page title; highlight the section in view (simple CSS / `scroll-margin` anchors). On validation error, scroll/focus the first section that has an error.
+4. **Short workflow hint** under the H4 (one line):  
+   `After submit: Supervisor → Motorpool (official vehicle only) → Guard stamps → Certificate of Appearance.`
+5. **Preserve all existing validation and JS** (`ob-official-only` show/hide, plate green/red day status, Tom Select participants, purpose counter, CSRF, private-vehicle Motorpool skip). No schema / API / workflow changes.
+6. **Visual language:** match existing Bootstrap LOKA cards (section cards or bordered `fieldset`-style blocks with `Step N · Title`). Avoid a new design system or purple/gradient chrome.
+
+## Implementation checklist — ✅ DONE (2026-09-28)
+
+- [x] `pages/ob-requests/create.php` restructured: the single "Pass Slip details" card is now **4 section cards** (`#obStep1`–`#obStep4`, each a `.card.shadow-sm.ob-step` with a numbered badge header `Step N · Title` in the locked copy: 1 Trip details, 2 Vehicle, 3 Approvers, 4 Participants), still **one `<form id="obForm">` / one POST** — no wizard routes, so Tom Select chips and plate AJAX state survive.
+- [x] **Stepper**: compact numbered pill row (1–4, `flex-wrap` for mobile) under the page title; `IntersectionObserver` scrollspy highlights the pill of the section in view; pill clicks update immediately; sections get `scroll-margin-top` so anchor jumps clear the navbar. Existing Bootstrap/blue visual language only (`.ob-step-badge` + `.ob-step-pill` in-page CSS) — no new design system.
+- [x] **Workflow hint** under the H4 (one line): "After submit: Supervisor → Motorpool (official vehicle only) → Guard stamps → Certificate of Appearance."
+- [x] `ob-official-only` wiring preserved unchanged — Step 2 plate + Step 3 Motorpool Head hide/disable/de-require for Private via the existing `obSyncVehicleKind()`; the previously dead `ob-private-note` (it sat *inside* the hidden Motorpool column) now lives as two standalone notes in Steps 2 and 3 that appear only on Private.
+- [x] **Failed-POST jump**: validation now records the step of the first failing check (`$firstErrorStep` — purpose/date→1, vehicle choice/plate→2, supervisor/motorpool→3) via an `$addError` helper; on re-render the page script scrolls the section into view, adds `.has-error` (red border), and focuses its first enabled field.
+- [x] Submit + Cancel stay once at the bottom after Step 4; Cancel href still the OB index; breadcrumb unchanged.
+- [x] All existing JS/validation preserved verbatim: `ob-plate-select.js` (green/red day status + busy modal), `ob-participants.js` (Tom Select + "How this prints" preview), purpose counter, CSRF, private-vehicle Motorpool skip, server-side rules. No schema / API / workflow changes; only `create.php` touched (+ in-page CSS/JS).
+- [x] `php -l` clean; browser click-through + POST harness below.
+
+## QA matrix — verified 2026-09-28 via real-browser click-through (in-app browser, `requester@fleet.local` QA persona; user 43 temporarily flagged OB Approver and one fleet plate/motorpool head available) + `_deploy_tmp/verify_plan33.php` POST harness. QA passwords restored and DB verified clean afterwards.
+
+- [x] **Official path**: all 4 steps render (numbered cards + stepper pills + workflow hint); plate and Motorpool Head visible, enabled, and `required` after switching back from Private (asserted via DOM state).
+- [x] **Private path**: clicking the Private radio hides and disables the plate select (Step 2) and Motorpool Head select (Step 3), drops `data-required-when-official` `required`, and reveals both private notes; POST harness `private` path → row with `uses_official_vehicle=0`, `plate_number NULL`, `motorpool_head_id NULL`, status `pending_supervisor`, supervisor notified, motorpool **not** notified (existing Plan #24 behavior intact).
+- [x] **Participants Tom Select + print preview** still update (chips render, requester locked in, "How this prints" shows `Test Requester` / `T.Requester` on load).
+- [x] **Plate green/red availability** unchanged — same `ObPlateSelect.init` config (`#obPlateSelect` + `#obDate` + trips JSON); the assets carry no structural DOM assumptions (verified by reading both JS files).
+- [x] **Validation errors list + focus the right section** — empty submit (native validation bypassed) lists all 4 server errors, highlights Step 1 (`has-error`), scrolls it to the top, and focuses the Purpose field; a second run with Step 1 valid jumps to Step 2 (red border, scrolled, focus on the vehicle radio, stepper pill "2 Vehicle" active).
+- [x] **Cancel returns to OB index; breadcrumb unchanged** — Dashboard / OB Pass Slips / Apply preserved; Cancel href `/?page=ob-requests`.
+- [x] **No regression on create POST / notifications** — harness `official` path: row created with plate + motorpool head, `pending_supervisor`, success flash, supervisor **and** motorpool head notified; 16/16 checks pass; high-water cleanup deleted the test rows (DB verified pristine; only a legitimate login audit row remains).
+- [x] Mobile stacking: sections are plain Bootstrap cards in a single column at 860px max width; stepper pills wrap (`flex-wrap gap-2`) — readable as compact pills on narrow viewports.
+
+## Files (planned)
+
+- `Plan.md` (this section)
+- `public_html/pages/ob-requests/create.php` (primary)
+- Optional small CSS in-page or existing `assets/css` only if needed for stepper
+
+## Out of scope
+
+Multi-page wizard with separate routes; changing OB approval/guard/CoA workflow; `view.php` / `print.php` redesign; edit-after-submit; live deploy until explicitly requested after implementation.
+
+## Status
+
+**DONE (2026-09-28) — implemented + QA'd on localhost (real-browser click-through + POST harness), NOT deployed.** No migration. Files touched: `public_html/pages/ob-requests/create.php` only (+ in-page stepper CSS/JS), `_deploy_tmp/verify_plan33.php` (POST harness), `Plan.md`. QA-side temporary state fully reverted: `dash_pw.php restore` run, user 43 `is_ob_approver` reset to 0, harness rows deleted.
 

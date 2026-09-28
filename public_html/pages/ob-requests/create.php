@@ -37,6 +37,15 @@ foreach (obActiveVehicleTrips() as $t) {
 }
 $errors = [];
 $postedParticipantIds = [];
+// Plan #33 — step the first validation error belongs to (1 Trip details,
+// 2 Vehicle, 3 Approvers). Drives the failed-POST scroll/focus jump.
+$firstErrorStep = 0;
+$addError = static function (string $msg, int $step) use (&$errors, &$firstErrorStep): void {
+    $errors[] = $msg;
+    if ($firstErrorStep === 0) {
+        $firstErrorStep = $step;
+    }
+};
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
@@ -62,14 +71,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $participantIds = obCollectParticipantIds($extraIds, userId());
 
     if ($purpose === '' || mb_strlen($purpose) > 200) {
-        $errors[] = 'Purpose is required (max 200 characters).';
+        $addError('Purpose is required (max 200 characters).', 1);
     }
     if ($obDate === '' || !strtotime($obDate)) {
-        $errors[] = 'A valid Official Business date is required.';
+        $addError('A valid Official Business date is required.', 1);
     }
     // Official DICT vehicle vs private vehicle (required — never inferred from a blank plate)
     if (!in_array($usesOfficialRaw, ['1', '0'], true)) {
-        $errors[] = 'Please choose whether the trip uses an Official DICT vehicle or a Private vehicle.';
+        $addError('Please choose whether the trip uses an Official DICT vehicle or a Private vehicle.', 2);
     }
     $usesOfficial = $usesOfficialRaw === '1';
     if (!$usesOfficial) {
@@ -79,17 +88,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $validPlates = array_map(static fn($v): string => (string) $v->plate_number, $vehicles);
         if ($plate === '' || !in_array($plate, $validPlates, true)) {
-            $errors[] = 'Please select the fleet vehicle plate from the list.';
+            $addError('Please select the fleet vehicle plate from the list.', 2);
         }
     }
     $supervisorIds = array_map(fn($s) => (int) $s->id, $supervisors);
     if (!in_array($supervisorId, $supervisorIds, true)) {
-        $errors[] = 'Please select your Immediate Supervisor.';
+        $addError('Please select your Immediate Supervisor.', 3);
     }
     if ($usesOfficial) {
         $headIds = array_map(fn($h) => (int) $h->id, $motorpoolHeads);
         if (!in_array($motorpoolHeadId, $headIds, true)) {
-            $errors[] = 'Please select a Motorpool Head.';
+            $addError('Please select a Motorpool Head.', 3);
         }
     }
 
@@ -159,13 +168,16 @@ require_once INCLUDES_PATH . '/header.php';
 ?>
 
 <div class="container py-4" style="max-width:860px;">
-    <div class="mb-4">
+    <div class="mb-3">
         <h4 class="mb-1"><i class="bi bi-file-earmark-text me-2"></i>Apply — Official Business Pass Slip</h4>
-        <nav aria-label="breadcrumb"><ol class="breadcrumb mb-0">
+        <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1">
             <li class="breadcrumb-item"><a href="<?= APP_URL ?>">Dashboard</a></li>
             <li class="breadcrumb-item"><a href="<?= APP_URL ?>/?page=ob-requests">OB Pass Slips</a></li>
             <li class="breadcrumb-item active">Apply</li>
         </ol></nav>
+        <div class="small text-muted">
+            After submit: Supervisor &rarr; Motorpool (official vehicle only) &rarr; Guard stamps &rarr; Certificate of Appearance.
+        </div>
     </div>
 
     <?php if (!empty($errors)): ?>
@@ -178,20 +190,51 @@ require_once INCLUDES_PATH . '/header.php';
             Ask an administrator to tag users with <strong>OB Approver</strong> in User Management first.
         </div>
     <?php else: ?>
-    <div class="card shadow-sm">
-        <div class="card-header bg-white"><strong>Pass Slip details</strong></div>
-        <div class="card-body">
-            <style>
-                #obForm .ts-wrapper.multi .ts-control { gap: 0.25rem; }
-                #obForm .ts-wrapper.multi .ts-control > .item {
-                    max-width: 100%;
-                    white-space: nowrap;
-                }
-            </style>
-            <form method="POST" id="obForm">
-                <?= csrfField() ?>
+    <style>
+        .ob-step-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 1.6rem; height: 1.6rem; border-radius: 50%;
+            background: #0d6efd; color: #fff; font-size: .8rem; font-weight: 600; flex: 0 0 auto;
+        }
+        .ob-stepper { row-gap: .4rem; }
+        .ob-stepper .ob-step-pill {
+            display: inline-flex; align-items: center; gap: .45rem;
+            padding: .25rem .8rem .25rem .3rem;
+            border: 1px solid #dee2e6; border-radius: 50rem;
+            background: #fff; color: #212529; text-decoration: none; font-size: .82rem; line-height: 1.2;
+        }
+        .ob-stepper .ob-step-pill .ob-step-badge { width: 1.4rem; height: 1.4rem; font-size: .72rem; background: #e9ecef; color: #495057; }
+        .ob-stepper .ob-step-pill.active { border-color: #0d6efd; }
+        .ob-stepper .ob-step-pill.active .ob-step-badge { background: #0d6efd; color: #fff; }
+        .ob-step { scroll-margin-top: 72px; }
+        .ob-step.has-error { border-color: #dc3545; }
+    </style>
+
+    <div class="ob-stepper d-flex flex-wrap align-items-center gap-2 mb-3" aria-label="Form sections">
+        <a class="ob-step-pill active" href="#obStep1"><span class="ob-step-badge">1</span>Trip details</a>
+        <a class="ob-step-pill" href="#obStep2"><span class="ob-step-badge">2</span>Vehicle</a>
+        <a class="ob-step-pill" href="#obStep3"><span class="ob-step-badge">3</span>Approvers</a>
+        <a class="ob-step-pill" href="#obStep4"><span class="ob-step-badge">4</span>Participants</a>
+    </div>
+
+    <form method="POST" id="obForm">
+        <?= csrfField() ?>
+        <style>
+            #obForm .ts-wrapper.multi .ts-control { gap: 0.25rem; }
+            #obForm .ts-wrapper.multi .ts-control > .item {
+                max-width: 100%;
+                white-space: nowrap;
+            }
+        </style>
+
+        <!-- Step 1 · Trip details -->
+        <div class="card shadow-sm ob-step mb-3" id="obStep1" tabindex="-1">
+            <div class="card-header bg-white d-flex align-items-center gap-2">
+                <span class="ob-step-badge">1</span><strong>Trip details</strong>
+            </div>
+            <div class="card-body">
                 <div class="row g-3">
-                    <div class="col-md-8">
+                    <div class="col-12">
                         <label class="form-label">Purpose <span class="text-danger">*</span> <small class="text-muted fw-normal">(max 200)</small></label>
                         <textarea class="form-control" id="obPurpose" name="purpose" rows="2" maxlength="200" required
                             placeholder="e.g. Attend the LGU coordination meeting at Santiago City Hall"><?= e(post('purpose', '')) ?></textarea>
@@ -199,11 +242,22 @@ require_once INCLUDES_PATH . '/header.php';
                             <small class="text-muted"><span id="obPurposeCount"><?= (int) mb_strlen((string) post('purpose', '')) ?></span>/200</small>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <label class="form-label">Date of Official Business <span class="text-danger">*</span></label>
                         <input type="date" class="form-control" id="obDate" name="ob_date" required
                             value="<?= e(post('ob_date', date('Y-m-d'))) ?>">
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2 · Vehicle -->
+        <div class="card shadow-sm ob-step mb-3" id="obStep2" tabindex="-1">
+            <div class="card-header bg-white d-flex align-items-center gap-2">
+                <span class="ob-step-badge">2</span><strong>Vehicle</strong>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
                     <div class="col-12">
                         <label class="form-label">Vehicle used for this Official Business <span class="text-danger">*</span></label>
                         <div class="d-flex gap-4 flex-wrap">
@@ -219,7 +273,7 @@ require_once INCLUDES_PATH . '/header.php';
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4 ob-official-only">
+                    <div class="col-md-6 ob-official-only">
                         <label class="form-label">Fleet Vehicle Plate <span class="text-danger">*</span></label>
                         <select class="form-select" id="obPlateSelect" name="plate_number">
                             <option value="">Select fleet vehicle...</option>
@@ -237,7 +291,21 @@ require_once INCLUDES_PATH . '/header.php';
                         </select>
                         <small class="text-muted">Green = free that day · Red = already on a trip</small>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-12 d-none ob-private-note">
+                        <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Private vehicle — no fleet plate needed; Motorpool approval is skipped.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3 · Approvers -->
+        <div class="card shadow-sm ob-step mb-3" id="obStep3" tabindex="-1">
+            <div class="card-header bg-white d-flex align-items-center gap-2">
+                <span class="ob-step-badge">3</span><strong>Approvers</strong>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
                         <label class="form-label">Immediate Supervisor <span class="text-danger">*</span></label>
                         <select class="form-select" name="supervisor_user_id" required>
                             <option value="">Select supervisor...</option>
@@ -246,7 +314,7 @@ require_once INCLUDES_PATH . '/header.php';
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-4 ob-official-only">
+                    <div class="col-md-6 ob-official-only">
                         <label class="form-label">Motorpool Head <span class="text-danger">*</span></label>
                         <select class="form-select" name="motorpool_head_id" data-required-when-official>
                             <option value="">Select motorpool head...</option>
@@ -254,8 +322,21 @@ require_once INCLUDES_PATH . '/header.php';
                             <option value="<?= (int) $h->id ?>" <?= post('motorpool_head_id') == $h->id ? 'selected' : '' ?>><?= e($h->name) ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <small class="text-muted d-none ob-private-note">Not required for private vehicles.</small>
                     </div>
+                    <div class="col-12 d-none ob-private-note">
+                        <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Private vehicle — Motorpool Head is not required.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4 · Participants -->
+        <div class="card shadow-sm ob-step mb-3" id="obStep4" tabindex="-1">
+            <div class="card-header bg-white d-flex align-items-center gap-2">
+                <span class="ob-step-badge">4</span><strong>Participants</strong>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
                     <div class="col-12">
                         <label class="form-label">Participants</label>
                         <select class="form-select" id="obParticipants" name="participant_ids[]" multiple>
@@ -290,15 +371,14 @@ require_once INCLUDES_PATH . '/header.php';
                         </div>
                     </div>
                 </div>
-
-                <hr class="my-4">
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="submit" class="btn btn-primary text-nowrap"><i class="bi bi-send me-1"></i>Submit</button>
-                    <a href="<?= APP_URL ?>/?page=ob-requests" class="btn btn-outline-secondary text-nowrap">Cancel</a>
-                </div>
-            </form>
+            </div>
         </div>
-    </div>
+
+        <div class="d-flex flex-wrap gap-2 mb-4">
+            <button type="submit" class="btn btn-primary text-nowrap"><i class="bi bi-send me-1"></i>Submit</button>
+            <a href="<?= APP_URL ?>/?page=ob-requests" class="btn btn-outline-secondary text-nowrap">Cancel</a>
+        </div>
+    </form>
     <?php endif; ?>
 </div>
 
@@ -371,6 +451,42 @@ document.addEventListener("DOMContentLoaded", function () {
         officialRadio.addEventListener("change", obSyncVehicleKind);
         privateRadio.addEventListener("change", obSyncVehicleKind);
         obSyncVehicleKind();
+    }
+
+    // Plan #33 — stepper: highlight the section in view
+    var stepPills = document.querySelectorAll(".ob-stepper .ob-step-pill");
+    var stepSections = document.querySelectorAll(".ob-step");
+    function obActivatePill(hash) {
+        stepPills.forEach(function (p) {
+            p.classList.toggle("active", p.getAttribute("href") === hash);
+        });
+    }
+    if ("IntersectionObserver" in window && stepSections.length) {
+        var io = new IntersectionObserver(function (entries) {
+            entries.forEach(function (en) {
+                if (en.isIntersecting) {
+                    obActivatePill("#" + en.target.id);
+                }
+            });
+        }, { rootMargin: "-15% 0px -60% 0px", threshold: 0 });
+        stepSections.forEach(function (s) { io.observe(s); });
+    }
+    stepPills.forEach(function (p) {
+        p.addEventListener("click", function () { obActivatePill(p.getAttribute("href")); });
+    });
+
+    // Plan #33 — failed POST: jump to + highlight the first invalid section
+    var firstErrorStep = ' . json_encode((int) $firstErrorStep) . ';
+    if (firstErrorStep > 0) {
+        var sec = document.getElementById("obStep" + firstErrorStep);
+        if (sec) {
+            sec.classList.add("has-error");
+            sec.scrollIntoView({ behavior: "smooth", block: "start" });
+            var firstField = sec.querySelector("textarea:not([disabled]), select:not([disabled]), input:not([type=hidden]):not([disabled])");
+            if (firstField) {
+                firstField.focus({ preventScroll: true });
+            }
+        }
     }
 });
 </script>';
