@@ -44,6 +44,8 @@ define('SMS_DEFAULT_ALLOWLIST', [
     'passenger_override_notice',
     'gas_voucher_submitted',
     'gas_voucher_reviewed',
+    'gas_voucher_budget_pending',
+    'gas_voucher_budget_approved',
     'gas_voucher_approved',
     'gas_voucher_rejected',
     'gas_voucher_cancelled',

@@ -93,17 +93,26 @@ function badgePendingIdsApprovals(): array
 function badgePendingIdsGasVouchers(): array
 {
     try {
+        $ids = [];
         if (isChiefAdminFinance() || isAdmin()) {
-            return badgeFetchIds(
+            // CAF stays on the final step only (Plan #31)
+            $ids = badgeFetchIds(
                 "SELECT id FROM gas_vouchers WHERE status = 'pending_approval' AND deleted_at IS NULL"
             );
-        }
-        if (isMotorpool() || isApprover()) {
-            return badgeFetchIds(
+        } elseif (isMotorpool() || isApprover()) {
+            $ids = badgeFetchIds(
                 "SELECT id FROM gas_vouchers
                  WHERE status IN ('pending_review','pending_approval') AND deleted_at IS NULL"
             );
         }
+        // Budget Officers (flag pool) see the pending_budget step regardless of role
+        if (isBudgetOfficer()) {
+            $budgetIds = badgeFetchIds(
+                "SELECT id FROM gas_vouchers WHERE status = 'pending_budget' AND deleted_at IS NULL"
+            );
+            $ids = array_values(array_unique(array_merge($ids, $budgetIds)));
+        }
+        return $ids;
     } catch (Throwable $e) {
         error_log('badgePendingIdsGasVouchers: ' . $e->getMessage());
     }

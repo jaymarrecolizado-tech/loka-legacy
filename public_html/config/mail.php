@@ -296,6 +296,40 @@ define('MAIL_TEMPLATES', [
         'template' => 'An approved Official Business Pass Slip is waiting for its departure stamp.'
     ],
 
+    // Gas vouchers (incl. Plan #31 budget step)
+    'gas_voucher_submitted' => [
+        'subject' => 'New Gas Voucher Request',
+        'template' => 'A gas voucher has been submitted and needs review.'
+    ],
+    'gas_voucher_reviewed' => [
+        'subject' => 'Gas Voucher Reviewed',
+        'template' => 'A gas voucher has been reviewed by Motorpool and is moving to the next approval step.'
+    ],
+    'gas_voucher_budget_pending' => [
+        'subject' => 'Gas Voucher Awaiting Budget Certification',
+        'template' => 'A gas voucher has been reviewed by Motorpool and requires Budget Officer certification.'
+    ],
+    'gas_voucher_budget_approved' => [
+        'subject' => 'Gas Voucher Budget Certified',
+        'template' => 'A gas voucher has been certified by the Budget Officer and is awaiting final approval.'
+    ],
+    'gas_voucher_approved' => [
+        'subject' => 'Gas Voucher Approved',
+        'template' => 'A gas voucher has been fully approved and may be printed for fuel pickup.'
+    ],
+    'gas_voucher_rejected' => [
+        'subject' => 'Gas Voucher Rejected',
+        'template' => 'A gas voucher has been rejected. Please check the comments.'
+    ],
+    'gas_voucher_cancelled' => [
+        'subject' => 'Gas Voucher Cancelled',
+        'template' => 'A gas voucher has been cancelled.'
+    ],
+    'gas_voucher_payment_updated' => [
+        'subject' => 'Gas Voucher Payment Updated',
+        'template' => 'The payment status of a gas voucher has been updated.'
+    ],
+
     // Default fallback template
     'default' => [
         'subject' => 'LOKA Notification',

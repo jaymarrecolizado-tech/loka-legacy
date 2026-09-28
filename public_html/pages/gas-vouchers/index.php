@@ -102,6 +102,12 @@ if (isMotorpool() || isApprover() || isAdmin() || isChiefAdminFinance()) {
     $pendingReviewCount = $counts['pending_review'] ?? 0;
 }
 
+// Pending budget (Budget Officer flag pool only — Plan #31)
+$pendingBudgetCount = 0;
+if (isBudgetOfficer()) {
+    $pendingBudgetCount = $counts['pending_budget'] ?? 0;
+}
+
 // Pending approval (for Chief Admin & Finance / Admin role)
 $pendingApprovalCount = 0;
 if (isAdmin() || isMotorpool() || isChiefAdminFinance()) {
@@ -134,12 +140,13 @@ require_once INCLUDES_PATH . '/header.php';
     <div class="row g-4 mb-4">
         <?php $gvStats = [
             ['Pending Review', $counts['pending_review'] ?? 0, 'text-warning'],
+            ['Pending Budget', $counts['pending_budget'] ?? 0, 'text-primary'],
             ['Pending Approval', $counts['pending_approval'] ?? 0, 'text-info'],
             ['Approved', $counts['approved'] ?? 0, 'text-success'],
             ['Total Vouchers', array_sum($counts), 'text-secondary'],
         ]; ?>
         <?php foreach ($gvStats as [$gvLabel, $gvVal, $gvColor]): ?>
-        <div class="col-6 col-xl-3">
+        <div class="col-6 col-xl">
             <div class="card stat-card h-100">
                 <div class="card-body">
                     <div class="stat-value text-<?= $gvColor ?>"><?= $gvVal ?></div>
@@ -161,6 +168,7 @@ require_once INCLUDES_PATH . '/header.php';
                     <option value="">All</option>
                     <option value="draft" <?= $statusFilter === 'draft' ? 'selected' : '' ?>>Draft</option>
                     <option value="pending_review" <?= $statusFilter === 'pending_review' ? 'selected' : '' ?>>Pending Review</option>
+                    <option value="pending_budget" <?= $statusFilter === 'pending_budget' ? 'selected' : '' ?>>Pending Budget</option>
                     <option value="pending_approval" <?= $statusFilter === 'pending_approval' ? 'selected' : '' ?>>Pending Approval</option>
                     <option value="approved" <?= $statusFilter === 'approved' ? 'selected' : '' ?>>Approved</option>
                     <option value="rejected" <?= $statusFilter === 'rejected' ? 'selected' : '' ?>>Rejected</option>
@@ -269,9 +277,11 @@ require_once INCLUDES_PATH . '/header.php';
                                     </a>
                                     <?php endif; ?>
                                     <?php if (($v->status === 'pending_review' && (isMotorpool() || isApprover() || isAdmin() || isChiefAdminFinance())) ||
+                                              ($v->status === 'pending_budget' && isBudgetOfficer()) ||
                                               ($v->status === 'pending_approval' && (isAdmin() || isMotorpool() || isChiefAdminFinance()))): ?>
                                     <a href="<?= APP_URL ?>/?page=gas-vouchers&action=approve&id=<?= $v->id ?>"
-                                       class="btn btn-sm btn btn-light text-warning" title="Process">
+                                       class="btn btn-sm btn btn-light <?= $v->status === 'pending_budget' ? 'text-primary' : 'text-warning' ?>"
+                                       title="<?= $v->status === 'pending_budget' ? 'Certify Budget' : 'Process' ?>">
                                         <i class="bi bi-check-circle"></i>
                                     </a>
                                     <?php endif; ?>

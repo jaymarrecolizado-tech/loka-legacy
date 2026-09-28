@@ -1480,7 +1480,8 @@ function canAccessGasVouchers(): bool
         || isApprover()
         || isMotorpool()
         || isAdmin()
-        || isChiefAdminFinance();
+        || isChiefAdminFinance()
+        || isBudgetOfficer();
 }
 
 /**
@@ -1631,9 +1632,58 @@ function passengerInvolvementMessage(int $requestId, string $detail): string
 // GAS VOUCHER HELPERS
 // =============================================================================
 
+/**
+ * Plan #31 — Budget Officer flag (gas voucher pending_budget step).
+ * Flags define who may act: Budget Officer or OIC Budget Officer only.
+ * Roles alone (Admin / Motorpool / CAF) do NOT grant the step, and the real
+ * All Father account only assigns budget officers — it never approves the
+ * budget step, even if flagged.
+ */
+function isBudgetOfficer(): bool
+{
+    if (!isLoggedIn() || isRealAllFather()) {
+        return false;
+    }
+
+    static $loaded = false;
+    static $flagged = false;
+
+    if (!$loaded) {
+        $row = db()->fetch(
+            "SELECT is_budget_officer, is_oic_budget_officer
+             FROM users
+             WHERE id = ? AND status = 'active' AND deleted_at IS NULL
+             LIMIT 1",
+            [userId()]
+        );
+        $flagged = $row !== null && $row !== false
+            && ((int) $row->is_budget_officer === 1 || (int) $row->is_oic_budget_officer === 1);
+        $loaded = true;
+    }
+
+    return $flagged;
+}
+
+/**
+ * Active Budget Officer pool (either flag) for dropdowns and notifications.
+ *
+ * @return list<object>{id:int,name:string,is_budget_officer:int,is_oic_budget_officer:int}
+ */
+function budgetOfficerPool(): array
+{
+    return db()->fetchAll(
+        "SELECT id, name, is_budget_officer, is_oic_budget_officer
+         FROM users
+         WHERE (is_budget_officer = 1 OR is_oic_budget_officer = 1)
+           AND status = 'active' AND deleted_at IS NULL
+         ORDER BY name ASC"
+    );
+}
+
 define('GAS_VOUCHER_STATUSES', [
     'draft'            => ['label' => 'Draft',              'color' => 'secondary'],
     'pending_review'   => ['label' => 'Pending Review',     'color' => 'warning'],
+    'pending_budget'   => ['label' => 'Pending Budget',     'color' => 'primary'],
     'pending_approval' => ['label' => 'Pending Approval',   'color' => 'info'],
     'approved'         => ['label' => 'Approved',           'color' => 'success'],
     'rejected'         => ['label' => 'Rejected',           'color' => 'danger'],

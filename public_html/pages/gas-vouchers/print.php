@@ -13,11 +13,13 @@ $voucher = db()->fetch(
     "SELECT gv.*,
             u.name AS requester_name,
             reviewer.name AS reviewer_name,
-            approver.name AS approver_name_full
+            approver.name AS approver_name_full,
+            budget_officer.name AS budget_officer_name
      FROM gas_vouchers gv
      JOIN users u ON gv.requested_by_user_id = u.id
      LEFT JOIN users reviewer ON gv.reviewed_by = reviewer.id
      LEFT JOIN users approver ON gv.approved_by = approver.id
+     LEFT JOIN users budget_officer ON gv.budget_reviewed_by = budget_officer.id
      WHERE gv.id = ? AND gv.deleted_at IS NULL",
     [$voucherId]
 );
@@ -234,7 +236,7 @@ if ($qrHtml === '') {
         .signatures-row td {
             border: 1px solid #000;
             padding: 10px;
-            width: 33.33%;
+            width: 25%;
             vertical-align: top;
         }
 
@@ -497,6 +499,11 @@ if ($qrHtml === '') {
                 <div class="sig-label">Reviewed by:</div>
                 <div class="sig-name"><?= e(strtoupper($voucher->reviewer_name ?? 'ENGR. RONALD S. BARIUAN')) ?></div>
                 <div class="sig-title">OIC, Motor Pool Unit</div>
+            </td>
+            <td>
+                <div class="sig-label">Certified by:</div>
+                <div class="sig-name"><?= e(strtoupper($voucher->budget_officer_name ?? '')) ?></div>
+                <div class="sig-title">Budget Officer</div>
             </td>
             <td>
                 <div class="sig-label">Approved by:</div>

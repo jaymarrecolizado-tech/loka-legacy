@@ -65,6 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'role' => $role,
                 'department_id' => $departmentId,
                 'is_ob_approver' => post('is_ob_approver') === '1' ? 1 : 0,
+                'is_budget_officer' => post('is_budget_officer') === '1' ? 1 : 0,
+                'is_oic_budget_officer' => post('is_oic_budget_officer') === '1' ? 1 : 0,
                 'status' => USER_ACTIVE,
                 'failed_login_attempts' => 0,
                 'created_at' => date(DATETIME_FORMAT),
@@ -177,6 +179,23 @@ require_once INCLUDES_PATH . '/header.php';
                                         role="switch" id="obApproverChk" <?= post('is_ob_approver') === '1' ? 'checked' : '' ?>>
                                     <label class="form-check-label" for="obApproverChk">
                                         Can act as <strong>Immediate Supervisor</strong> for OB Pass Slips
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label d-block">Budget Officer</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="is_budget_officer" value="1"
+                                        role="switch" id="budgetOfficerChk" <?= post('is_budget_officer') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="budgetOfficerChk">
+                                        Can act as <strong>Budget Officer</strong> on gas vouchers (pending budget step)
+                                    </label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="is_oic_budget_officer" value="1"
+                                        role="switch" id="oicBudgetOfficerChk" <?= post('is_oic_budget_officer') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="oicBudgetOfficerChk">
+                                        Can act as <strong>OIC Budget Officer</strong> on gas vouchers
                                     </label>
                                 </div>
                             </div>

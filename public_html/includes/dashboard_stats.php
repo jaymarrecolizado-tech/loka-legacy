@@ -157,7 +157,7 @@ function dashboardStatsForUser(): array
             [$userId, $sevenDays]
         );
         $myGas = (int) db()->fetchColumn(
-            "SELECT COUNT(*) FROM gas_vouchers WHERE requested_by_user_id = ? AND status IN ('pending_review','pending_approval') AND deleted_at IS NULL",
+            "SELECT COUNT(*) FROM gas_vouchers WHERE requested_by_user_id = ? AND status IN ('pending_review','pending_budget','pending_approval') AND deleted_at IS NULL",
             [$userId]
         );
 
@@ -178,6 +178,17 @@ function dashboardStatsForUser(): array
             ['label' => 'Upcoming Trips', 'value' => $myUpcoming, 'href' => APP_URL . '/?page=requests&status=approved', 'tone' => 'success', 'icon' => 'bi-calendar-event'],
             ['label' => 'Gas Pending', 'value' => $myGas, 'href' => APP_URL . '/?page=gas-vouchers', 'tone' => 'warning', 'icon' => 'bi-fuel-pump'],
         ];
+
+        // Budget Officers (flag pool) — work queue for the pending_budget step (Plan #31)
+        if (isBudgetOfficer()) {
+            $budgetPending = (int) db()->fetchColumn(
+                "SELECT COUNT(*) FROM gas_vouchers WHERE status = 'pending_budget' AND deleted_at IS NULL"
+            );
+            if ($budgetPending > 0) {
+                $actions[] = ['label' => 'Gas vouchers for budget review', 'count' => $budgetPending, 'href' => APP_URL . '/?page=gas-vouchers&status=pending_budget', 'tone' => 'warning'];
+            }
+            $kpis[] = ['label' => 'Budget Review', 'value' => $budgetPending, 'href' => APP_URL . '/?page=gas-vouchers&status=pending_budget', 'tone' => 'primary', 'icon' => 'bi-cash-coin'];
+        }
 
         $queue = [
             'title' => 'Requests Needing Attention',

@@ -34,6 +34,7 @@
 | #28 | Soft Nag + 3-Pending Trip-Create Gate | DONE (2026-09-19; run migrations 052+053 on each env) |
 | #29 | Vehicle Trip Ticket — Full Purpose + No PDF Scrollbars | DONE (2026-09-26; live `lokafleet.dictr2.cloud`) |
 | #30 | All-Trip Visibility for Motorpool Head + Department Approver | DONE (2026-09-27; live `lokafleet.dictr2.cloud`) |
+| #31 | Gas Voucher Budget Officer Step (hybrid C) | DONE (2026-09-28; live `lokafleet.dictr2.cloud`; run migration 054) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -2480,4 +2481,112 @@ Changing approval authority, department ownership, request workflow statuses, Li
 ## Deployment
 
 - [x] Deployed to live `lokafleet.dictr2.cloud` on 2026-09-27 — surgical upload of Plan #30 PHP files; prod DB/uploads/`.env` untouched; no migrations.
+
+---
+
+# LOKA Plan #31: Gas Voucher Budget Officer Step (hybrid C) — ✅ DONE (2026-09-28, live `lokafleet.dictr2.cloud`)
+
+## Goal
+
+After **Motorpool Head** review, a gas voucher must be **seen and approved by a Budget Officer or OIC Budget Officer** before **Chief Admin & Finance / OIC CAF** can finally approve.
+
+Gas vouchers remain a standalone fuel flow (not tied to trip `request_id`).
+
+## Locked decisions
+
+1. **Flags, not a new role:** `users.is_budget_officer` and `users.is_oic_budget_officer` (same pattern as `is_ob_approver`). No new `ROLE_*` ENUM value.
+2. **Budget step actors only:** Budget Officer **or** OIC Budget Officer. Administrator / All Father / Motorpool / CAF **cannot** approve the middle step.
+3. **Hybrid C (v1):** flags define who **may** act; All Father gets a **Gas voucher workflow assignees** page to toggle those flags in one place and see Motorpool / CAF pools (by role) for awareness. All Father does **not** gain budget-step approval power — only assignment.
+4. Requesters may still pick a **preferred Budget Officer** from the flagged pool on create (like preferred reviewer/approver today).
+5. Vouchers already in `pending_approval` when this ships stay CAF-ready (**grandfathered**). Only newly Motorpool-reviewed vouchers enter `pending_budget`.
+
+## Happy path flowchart
+
+```mermaid
+flowchart TD
+  start[Staff creates gas voucher] --> draft{Save or Submit?}
+  draft -->|Save| draftStatus[draft]
+  draft -->|Submit| pendingReview[pending_review]
+  draftStatus -->|Submit later| pendingReview
+
+  pendingReview -->|Motorpool Head reviews OK| pendingBudget[pending_budget]
+  pendingReview -->|Reject| rejected[rejected]
+
+  pendingBudget -->|"ONLY Budget Officer or OIC Budget Officer"| pendingApproval[pending_approval]
+  pendingBudget -->|Reject| rejected
+
+  pendingApproval -->|CAF or OIC CAF final approve| approved[approved]
+  pendingApproval -->|Reject| rejected
+
+  approved --> print[Print voucher]
+  print --> station[Use at gas station]
+  approved --> payment[payment_status unpaid to paid]
+
+  draftStatus -->|Cancel| cancelled[cancelled]
+  pendingReview -->|Cancel by owner| cancelled
+```
+
+| Status | Who acts | Moves to |
+|--------|----------|----------|
+| `draft` | Owner / staff with gas access | `pending_review` on submit |
+| `pending_review` | Motorpool Head (role; existing Step 1) | `pending_budget` |
+| `pending_budget` | Budget Officer / OIC Budget Officer (**flags only**) | `pending_approval` |
+| `pending_approval` | CAF / OIC CAF (roles; existing final step) | `approved` |
+
+Reject remains allowed at each pending step by whoever can act on that step. Cancel stays limited to `draft` / `pending_review` (owner), unless later expanded.
+
+## All Father assignee board (hybrid C)
+
+- **Who:** All Father (real All Father) only.
+- **Route (suggested):** `/?page=settings&action=gas-workflow` or System Control link.
+- **Editable:** toggle `is_budget_officer` / `is_oic_budget_officer` on active users (same DB columns as Users create/edit).
+- **Read-only:** active Motorpool Heads; active CAF / OIC CAF (role-based — those stay assigned via Users → Role).
+- Does **not** let All Father approve `pending_budget`.
+
+## Implementation checklist — ✅ DONE (2026-09-28)
+
+- [x] Migration `054_gas_voucher_budget_officer.php` (run locally 2026-09-28, idempotent) — `users.is_budget_officer` + `users.is_oic_budget_officer` after `is_ob_approver`; `gas_vouchers.status` ENUM now `('draft','pending_review','pending_budget','pending_approval','approved','rejected','cancelled')` (ENUM rewrite preserves existing values — grandfathering is automatic); columns `requested_budget_officer_id`, `budget_reviewed_by`, `budget_reviewed_at`, `budget_officer_notes` with indexes.
+- [x] Helpers in `includes/functions.php` — `isBudgetOfficer()` (either flag, active account; **hard-false for the real All Father account** so assignment never becomes approval power, decision 2/3) + `budgetOfficerPool()`; `pending_budget` added to `GAS_VOUCHER_STATUSES` (label "Pending Budget", color primary); `canAccessGasVouchers()` includes `isBudgetOfficer()`.
+- [x] `pages/users/create.php` + `edit.php` — Budget Officer / OIC Budget Officer switches next to the OB Approver switch (same insert/update keys pattern).
+- [x] All Father assignees board — new `pages/settings/gas-workflow.php` at `/?page=settings&action=gas-workflow` (router branch under `settings`; page itself calls `requireSystemControl()` = real All Father, View-as bounced; `requireRole(ROLE_ADMIN)` at router still lets Administrator reach the page where they get redirected). Searchable active-user table with per-row auto-submit toggles for both flags; read-only Motorpool Head and CAF/OIC CAF pools; pending-budget counter. Sidebar: **Gas Workflow** link under System Control (`canAccessSystemControl()` only).
+- [x] Workflow in `gas-vouchers/approve.php` — now a three-step page: Motorpool `review_approve` → **`pending_budget`** + notify budget pool (preferred `requested_budget_officer_id` or all flagged, type `gas_voucher_budget_pending`); new **`budget_approve`** valid only when `pending_budget` **and** `isBudgetOfficer()` → `pending_approval`, stores `budget_reviewed_by/_at` + `budget_officer_notes`, notifies requester + CAF pool (`gas_voucher_budget_approved`); CAF `final_approve` unchanged and only valid at `pending_approval` (existing actors kept — grandfathered vouchers stay processable); `reject` gated per step to that step's actor set; decision whitelist derives from the computed step gates so a stale/hidden decision POST cannot fire. Edit-fields shortcut hidden at the budget step (create.php edit rules unchanged: only draft/pending_review/pending_approval editable).
+- [x] `view.php` — budget-officer joins; access widened to flagged officers; `pending_budget` status banner + timeline step (Budget Certified / Pending Budget Review / Budget Review, with preferred officer + notes); Review step shows completed during `pending_budget`; Process card gains the budget branch ("Certify Budget"); CAF sees no process card at `pending_budget` (gate falls through).
+- [x] `index.php` — `pending_budget` status filter + "Pending Budget" summary card (grid now `col-6 col-xl`); row Process button for flagged officers at `pending_budget`; `$pendingBudgetCount` computed for the flag pool.
+- [x] `create.php` — optional Preferred Budget Officer dropdown from `budgetOfficerPool()` (hidden entirely when pool empty; persisted to `requested_budget_officer_id` like the other preferred signatories).
+- [x] Badges / dashboard — `badgePendingIdsGasVouchers()`: CAF/Admin keep `pending_approval` only; Motorpool/Approver keep `pending_review`+`pending_approval`; flagged officers get a **union** of `pending_budget` ids on top of their role set. `dashboard_stats.php`: requester-branch staff flagged as officers get a "Gas vouchers for budget review" action + "Budget Review" KPI linking to `status=pending_budget`; `$myGas` now counts `pending_budget` too.
+- [x] Notifications + SMS — types `gas_voucher_budget_pending` / `gas_voucher_budget_approved` on SMS allow-list; **MAIL_TEMPLATES** entries added for all `gas_voucher_*` types (closes default-template WARN).
+- [x] Print / view timeline — `print.php` signatures row is now 4-up (Requested by/Bearer, Reviewed by OIC Motor Pool, **Certified by Budget Officer**, Approved by CAF; widths 25%); `view.php` timeline as above. Grandfathered approved vouchers (no `budget_reviewed_by`) print an empty Budget Officer name line for wet signing.
+- [x] `php -l` clean on all touched files; QA matrix below (harness scenarios PASS).
+- [x] Deployed to live `lokafleet.dictr2.cloud` on 2026-09-28 — code + migration 054; prod DB rows preserved.
+
+## QA matrix — verified 2026-09-28 via `_deploy_tmp/verify_plan31.php` (persona session injection; approve.php opens its own transactions, so scenarios run against the real local DB with a shutdown cleanup that deletes every created row — vouchers `voucher_no LIKE '31TEST-%'`, notifications/email_queue/sms_logs/audit_logs above process high-water marks — and resets the test flags on users 15/32; post-run DB verified pristine). One process per scenario; each scenario seeds its own voucher(s).
+
+- [x] **Motorpool review lands on `pending_budget`** — motorpool head (14) `review_approve` on a `pending_review` voucher → status `pending_budget`, `reviewed_by=14`, success flash; both flagged officers notified (`gas_voucher_budget_pending`), requester notified (`gas_voucher_reviewed`).
+- [x] **Budget Officer / OIC Budget Officer can approve the budget step; Admin cannot** — flagged plain-staff user 15 `budget_approve` → `pending_approval` with `budget_reviewed_by/_at` + notes; Admin (115), **All Father (1)**, CAF (43), and an active unflagged requester are all bounced with "cannot be processed at this stage", status and `budget_reviewed_by` untouched.
+- [x] **CAF Process only after budget approve** — gate scenario proves CAF blocked at `pending_budget`; `grandfathered_caf` scenario proves CAF `final_approve` works at `pending_approval` → `approved`, budget columns left NULL.
+- [x] **Reject with reason at budget step** — flagged officer rejects → `rejected`, `rejection_reason` stored, `rejected_by=15`, warning flash.
+- [x] **Preferred budget officer notification targeting** — voucher with `requested_budget_officer_id=32`: only officer 32 notified, officer 15 not; without preference: whole flagged pool notified.
+- [x] **All Father board toggles flags; All Father cannot process `pending_budget`** — board renders for real All Father with both toggles + read-only Motorpool/CAF pools; POST toggle persists `is_budget_officer=1` with success flash; Administrator bounced from the board ("All Father access required"); All Father blocked at the budget step (above).
+- [x] **Grandfathered `pending_approval` still CAF-processable** — see `grandfathered_caf` above (decision 5 satisfied by the ENUM rewrite keeping existing values untouched).
+- [x] **Soft-delete / cancelled behaviour unchanged for pre-budget statuses** — `cancel.php` untouched: owner cancel at `pending_budget` refused ("cannot be cancelled at this stage"), `pending_review` path unchanged; soft-delete filters (`deleted_at IS NULL`) present in every touched query.
+- [x] **Render checks** — index: `pending_budget` filter option + summary card + Process link for flagged officers; view: budget banner, timeline step, Certify Budget card; create: preferred officer dropdown listing the flagged pool; print: 4-up signatures with "Certified by:" + officer name.
+
+## Files (planned)
+
+- `Plan.md` (this section)
+- `public_html/migrations/054_gas_voucher_budget_officer.php` (new)
+- `public_html/includes/functions.php`
+- `public_html/pages/users/create.php`, `public_html/pages/users/edit.php`
+- `public_html/pages/gas-vouchers/approve.php`, `view.php`, `index.php`, `create.php` (+ print if timeline/signatories)
+- New All Father assignees page under settings/system control + router/`sidebar` or System Control link
+- `public_html/config/sms.php` (notify type allow-list if needed)
+- Badge / dashboard helpers as touched today for gas pending counts
+
+## Out of scope
+
+New system role ENUM; changing trip-request / OB / Live Board workflows; payment rules beyond existing `payment_status`; live deploy until explicitly requested after implementation.
+
+## Status
+
+**DONE (2026-09-28) — implemented, QA'd, and deployed to live `lokafleet.dictr2.cloud`.** Migration 054 applied on prod. Files: `migrations/054_gas_voucher_budget_officer.php` (new), `includes/functions.php`, `includes/badge_counts.php`, `includes/dashboard_stats.php`, `includes/sidebar.php`, `config/sms.php`, `config/mail.php`, `index.php` (router), `pages/users/create.php`, `pages/users/edit.php`, `pages/gas-vouchers/approve.php`, `view.php`, `index.php`, `create.php`, `print.php`, `pages/settings/gas-workflow.php` (new), `_deploy_tmp/verify_plan31.php` (QA harness), `Plan.md`.
 

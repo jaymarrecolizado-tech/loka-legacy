@@ -2,12 +2,16 @@
 /**
  * LOKA - Gas Voucher Approval Processing Page
  *
- * Two-step workflow:
- *  Step 1 (pending_review)    â†’ Reviewed by OIC Motorpool â†’ moves to pending_approval
- *  Step 2 (pending_approval)  â†’ Approved/Rejected by Chief Admin & Finance
+ * Three-step workflow (Plan #31):
+ *  Step 1 (pending_review)    -> Reviewed by Motorpool Head -> pending_budget
+ *  Step 2 (pending_budget)    -> Budget Officer / OIC Budget Officer (flags only) -> pending_approval
+ *  Step 3 (pending_approval)  -> Approved/Rejected by Chief Admin & Finance (existing actors)
  */
 
-requireAnyRole([ROLE_APPROVER, ROLE_MOTORPOOL, ROLE_ADMIN, ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE]);
+requireAuth();
+if (!canAccessGasVouchers()) {
+    redirectWith('/?page=dashboard', 'danger', 'You do not have permission to access this page.');
+}
 
 $voucherId = (int) get('id', 0);
 if (!$voucherId) {
@@ -26,11 +30,17 @@ if (!$voucher) {
     redirectWith('/?page=gas-vouchers', 'danger', 'Voucher not found.');
 }
 
-// Determine which step we're at and what actions are available
+// Determine which step we're at and what actions are available.
+// Step 2 is flag-gated ONLY (Plan #31 decision 2): Admin / Motorpool / CAF /
+// All Father cannot act on pending_budget unless separately flagged.
 $canReview  = ($voucher->status === 'pending_review' && (isMotorpool() || isApprover() || isAdmin()));
+$canBudget  = ($voucher->status === 'pending_budget' && isBudgetOfficer());
 $canApprove = ($voucher->status === 'pending_approval' && (isAdmin() || isMotorpool() || isChiefAdminFinance()));
 
-if (!$canReview && !$canApprove) {
+// Reject stays available at each pending step, but only by that step's actor.
+$canRejectAtStep = $canReview || $canBudget || $canApprove;
+
+if (!$canRejectAtStep) {
     redirectWith('/?page=gas-vouchers&action=view&id=' . $voucherId, 'warning', 'This voucher cannot be processed at this stage by your role.');
 }
 
@@ -49,6 +59,8 @@ $chiefFinanceUsers = db()->fetchAll(
     [ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE]
 );
 
+$budgetOfficers = budgetOfficerPool();
+
 $errors = [];
 $pageTitle = 'Process Gas Voucher: ' . $voucher->voucher_no;
 
@@ -62,9 +74,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $rejectReason = $notes;
     }
     $selectedReviewer = (int) post('reviewed_by', userId());
+    $selectedBudgetOfficer = (int) post('budget_officer_id', userId());
     $selectedApprover = (int) post('approved_by', userId());
 
-    if (!in_array($decision, ['review_approve', 'final_approve', 'reject'])) {
+    $validDecisions = [];
+    if ($canReview)  $validDecisions[] = 'review_approve';
+    if ($canBudget)  $validDecisions[] = 'budget_approve';
+    if ($canApprove) $validDecisions[] = 'final_approve';
+    if ($canRejectAtStep) $validDecisions[] = 'reject';
+
+    if (!in_array($decision, $validDecisions, true)) {
         $errors[] = 'Invalid decision.';
     }
 
@@ -74,6 +93,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($decision === 'review_approve' && $selectedReviewer <= 0) {
         $errors[] = 'Please select a reviewer.';
+    }
+
+    if ($decision === 'budget_approve') {
+        if ($selectedBudgetOfficer <= 0) {
+            $errors[] = 'Please select the Budget Officer signing off.';
+        } else {
+            $officerRow = db()->fetch(
+                "SELECT id FROM users
+                 WHERE id = ? AND (is_budget_officer = 1 OR is_oic_budget_officer = 1)
+                   AND status = 'active' AND deleted_at IS NULL",
+                [$selectedBudgetOfficer]
+            );
+            if (!$officerRow) {
+                $errors[] = 'Selected signatory is not an active Budget Officer.';
+            }
+        }
     }
 
     if ($decision === 'final_approve' && $selectedApprover <= 0) {
@@ -90,32 +125,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'user_id' => $requesterUserId,
                 'type' => 'gas_voucher_reviewed',
                 'title' => 'Gas Voucher Reviewed',
-                'message' => "Your gas voucher {$voucher->voucher_no} has been reviewed and is now awaiting final approval.",
+                'message' => "Your gas voucher {$voucher->voucher_no} has been reviewed and is now awaiting Budget Officer certification.",
                 'link' => '/?page=gas-vouchers&action=view&id=' . $voucherId,
                 'requestId' => $voucherId
             ];
 
-            // Notify only the selected approver (if set), otherwise all Chief Admin & Finance
-            if ($voucher->requested_approver_id) {
+            // Notify the preferred Budget Officer (if set), otherwise all flagged officers
+            if ($voucher->requested_budget_officer_id) {
                 $notificationsToSend[] = [
-                    'user_id' => $voucher->requested_approver_id,
-                    'type' => 'gas_voucher_reviewed',
-                    'title' => 'Gas Voucher Awaiting Final Approval',
-                    'message' => "Gas voucher {$voucher->voucher_no} has been reviewed and requires your final approval.",
+                    'user_id' => $voucher->requested_budget_officer_id,
+                    'type' => 'gas_voucher_budget_pending',
+                    'title' => 'Gas Voucher Awaiting Budget Review',
+                    'message' => "Gas voucher {$voucher->voucher_no} has been reviewed and requires Budget Officer certification.",
                     'link' => '/?page=gas-vouchers&action=view&id=' . $voucherId,
                     'requestId' => $voucherId
                 ];
             } else {
-                $chiefFinanceUsers = db()->fetchAll(
-                    "SELECT id FROM users WHERE role IN (?, ?) AND deleted_at IS NULL AND status = 'active'",
-                    [ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE]
-                );
-                foreach ($chiefFinanceUsers as $user) {
+                foreach ($budgetOfficers as $officer) {
                     $notificationsToSend[] = [
-                        'user_id' => $user->id,
-                        'type' => 'gas_voucher_reviewed',
-                        'title' => 'Gas Voucher Awaiting Final Approval',
-                        'message' => "Gas voucher {$voucher->voucher_no} has been reviewed and requires your final approval.",
+                        'user_id' => $officer->id,
+                        'type' => 'gas_voucher_budget_pending',
+                        'title' => 'Gas Voucher Awaiting Budget Review',
+                        'message' => "Gas voucher {$voucher->voucher_no} has been reviewed and requires Budget Officer certification.",
                         'link' => '/?page=gas-vouchers&action=view&id=' . $voucherId,
                         'requestId' => $voucherId
                     ];
@@ -125,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             db()->beginTransaction();
             try {
                 db()->update('gas_vouchers', [
-                    'status'         => 'pending_approval',
+                    'status'         => 'pending_budget',
                     'reviewed_by'    => $selectedReviewer,
                     'reviewed_at'    => date(DATETIME_FORMAT),
                     'reviewer_notes' => $notes ?: null,
@@ -138,7 +169,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     notify($notif['user_id'], $notif['type'], $notif['title'], $notif['message'], $notif['link'], $notif['requestId']);
                 }
 
-                redirectWith('/?page=gas-vouchers&action=view&id=' . $voucherId, 'success', 'Gas voucher reviewed. Now awaiting final approval.');
+                redirectWith('/?page=gas-vouchers&action=view&id=' . $voucherId, 'success', 'Gas voucher reviewed. Now awaiting Budget Officer certification.');
+            } catch (Exception $e) {
+                db()->rollback();
+                $errors[] = 'Error: ' . $e->getMessage();
+            }
+
+        } elseif ($decision === 'budget_approve') {
+            // Notify requester
+            $notificationsToSend[] = [
+                'user_id' => $requesterUserId,
+                'type' => 'gas_voucher_budget_approved',
+                'title' => 'Gas Voucher Budget Certified',
+                'message' => "Your gas voucher {$voucher->voucher_no} has been certified by the Budget Officer and is now awaiting final approval.",
+                'link' => '/?page=gas-vouchers&action=view&id=' . $voucherId,
+                'requestId' => $voucherId
+            ];
+
+            // Notify only the selected approver (if set), otherwise all Chief Admin & Finance
+            if ($voucher->requested_approver_id) {
+                $notificationsToSend[] = [
+                    'user_id' => $voucher->requested_approver_id,
+                    'type' => 'gas_voucher_budget_approved',
+                    'title' => 'Gas Voucher Awaiting Final Approval',
+                    'message' => "Gas voucher {$voucher->voucher_no} has been certified by the Budget Officer and requires your final approval.",
+                    'link' => '/?page=gas-vouchers&action=view&id=' . $voucherId,
+                    'requestId' => $voucherId
+                ];
+            } else {
+                foreach ($chiefFinanceUsers as $cf) {
+                    $notificationsToSend[] = [
+                        'user_id' => $cf->id,
+                        'type' => 'gas_voucher_budget_approved',
+                        'title' => 'Gas Voucher Awaiting Final Approval',
+                        'message' => "Gas voucher {$voucher->voucher_no} has been certified by the Budget Officer and requires your final approval.",
+                        'link' => '/?page=gas-vouchers&action=view&id=' . $voucherId,
+                        'requestId' => $voucherId
+                    ];
+                }
+            }
+
+            db()->beginTransaction();
+            try {
+                db()->update('gas_vouchers', [
+                    'status'               => 'pending_approval',
+                    'budget_reviewed_by'   => $selectedBudgetOfficer,
+                    'budget_reviewed_at'   => date(DATETIME_FORMAT),
+                    'budget_officer_notes' => $notes ?: null,
+                    'updated_at'           => date(DATETIME_FORMAT),
+                ], 'id = ?', [$voucherId]);
+                auditLog('budget_approve', 'gas_voucher', $voucherId);
+                db()->commit();
+
+                foreach ($notificationsToSend as $notif) {
+                    notify($notif['user_id'], $notif['type'], $notif['title'], $notif['message'], $notif['link'], $notif['requestId']);
+                }
+
+                redirectWith('/?page=gas-vouchers&action=view&id=' . $voucherId, 'success', 'Budget certified. Now awaiting final approval by Chief, Admin. and Finance.');
             } catch (Exception $e) {
                 db()->rollback();
                 $errors[] = 'Error: ' . $e->getMessage();
@@ -356,12 +443,17 @@ require_once INCLUDES_PATH . '/header.php';
             <?php if ($canReview): ?>
             <div class="alert alert-warning">
                 <i class="bi bi-person-badge me-2"></i>
-                <strong>Step 1 – Review:</strong> As OIC, Motor Pool Unit, you are reviewing this voucher before it goes for final approval.
+                <strong>Step 1 – Review:</strong> As OIC, Motor Pool Unit, you are reviewing this voucher before Budget Officer certification.
+            </div>
+            <?php elseif ($canBudget): ?>
+            <div class="alert alert-primary">
+                <i class="bi bi-cash-coin me-2"></i>
+                <strong>Step 2 – Budget Certification:</strong> As Budget Officer, you are certifying the fund source/charges before final approval.
             </div>
             <?php elseif ($canApprove): ?>
             <div class="alert alert-info">
                 <i class="bi bi-person-check me-2"></i>
-                <strong>Step 2 – Final Approval:</strong> As Chief, Admin. and Finance Division, you are authorizing the bearer to secure fuel/items.
+                <strong>Step 3 – Final Approval:</strong> As Chief, Admin. and Finance Division, you are authorizing the bearer to secure fuel/items.
             </div>
             <?php endif; ?>
 
@@ -371,6 +463,7 @@ require_once INCLUDES_PATH . '/header.php';
                     <h6 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Your Decision</h6>
                 </div>
                 <div class="p-4">
+                    <?php if (!$canBudget): ?>
                     <div class="mb-4 d-flex align-items-center justify-content-between bg-light p-3 rounded border">
                         <div>
                             <strong>Need to change something?</strong>
@@ -380,10 +473,10 @@ require_once INCLUDES_PATH . '/header.php';
                             <i class="bi bi-pencil me-1"></i>Edit Voucher Fields
                         </a>
                     </div>
-                    
+                    <?php endif; ?>
                     <form method="POST">
                         <?= csrfField() ?>
-                        <input type="hidden" name="decision" value="<?= $canReview ? 'review_approve' : 'final_approve' ?>">
+                        <input type="hidden" name="decision" value="<?= $canReview ? 'review_approve' : ($canBudget ? 'budget_approve' : 'final_approve') ?>">
 
                         <?php if ($canReview): ?>
                         <div class="mb-4">
@@ -396,6 +489,21 @@ require_once INCLUDES_PATH . '/header.php';
                                     (!$voucher->requested_reviewer_id && $mp->id == userId() ? 'selected' : '')
                                 ?>>
                                     <?= e($mp->name) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php elseif ($canBudget): ?>
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">Budget Officer <span class="text-danger">*</span></label>
+                            <select name="budget_officer_id" class="form-select" required>
+                                <option value="">-- Select Budget Officer --</option>
+                                <?php foreach ($budgetOfficers as $bo): ?>
+                                <option value="<?= $bo->id ?>" <?=
+                                    ($voucher->requested_budget_officer_id && $bo->id == $voucher->requested_budget_officer_id) ? 'selected' :
+                                    (!$voucher->requested_budget_officer_id && $bo->id == userId() ? 'selected' : '')
+                                ?>>
+                                    <?= e($bo->name) ?><?= ((int) $bo->is_oic_budget_officer === 1 && (int) $bo->is_budget_officer !== 1) ? ' (OIC)' : '' ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -425,8 +533,13 @@ require_once INCLUDES_PATH . '/header.php';
 
                         <?php if ($canReview): ?>
                         <button type="submit" class="btn btn-success"
-                                onclick="return confirm('Send this voucher for final approval?')">
-                            <i class="bi bi-check-circle me-1"></i>Approve for Final Review
+                                onclick="return confirm('Send this voucher to the Budget Officer for certification?')">
+                            <i class="bi bi-check-circle me-1"></i>Approve for Budget Review
+                        </button>
+                        <?php elseif ($canBudget): ?>
+                        <button type="submit" class="btn btn-success"
+                                onclick="return confirm('Certify the budget and send this voucher for final approval?')">
+                            <i class="bi bi-cash-coin me-1"></i>Certify Budget
                         </button>
                         <?php elseif ($canApprove): ?>
                         <button type="submit" class="btn btn-success"

@@ -75,6 +75,9 @@ $chiefFinanceUsers = db()->fetchAll(
     [ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE]
 );
 
+// Fetch Budget Officer pool for the preferred-officer selection (Plan #31)
+$budgetOfficers = budgetOfficerPool();
+
 // Handle POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
@@ -104,6 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dateWithdrawn = post('date_withdrawn', '');
     $requestedReviewerId = (int) post('requested_reviewer_id', 0) ?: null;
     $requestedApproverId = (int) post('requested_approver_id', 0) ?: null;
+    $requestedBudgetOfficerId = (int) post('requested_budget_officer_id', 0) ?: null;
 
     $allowedStations = getActiveGasStations();
     // Allow editing a voucher that already has an inactive station
@@ -153,6 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'status'             => $newStatus,
             'requested_reviewer_id' => $requestedReviewerId,
             'requested_approver_id' => $requestedApproverId,
+            'requested_budget_officer_id' => $requestedBudgetOfficerId,
             'updated_at'         => date(DATETIME_FORMAT),
         ];
 
@@ -335,6 +340,22 @@ require_once INCLUDES_PATH . '/header.php';
                                 <span class="form-text text-muted d-block small text-muted">Select a preferred approver (optional)</span>
                             </label>
                         </div>
+                        <?php if (!empty($budgetOfficers)): ?>
+                        <div class="col-md-6">
+                            <label class="form-label small">Budget Officer</label>
+                            <select name="requested_budget_officer_id" class="form-select w-100">
+                                <option value="">-- Auto-assign --</option>
+                                <?php foreach ($budgetOfficers as $bo): ?>
+                                <option value="<?= $bo->id ?>" <?= (int) ($d?->requested_budget_officer_id ?? 0) === (int) $bo->id ? 'selected' : '' ?>>
+                                    <?= e($bo->name) ?><?= ((int) $bo->is_oic_budget_officer === 1 && (int) $bo->is_budget_officer !== 1) ? ' (OIC)' : '' ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <label class="form-label">
+                                <span class="form-text text-muted d-block small text-muted">Select a preferred Budget Officer (optional)</span>
+                            </label>
+                        </div>
+                        <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>

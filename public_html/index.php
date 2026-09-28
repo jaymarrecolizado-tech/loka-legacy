@@ -462,6 +462,9 @@ switch ($page) {
         requireRole(ROLE_ADMIN);
         if ($action === 'email-queue') {
             require_once PAGES_PATH . '/settings/email-queue.php';
+        } elseif ($action === 'gas-workflow') {
+            // Plan #31 — page itself enforces real All Father (requireSystemControl)
+            require_once PAGES_PATH . '/settings/gas-workflow.php';
         } else {
             require_once PAGES_PATH . '/settings/index.php';
         }

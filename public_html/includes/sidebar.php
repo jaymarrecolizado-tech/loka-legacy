@@ -316,6 +316,15 @@
             <?php if (canAccessSystemControl()): ?>
             <li class="nav-header">System Control</li>
 
+            <!-- Gas voucher workflow assignees (Plan #31) -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'settings' && get('action') === 'gas-workflow') ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=settings&action=gas-workflow">
+                    <i class="bi bi-cash-coin"></i>
+                    <span>Gas Workflow</span>
+                </a>
+            </li>
+
             <!-- Lockouts -->
             <li class="nav-item">
                 <a class="nav-link <?= (get('page') === 'security' && in_array(get('action'), ['rate-limits', 'index'])) ? 'active' : '' ?>"

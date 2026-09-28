@@ -15,7 +15,9 @@ $voucher = db()->fetch(
             approver.name AS approver_name_full,
             rejector.name AS rejector_name,
             req_reviewer.name AS requested_reviewer_name,
-            req_approver.name AS requested_approver_name
+            req_approver.name AS requested_approver_name,
+            budget_officer.name AS budget_officer_name,
+            req_budget.name AS requested_budget_officer_name
      FROM gas_vouchers gv
      JOIN users u ON gv.requested_by_user_id = u.id
      LEFT JOIN users reviewer ON gv.reviewed_by = reviewer.id
@@ -23,6 +25,8 @@ $voucher = db()->fetch(
      LEFT JOIN users rejector ON gv.rejected_by = rejector.id
      LEFT JOIN users req_reviewer ON gv.requested_reviewer_id = req_reviewer.id
      LEFT JOIN users req_approver ON gv.requested_approver_id = req_approver.id
+     LEFT JOIN users budget_officer ON gv.budget_reviewed_by = budget_officer.id
+     LEFT JOIN users req_budget ON gv.requested_budget_officer_id = req_budget.id
      WHERE gv.id = ? AND gv.deleted_at IS NULL",
     [$voucherId]
 );
@@ -31,8 +35,8 @@ if (!$voucher) {
     redirectWith('/?page=gas-vouchers', 'danger', 'Gas voucher not found.');
 }
 
-// Access control: only owner, admin, approvers, or Chief Admin/Finance can view
-if ($voucher->requested_by_user_id != userId() && !isAdmin() && !isApprover() && !isMotorpool() && !isChiefAdminFinance()) {
+// Access control: only owner, admin, approvers, Chief Admin/Finance, or Budget Officers can view
+if ($voucher->requested_by_user_id != userId() && !isAdmin() && !isApprover() && !isMotorpool() && !isChiefAdminFinance() && !isBudgetOfficer()) {
     redirectWith('/?page=gas-vouchers', 'danger', 'Access denied.');
 }
 
@@ -92,6 +96,8 @@ require_once INCLUDES_PATH . '/header.php';
                 <strong>Status: <?= gasVoucherStatusLabel($voucher->status) ?></strong>
                 <?php if ($voucher->status === 'pending_review'): ?>
                 — Awaiting review by OIC, Motor Pool Unit.
+                <?php elseif ($voucher->status === 'pending_budget'): ?>
+                — Awaiting certification by the Budget Officer.
                 <?php elseif ($voucher->status === 'pending_approval'): ?>
                 — Awaiting final approval by Chief, Admin. and Finance Division.
                 <?php elseif ($voucher->status === 'approved'): ?>
@@ -241,7 +247,7 @@ require_once INCLUDES_PATH . '/header.php';
 
                             <!-- Step 2: Reviewed by OIC Motorpool -->
                             <li class="d-flex align-items-start gap-3 p-4 border-bottom">
-                                <?php if (in_array($voucher->status, ['pending_approval', 'approved', 'rejected']) && $voucher->reviewed_by): ?>
+                                <?php if (in_array($voucher->status, ['pending_budget', 'pending_approval', 'approved', 'rejected']) && $voucher->reviewed_by): ?>
                                 <div class="text-success mt-1"><i class="bi bi-check-circle-fill fs-5"></i></div>
                                 <div>
                                     <div class="fw-semibold">Reviewed</div>
@@ -275,7 +281,43 @@ require_once INCLUDES_PATH . '/header.php';
                                 <?php endif; ?>
                             </li>
 
-                            <!-- Step 3: Approved by Chief Admin & Finance -->
+                            <!-- Step 3: Budget Officer certification -->
+                            <li class="d-flex align-items-start gap-3 p-4 border-bottom">
+                                <?php if (in_array($voucher->status, ['pending_approval', 'approved', 'rejected']) && $voucher->budget_reviewed_by): ?>
+                                <div class="text-success mt-1"><i class="bi bi-check-circle-fill fs-5"></i></div>
+                                <div>
+                                    <div class="fw-semibold">Budget Certified</div>
+                                    <div class="small text-muted">by <?= e($voucher->budget_officer_name) ?> (Budget Officer)</div>
+                                    <div class="small text-muted"><?= e(date('M d, Y h:i A', strtotime($voucher->budget_reviewed_at))) ?></div>
+                                    <?php if ($voucher->budget_officer_notes): ?>
+                                    <div class="mt-1 small text-muted italic">"<?= e($voucher->budget_officer_notes) ?>"</div>
+                                    <?php endif; ?>
+                                    <?php if ($voucher->requested_budget_officer_name && $voucher->requested_budget_officer_name !== $voucher->budget_officer_name): ?>
+                                    <div class="mt-1 small text-muted">Budget Officer: <?= e($voucher->requested_budget_officer_name) ?></div>
+                                    <?php endif; ?>
+                                </div>
+                                <?php elseif ($voucher->status === 'pending_budget'): ?>
+                                <div class="text-warning mt-1"><i class="bi bi-hourglass-split fs-5"></i></div>
+                                <div>
+                                    <div class="fw-semibold">Pending Budget Review</div>
+                                    <?php if ($voucher->requested_budget_officer_name): ?>
+                                    <div class="small">to <?= e($voucher->requested_budget_officer_name) ?></div>
+                                    <?php endif; ?>
+                                    <div class="small text-muted">Budget Officer</div>
+                                </div>
+                                <?php else: ?>
+                                <div class="text-muted mt-1"><i class="bi bi-circle fs-5"></i></div>
+                                <div class="text-muted">
+                                    <div class="fw-semibold">Budget Review</div>
+                                    <?php if ($voucher->requested_budget_officer_name): ?>
+                                    <div class="small">to <?= e($voucher->requested_budget_officer_name) ?></div>
+                                    <?php endif; ?>
+                                    <div class="small">Budget Officer</div>
+                                </div>
+                                <?php endif; ?>
+                            </li>
+
+                            <!-- Step 4: Approved by Chief Admin & Finance -->
                             <li class="d-flex align-items-start gap-3 p-4">
                                 <?php if ($voucher->status === 'approved'): ?>
                                 <div class="text-success mt-1"><i class="bi bi-check-circle-fill fs-5"></i></div>
@@ -361,6 +403,7 @@ require_once INCLUDES_PATH . '/header.php';
 
                 <!-- Process Actions -->
                 <?php if (($voucher->status === 'pending_review' && (isMotorpool() || isApprover() || isAdmin() || isChiefAdminFinance())) ||
+                          ($voucher->status === 'pending_budget' && isBudgetOfficer()) ||
                           ($voucher->status === 'pending_approval' && (isAdmin() || isMotorpool() || isChiefAdminFinance()))): ?>
                 <div class="card border-warning mb-4">
                     <div class="card-header bg-warning text-dark">
@@ -369,7 +412,7 @@ require_once INCLUDES_PATH . '/header.php';
                     <div class="card-body">
                         <a href="<?= APP_URL ?>/?page=gas-vouchers&action=approve&id=<?= $voucher->id ?>"
                            class="btn btn-warning w-100">
-                            <i class="bi bi-pencil-square me-1"></i>Review / Approve
+                            <i class="bi bi-pencil-square me-1"></i><?= $voucher->status === 'pending_budget' ? 'Certify Budget' : 'Review / Approve' ?>
                         </a>
                     </div>
                 </div>
