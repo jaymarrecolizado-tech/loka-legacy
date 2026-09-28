@@ -2737,5 +2737,5 @@ Multi-page wizard with separate routes; changing OB approval/guard/CoA workflow;
 
 ## Status
 
-**DONE (2026-09-28) — implemented + QA'd on localhost (real-browser click-through + POST harness), NOT deployed.** No migration. Files touched: `public_html/pages/ob-requests/create.php` only (+ in-page stepper CSS/JS), `_deploy_tmp/verify_plan33.php` (POST harness), `Plan.md`. QA-side temporary state fully reverted: `dash_pw.php restore` run, user 43 `is_ob_approver` reset to 0, harness rows deleted.
+**DONE (2026-09-28) — implemented, QA'd, and deployed to live `lokafleet.dictr2.cloud`.** No migration. Files touched: `public_html/pages/ob-requests/create.php` only (+ in-page stepper CSS/JS), `_deploy_tmp/verify_plan33.php` (POST harness), `Plan.md`.
 
