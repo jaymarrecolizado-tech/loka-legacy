@@ -194,13 +194,18 @@ class Mailer
         }
 
         $template = MAIL_TEMPLATES[$templateKey];
+
+        // Plan #32: family-aware subject wording + theme color
+        $family = function_exists('notificationFamily') ? notificationFamily($templateKey) : 'vehicle';
         $subject = $requestId !== null
-            ? ('Control No. ' . $requestId . ': LOKA Fleet Request')
+            ? (function_exists('notificationThreadSubject')
+                ? notificationThreadSubject($family, $requestId)
+                : ('Control No. ' . $requestId . ': LOKA Fleet Request'))
             : $template['subject'];
-        
+
         // Build HTML body
-        $body = $this->buildHtmlBody($template['subject'], $template['template'], $data);
-        
+        $body = $this->buildHtmlBody($template['subject'], $template['template'], $data, $family);
+
         return $this->send($to, $subject, $body, $toName, true, $requestId);
     }
 
@@ -256,12 +261,16 @@ class Mailer
     /**
      * Build HTML email body
      */
-    private function buildHtmlBody(string $title, string $content, array $data = []): string
+    private function buildHtmlBody(string $title, string $content, array $data = [], string $family = 'vehicle'): string
     {
         $message = $data['message'] ?? $content;
         $link = $data['link'] ?? null;
         $linkText = $data['link_text'] ?? 'View Details';
-        
+
+        // Plan #32: family theme colors the header + CTA; wordmark/footer stay
+        $theme = function_exists('notificationTheme') ? notificationTheme($family) : null;
+        $color = is_array($theme) ? $theme['color'] : '#0d6efd';
+
         $html = '
 <!DOCTYPE html>
 <html>
@@ -276,7 +285,7 @@ class Mailer
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
                     <!-- Header -->
                     <tr>
-                        <td style="background-color:#0d6efd;padding:30px;text-align:center;">
+                        <td style="background-color:' . $color . ';padding:30px;text-align:center;">
                             <h1 style="color:#ffffff;margin:0;font-size:24px;">LOKA Fleet Management</h1>
                         </td>
                     </tr>
@@ -285,13 +294,13 @@ class Mailer
                         <td style="padding:40px 30px;">
                             <h2 style="color:#333333;margin:0 0 20px 0;font-size:20px;">' . htmlspecialchars($title) . '</h2>
                             <p style="color:#666666;font-size:16px;line-height:1.6;margin:0 0 20px 0;">' . nl2br(htmlspecialchars($message)) . '</p>';
-        
+
         if ($link) {
             // If link already starts with http, use as-is, otherwise prepend SITE_URL
             $fullLink = (strpos($link, 'http') === 0) ? $link : SITE_URL . $link;
             $html .= '
                             <p style="text-align:center;margin:30px 0;">
-                                <a href="' . htmlspecialchars($fullLink) . '" style="display:inline-block;background-color:#0d6efd;color:#ffffff;padding:12px 30px;text-decoration:none;border-radius:5px;font-weight:bold;">' . htmlspecialchars($linkText) . '</a>
+                                <a href="' . htmlspecialchars($fullLink) . '" style="display:inline-block;background-color:' . $color . ';color:#ffffff;padding:12px 30px;text-decoration:none;border-radius:5px;font-weight:bold;">' . htmlspecialchars($linkText) . '</a>
                             </p>';
         }
         

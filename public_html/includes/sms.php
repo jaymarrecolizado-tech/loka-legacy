@@ -162,6 +162,15 @@ function buildSmsMessage(
         }
     }
 
+    // Plan #32: family tag ([Vehicle]/[Gas Voucher]/[OB]) so recipients can
+    // tell message families apart; skipped when the title already carries it.
+    if (function_exists('notificationFamily') && function_exists('notificationTheme')) {
+        $smsTag = notificationTheme(notificationFamily($eventType))['smsTag'] ?? '';
+        if ($smsTag !== '' && !str_starts_with($body, $smsTag)) {
+            $body = $smsTag . ' ' . $body;
+        }
+    }
+
     $text = $header . ' - ' . $body;
 
     if ($link) {

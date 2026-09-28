@@ -35,6 +35,7 @@
 | #29 | Vehicle Trip Ticket — Full Purpose + No PDF Scrollbars | DONE (2026-09-26; live `lokafleet.dictr2.cloud`) |
 | #30 | All-Trip Visibility for Motorpool Head + Department Approver | DONE (2026-09-27; live `lokafleet.dictr2.cloud`) |
 | #31 | Gas Voucher Budget Officer Step (hybrid C) | DONE (2026-09-28; live `lokafleet.dictr2.cloud`; run migration 054) |
+| #32 | Distinct email/SMS themes for Vehicle, Gas Voucher, OB | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -2589,4 +2590,78 @@ New system role ENUM; changing trip-request / OB / Live Board workflows; payment
 ## Status
 
 **DONE (2026-09-28) — implemented, QA'd, and deployed to live `lokafleet.dictr2.cloud`.** Migration 054 applied on prod. Files: `migrations/054_gas_voucher_budget_officer.php` (new), `includes/functions.php`, `includes/badge_counts.php`, `includes/dashboard_stats.php`, `includes/sidebar.php`, `config/sms.php`, `config/mail.php`, `index.php` (router), `pages/users/create.php`, `pages/users/edit.php`, `pages/gas-vouchers/approve.php`, `view.php`, `index.php`, `create.php`, `print.php`, `pages/settings/gas-workflow.php` (new), `_deploy_tmp/verify_plan31.php` (QA harness), `Plan.md`.
+
+---
+
+# LOKA Plan #32: Distinct email/SMS themes for Vehicle, Gas Voucher, and OB — ✅ DONE (2026-09-28; live `lokafleet.dictr2.cloud`)
+
+## Goal
+
+Make **Vehicle Request**, **Gas Voucher**, and **OB Pass Slip** notifications visually and textually distinct in email (and SMS), while keeping **LOKA Fleet Management** branding and stable per-ID email threading (Plan #13).
+
+## Problem
+
+Gas voucher emails currently look like vehicle requests:
+
+- **Subject:** `Control No. {id}: LOKA Fleet Request` even when the ID is a gas voucher id
+- **Theme:** same blue header + blue “View Details” button (`#0d6efd`) for every family
+
+Root cause: when `requestId` is set, [`EmailQueue.php`](public_html/classes/EmailQueue.php) and [`Mailer.php`](public_html/classes/Mailer.php) force one subject string and one HTML chrome color. Gas vouchers and OB pass their own IDs into that same `requestId` slot via `notify()`.
+
+## Locked decisions
+
+1. Infer a **notification family** from the `notify` / template type prefix (`gas_voucher_*`, `ob_*`, vehicle-related types, else system).
+2. Apply **family-specific email subject** and **theme color** (header + CTA button). Keep white “LOKA Fleet Management” wordmark and gray footer.
+3. Keep **stable per-ID subjects within each family** so Gmail/Outlook threading still works (do not put event titles in the subject).
+4. **SMS:** prepend `[Vehicle]` / `[Gas Voucher]` / `[OB]` to the SMS title when the family is known and the title does not already start with that tag.
+5. No new DB columns; no split of `email_queue.request_id` into voucher/ob FKs in this plan.
+
+## Family theme table
+
+| Family | Type prefix examples | Email subject (stable with ID) | Theme color (header + CTA) |
+|--------|----------------------|--------------------------------|----------------------------|
+| Vehicle | `request_*`, `vehicle_*`, `driver_*`, `trip_*`, `guard_trip_*`, … | `Control No. {id}: Vehicle Request` | `#0d6efd` (current blue) |
+| Gas voucher | `gas_voucher_*` | `Gas Voucher #{id}: Gas Voucher` | `#c2410c` (amber / fuel) |
+| OB Pass Slip | `ob_*`, `guard_ob_*` | `OB Pass Slip #{id}: Official Business` | `#0f766e` (teal) |
+| Other / system | `default`, password reset, etc. | Keep template subject (no forced Control No. label) | `#0d6efd` |
+
+## Implementation checklist — ✅ DONE (2026-09-28)
+
+- [x] Helpers in `includes/functions.php` (new "Notification family themes" section above `notify()`):
+  - [x] `notificationFamily(string $type): string` — `gas_voucher_*` → `gas`; `ob_*` / `guard_ob_*` → `ob`; exact `default` / `password_reset` / `system_notification` / `test` → `system`; everything else → `vehicle` (all remaining fleet types keep the historical blue Control No. family).
+  - [x] `notificationTheme(string $family): array` — `color`, `colorDark` (hover), `smsTag`, `subjectPattern` per the family table (gas `#c2410c`/`#9a3412`/`[Gas Voucher]`; ob `#0f766e`/`#115e59`/`[OB]`; vehicle/system `#0d6efd`/`#0b5ed7`, tags `[Vehicle]`/none).
+  - [x] `notificationThreadSubject(string $family, int $id): string` — `Control No. {id}: Vehicle Request` / `Gas Voucher #{id}: Gas Voucher` / `OB Pass Slip #{id}: Official Business`.
+  - [x] `notify()` now computes the family **from the caller's type before the `default`-template rewrite** and passes it to `queueTemplate()` — this is the load-bearing detail: gas/OB types (and unknown types rewritten to `default`) keep their own subject/theme. `notifyPassengers()` likewise passes `notificationFamily($type)`.
+- [x] Email subject — `EmailQueue::requestThreadSubject(int $id, ?string $family = null)` (family-aware; legacy `Control No.: LOKA Fleet Request` kept only as a no-helpers fallback); `queue()` gains `?string $family` (infers from the `$template` key when null — covers the direct `queue()` callers in cron/process_trip_confirmations and trip-enhancements, which are correctly vehicle); `queueTemplate()` gains `?string $family` passthrough; `Mailer::sendTemplate` infers family from the template key and uses `notificationThreadSubject`.
+- [x] Email HTML chrome — `EmailQueue::buildEmailBody(..., string $family)` and `Mailer::buildHtmlBody(..., string $family)` parameterize the hardcoded `#0d6efd` (header block + CTA button, plus the `:hover` shade in the class-based template). White "LOKA Fleet Management" wordmark and gray footer untouched. The `queueTemplate` sync-send path sends the same themed `$body`/`$subject`, so hybrid/immediate modes match the queued rows.
+- [x] SMS title prefix — `buildSmsMessage()` (in `includes/sms.php`, which backs both `SmsQueue::queueForUser` and `smsNotifyUser`) prepends the family `smsTag` to the title when the family has one and the title doesn't already start with it; system messages stay untagged.
+- [x] Local smoke — `_deploy_tmp/verify_plan32.php`: helper units, `buildSmsMessage` tags, and live `notify()` calls for one vehicle, one gas voucher, one OB event (plus a second same-id gas email), asserting queued `email_queue` subjects + themed chrome; 31 checks, all PASS; high-water cleanup verified (0 residual rows).
+- [x] `php -l` clean on `includes/functions.php`, `includes/sms.php`, `classes/EmailQueue.php`, `classes/Mailer.php`; login page renders 200 after the changes.
+
+## QA matrix — verified 2026-09-28 via `_deploy_tmp/verify_plan32.php` (31 checks, all PASS; local delivery mode is `queued` so nothing actually sends; shutdown cleanup deletes the created notifications/email_queue/sms_logs rows and the DB was verified pristine afterwards)
+
+- [x] Gas voucher email subject is `Gas Voucher #{id}: Gas Voucher`, not `LOKA Fleet Request` — notify() with `gas_voucher_approved` (rendered from the `default` template) queues with the family subject.
+- [x] Gas voucher email header/button use `#c2410c` — queued body contains the amber header block and CTA, and no `#0d6efd` anywhere.
+- [x] Vehicle request keeps blue theme and `Control No. {id}: Vehicle Request` — notify() with `request_approved` queues blue chrome + the (reworded per the locked table) Control No. subject; cron/trip-enhancement direct `queue()` callers inherit the same vehicle subject.
+- [x] OB email uses teal theme and `OB Pass Slip #{id}: Official Business` — notify() with `ob_submitted`.
+- [x] SMS titles show `[Gas Voucher]` / `[Vehicle]` / `[OB]` prefixes — `LOKA #id - [Gas Voucher] Title…` etc.; system types untagged; already-tagged titles not double-tagged.
+- [x] Threading: two emails for the same gas voucher id share the same subject (second event, same id → identical subject string; per-ID Message-ID/In-Reply-To headers unchanged).
+- [x] LOKA branding wordmark + footer unchanged — asserted on gas, OB, and vehicle queued bodies.
+- [x] System/default emails without family ID still use template subject — `queueTemplate('default', …, null)` keeps the template subject; `password_reset` via `Auth::queue()` has no `request_id` so no override applies.
+
+## Files (planned)
+
+- `Plan.md` (this section)
+- `public_html/includes/functions.php` (family helpers)
+- `public_html/classes/EmailQueue.php`
+- `public_html/classes/Mailer.php`
+- `public_html/classes/SmsQueue.php` and/or `public_html/includes/sms.php`
+
+## Out of scope
+
+Changing in-app notification UI chrome; splitting `email_queue.request_id` into separate voucher/ob FK columns; rewriting all `MAIL_TEMPLATES` body copy; live deploy until explicitly requested after implementation.
+
+## Status
+
+**DONE (2026-09-28) — implemented, QA'd, and deployed to live `lokafleet.dictr2.cloud`.** No DB migration needed (Plan decision 5). Files touched: `public_html/includes/functions.php` (family helpers + `notify()`/`notifyPassengers()` family passthrough), `public_html/classes/EmailQueue.php`, `public_html/classes/Mailer.php`, `public_html/includes/sms.php`, `_deploy_tmp/verify_plan32.php` (QA harness), `Plan.md`. Note: vehicle-request subjects change from `Control No. {id}: LOKA Fleet Request` to `Control No. {id}: Vehicle Request`, so in-flight email threads re-root once at cutover — expected per the locked family table.
 

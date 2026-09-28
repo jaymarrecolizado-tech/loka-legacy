@@ -17,15 +17,20 @@ class EmailQueue
     /**
      * Stable subject for all emails tied to one Control No. (request_id).
      * Keeps Gmail/Outlook threading; event details stay in the body.
+     * Plan #32: family-aware wording — vehicle requests keep the historical
+     * "Control No." label, gas vouchers and OB slips get their own.
      */
-    public static function requestThreadSubject(int $requestId): string
+    public static function requestThreadSubject(int $requestId, ?string $family = null): string
     {
+        if (function_exists('notificationThreadSubject')) {
+            return notificationThreadSubject($family ?? 'vehicle', $requestId);
+        }
         return "Control No. {$requestId}: LOKA Fleet Request";
     }
-    
+
     /**
      * Add email to queue
-     * 
+     *
      * @param string $toEmail Recipient email
      * @param string $subject Email subject
      * @param string $body Email body (HTML)
@@ -34,6 +39,7 @@ class EmailQueue
      * @param int $priority Email priority (1-10)
      * @param string|null $scheduledAt When to send the email
      * @param int|null $requestId Related request ID for Control No. tracking
+     * @param string|null $family Notification family (vehicle|gas|ob|system); inferred from $template when null
      * @return int Inserted email queue ID
      */
     public function queue(
@@ -44,10 +50,14 @@ class EmailQueue
         ?string $template = null,
         int $priority = 5,
         ?string $scheduledAt = null,
-        ?int $requestId = null
+        ?int $requestId = null,
+        ?string $family = null
     ): int {
         if ($requestId !== null && $requestId > 0) {
-            $subject = self::requestThreadSubject($requestId);
+            if ($family === null && $template !== null && function_exists('notificationFamily')) {
+                $family = notificationFamily($template);
+            }
+            $subject = self::requestThreadSubject($requestId, $family);
         }
 
         return $this->db->insert('email_queue', [
@@ -62,16 +72,17 @@ class EmailQueue
             'created_at' => date('Y-m-d H:i:s')
         ]);
     }
-    
+
     /**
      * Queue email using template
-     * 
+     *
      * @param string $toEmail Recipient email
      * @param string $templateKey Template key from MAIL_TEMPLATES
      * @param array $data Template data (message, link, link_text)
      * @param string|null $toName Recipient name
      * @param int $priority Email priority (1-10, lower = higher priority)
      * @param int|null $requestId Request ID for Control No. threading
+     * @param string|null $family Notification family override (Plan #32); inferred from $templateKey when null
      * @return int Inserted email queue ID
      */
     public function queueTemplate(
@@ -80,22 +91,29 @@ class EmailQueue
         array $data = [],
         ?string $toName = null,
         int $priority = 5,
-        ?int $requestId = null
+        ?int $requestId = null,
+        ?string $family = null
     ): int {
         // Get template
         $templates = MAIL_TEMPLATES;
         if (!isset($templates[$templateKey])) {
             throw new Exception("Email template '$templateKey' not found");
         }
-        
+
         $template = $templates[$templateKey];
-        // Event title stays in the body; subject is stable when request_id is set
+        // Event title stays in the body; subject is stable when request_id is set.
+        // Family (Plan #32) may be passed explicitly (notify() knows the original
+        // type even when the template was rewritten to 'default').
+        if ($family === null && function_exists('notificationFamily')) {
+            $family = notificationFamily($templateKey);
+        }
+        $family = $family ?? 'vehicle';
         $subject = ($requestId !== null && $requestId > 0)
-            ? self::requestThreadSubject($requestId)
+            ? self::requestThreadSubject($requestId, $family)
             : $template['subject'];
-        
+
         // Build email body (include template subject as heading for context)
-        $body = $this->buildEmailBody($templateKey, $template, $data);
+        $body = $this->buildEmailBody($templateKey, $template, $data, $family);
         
         // Optional sync send, controlled by delivery mode (immediate|queued|hybrid).
         // immediate → sync send always; queued → never (cron sends); hybrid → only
@@ -129,7 +147,7 @@ class EmailQueue
         }
 
         // Queue first so Message-ID can use email_queue.id
-        $queueId = $this->queue($toEmail, $subject, $body, $toName, $templateKey, $priority, null, $requestId);
+        $queueId = $this->queue($toEmail, $subject, $body, $toName, $templateKey, $priority, null, $requestId, $family);
 
         $syncSent = false;
         if ($shouldSync && MAIL_ENABLED) {
@@ -167,16 +185,21 @@ class EmailQueue
     /**
      * Build HTML email body from template
      */
-    private function buildEmailBody(string $templateKey, array $template, array $data): string
+    private function buildEmailBody(string $templateKey, array $template, array $data, string $family = 'vehicle'): string
     {
         $message = $data['message'] ?? $template['template'];
         $link = $data['link'] ?? null;
         $linkText = $data['link_text'] ?? 'View Details';
         $eventTitle = $template['subject'] ?? '';
-        
+
+        // Plan #32: family theme colors the header + CTA; wordmark/footer stay
+        $theme = function_exists('notificationTheme') ? notificationTheme($family) : null;
+        $color = is_array($theme) ? $theme['color'] : '#0d6efd';
+        $colorDark = is_array($theme) ? $theme['colorDark'] : '#0b5ed7';
+
         // Build full URL - link already starts with /, so just append to SITE_URL
         $fullLink = $link ? (SITE_URL . $link) : null;
-        
+
         $html = '
         <!DOCTYPE html>
         <html>
@@ -187,13 +210,13 @@ class EmailQueue
             <style>
                 body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f4f4f4; }
                 .container { max-width: 600px; margin: 20px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-                .header { background: #0d6efd; color: #fff; padding: 20px; text-align: center; }
+                .header { background: ' . $color . '; color: #fff; padding: 20px; text-align: center; }
                 .header h1 { margin: 0; font-size: 24px; }
                 .content { padding: 30px; }
                 .event-title { margin: 0 0 16px 0; font-size: 20px; color: #333; }
                 .message { margin-bottom: 20px; }
-                .btn { display: inline-block; padding: 12px 24px; background: #0d6efd; color: #fff; text-decoration: none; border-radius: 5px; font-weight: bold; }
-                .btn:hover { background: #0b5ed7; }
+                .btn { display: inline-block; padding: 12px 24px; background: ' . $color . '; color: #fff; text-decoration: none; border-radius: 5px; font-weight: bold; }
+                .btn:hover { background: ' . $colorDark . '; }
                 .footer { background: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; }
             </style>
         </head>

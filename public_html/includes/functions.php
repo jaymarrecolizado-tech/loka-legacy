@@ -597,8 +597,73 @@ function auditLog(string $action, string $entityType, ?int $entityId = null, ?ar
 }
 
 /**
+ * Notification family for a notify()/template type: vehicle | gas | ob | system.
+ * Drives the email subject wording and theme color (Plan #32). `gas_voucher_*`
+ * → gas, `ob_*` and `guard_ob_*` → ob, known one-off/system types → system;
+ * every other type is vehicle-flow (the historical blue Control No. family).
+ */
+function notificationFamily(string $type): string
+{
+    if (str_starts_with($type, 'gas_voucher_')) {
+        return 'gas';
+    }
+    if (str_starts_with($type, 'ob_') || str_starts_with($type, 'guard_ob_')) {
+        return 'ob';
+    }
+    if (in_array($type, ['default', 'password_reset', 'system_notification', 'test'], true)) {
+        return 'system';
+    }
+    return 'vehicle';
+}
+
+/**
+ * Family theme: header/CTA color, hover shade, SMS tag, email subject pattern.
+ * Branding (white wordmark + gray footer) stays fixed across families.
+ *
+ * @return array{color:string,colorDark:string,smsTag:string,subjectPattern:string}
+ */
+function notificationTheme(string $family): array
+{
+    return match ($family) {
+        'gas' => [
+            'color'          => '#c2410c',
+            'colorDark'      => '#9a3412',
+            'smsTag'         => '[Gas Voucher]',
+            'subjectPattern' => 'Gas Voucher #{id}: Gas Voucher',
+        ],
+        'ob' => [
+            'color'          => '#0f766e',
+            'colorDark'      => '#115e59',
+            'smsTag'         => '[OB]',
+            'subjectPattern' => 'OB Pass Slip #{id}: Official Business',
+        ],
+        'system' => [
+            'color'          => '#0d6efd',
+            'colorDark'      => '#0b5ed7',
+            'smsTag'         => '',
+            'subjectPattern' => 'LOKA Fleet Notification #{id}',
+        ],
+        default => [ // vehicle
+            'color'          => '#0d6efd',
+            'colorDark'      => '#0b5ed7',
+            'smsTag'         => '[Vehicle]',
+            'subjectPattern' => 'Control No. {id}: Vehicle Request',
+        ],
+    };
+}
+
+/**
+ * Stable per-ID email subject within a family (keeps Gmail/Outlook threading;
+ * event titles stay in the body).
+ */
+function notificationThreadSubject(string $family, int $id): string
+{
+    return str_replace('{id}', (string) $id, notificationTheme($family)['subjectPattern']);
+}
+
+/**
  * Create notification and send email
- * 
+ *
  * @param int $userId User ID to notify
  * @param string $type Notification type
  * @param string $title Notification title
@@ -608,6 +673,10 @@ function auditLog(string $action, string $entityType, ?int $entityId = null, ?ar
  */
 function notify(int $userId, string $type, string $title, string $message, ?string $link = null, ?int $requestId = null): void
 {
+    // Plan #32: capture family from the caller's type BEFORE any template rewrite
+    // so unknown types still get the right subject/theme when rendered via 'default'.
+    $family = notificationFamily($type);
+
     // FIX: Validate notification type against known templates
     $validTypes = array_keys(MAIL_TEMPLATES);
     if (!in_array($type, $validTypes)) {
@@ -662,19 +731,21 @@ function notify(int $userId, string $type, string $title, string $message, ?stri
         $requestId = isset($query['id']) ? (int) $query['id'] : null;
     }
 
+    // Family already computed above from the original caller type (Plan #32).
+
     // Queue email notification ONLY - never process during request to prevent lag
     try {
         $user = db()->fetch("SELECT email, name FROM users WHERE id = ? AND deleted_at IS NULL", [$userId]);
         if ($user && $user->email) {
             // Check if template exists, if not use a default one
             $templateKey = isset(MAIL_TEMPLATES[$type]) ? $type : 'default';
-            
+
             $queue = new EmailQueue();
             $emailId = $queue->queueTemplate($user->email, $templateKey, [
                 'message' => $message,
                 'link' => $link,
                 'link_text' => 'View Details'
-            ], $user->name, 5, $requestId);
+            ], $user->name, 5, $requestId, $family);
             
             error_log("NOTIFY: User #{$userId} ({$user->email}) - Notification #{$notifId} created, Email #{$emailId} queued (type: {$type}" . ($requestId ? ", Control No.: {$requestId}" : "") . ")");
         } else {
@@ -816,12 +887,15 @@ function notifyPassengersBatch(int $requestId, string $type, string $title, stri
         if ($passenger->email) {
             try {
                 $templateKey = isset(MAIL_TEMPLATES[$type]) ? $type : 'default';
-                
+                // Plan #32: pass family from the caller's type (not the template key)
+                // so unknown types rewritten to 'default' keep their own theme.
+                $family = notificationFamily($type);
+
                 $queue->queueTemplate($passenger->email, $templateKey, [
                     'message' => $message,
                     'link' => $link,
                     'link_text' => 'View Details'
-                ], $passenger->name, 5, $requestId);
+                ], $passenger->name, 5, $requestId, $family);
                 
                 $emailsQueued++;
             } catch (Exception $e) {
