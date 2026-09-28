@@ -44,7 +44,7 @@ if (!in_array($printLayout, ['dual', 'single'], true)) {
 }
 $copyCount = 2;
 
-// QR Verification â€” gas stations scan this to confirm authenticity
+// QR Verification -- gas stations scan this to confirm authenticity
 $verifyUrl = gasVoucherVerifyUrl($voucher);
 $siteLooksLocal = (bool) preg_match('#://(localhost|127\.0\.0\.1)([:/]|$)#i', $verifyUrl);
 
@@ -57,7 +57,7 @@ $pngRaw = function_exists('imagecreate') ? $qrBarcode->getBarcodePngData(6, 6, [
 if (is_string($pngRaw) && $pngRaw !== '' && function_exists('imagecreatefromstring')) {
     $src = @imagecreatefromstring($pngRaw);
     if ($src !== false) {
-        // TCPDF marks white as transparent â€” flatten onto opaque white + quiet zone
+        // TCPDF marks white as transparent -- flatten onto opaque white + quiet zone
         $sw = imagesx($src);
         $sh = imagesy($src);
         $pad = (int) max(28, round(min($sw, $sh) * 0.14));
@@ -367,7 +367,7 @@ if ($qrHtml === '') {
         .qr-block .qr-svg-pad {
             display: block;
             background: #fff;
-            padding: 14px; /* quiet zone â€” do not put text here */
+            padding: 14px; /* quiet zone -- do not put text here */
             line-height: 0;
         }
         .qr-block .qr-svg-pad svg {
@@ -399,12 +399,12 @@ if ($qrHtml === '') {
     </button>
     <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=dual" style="margin-left:12px;<?= $printLayout === 'dual' ? 'font-weight:bold;' : '' ?>">2-up (1 page)</a>
     <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=single" style="margin-left:8px;<?= $printLayout === 'single' ? 'font-weight:bold;' : '' ?>">1 copy / page</a>
-    <a href="javascript:history.back()" style="margin-left:15px;color:#666;text-decoration:none;">â† Back to App</a>
+    <a href="javascript:history.back()" style="margin-left:15px;color:#666;text-decoration:none;">&larr; Back to App</a>
     <div style="margin-top:10px;padding:8px 12px;background:#e7f1ff;border:1px solid #9ec5fe;border-radius:6px;display:inline-block;max-width:720px;font-size:13px;color:#084298;text-align:left;">
-        <strong>Phone scan tip:</strong> Join the same Wiâ€‘Fi as this PC, then scan again.<br>
+        <strong>Phone scan tip:</strong> Join the same Wi-Fi as this PC, then scan again.<br>
         Verify link: <code style="word-break:break-all;"><?= e($verifyUrl) ?></code>
         <?php if ($siteLooksLocal): ?>
-        <br><span style="color:#664d03;">Still using localhost â€” phones cannot open this. Set <code>SITE_URL</code> in <code>.env</code> to your LAN IP or public domain.</span>
+        <br><span style="color:#664d03;">Still using localhost -- phones cannot open this. Set <code>SITE_URL</code> in <code>.env</code> to your LAN IP or public domain.</span>
         <?php endif; ?>
     </div>
 </div>
@@ -462,7 +462,7 @@ if ($qrHtml === '') {
         <!-- Articles Data -->
         <?php
         $isFullTank = (strcasecmp((string) $voucher->unit, 'FULL TANK') === 0) || (float) $voucher->quantity <= 0;
-        $printQty = $isFullTank ? 'â€”' : e($voucher->quantity);
+        $printQty = $isFullTank ? '-' : e($voucher->quantity);
         $printUnit = $isFullTank ? 'FULL TANK' : e($voucher->unit);
         ?>
         <tr class="article-row">
