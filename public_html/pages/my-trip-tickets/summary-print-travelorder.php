@@ -359,6 +359,15 @@ if ($__verifyUrl) {
             resize: none;
             height: auto;
             min-height: 24px;
+            /* Plan #29: never paint scrollbar chrome (screen or PDF) */
+            scrollbar-width: none;              /* Firefox */
+            -ms-overflow-style: none;           /* old Edge/IE */
+        }
+
+        .tbl-itinerary textarea::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+            display: none;                      /* Chromium / Safari */
         }
 
         /* PURPOSE TABLE */
@@ -579,9 +588,19 @@ if ($__verifyUrl) {
             }
 
             .tbl-itinerary textarea {
-                overflow: visible !important;
+                overflow: hidden !important;  /* Plan #29: visible paints scrollbar chrome in Chromium PDF */
+                height: auto !important;      /* size from the rows attribute */
+                max-height: none !important;
                 white-space: pre-wrap !important;
                 word-break: break-word !important;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+                field-sizing: content;
+            }
+            .tbl-itinerary textarea::-webkit-scrollbar {
+                width: 0;
+                height: 0;
+                display: none;
             }
 
             .sig-title {
@@ -644,7 +663,7 @@ if ($__verifyUrl) {
         <a href="<?= APP_URL ?>/" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><span>🏠</span> Home</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">← Back to My Trip Tickets</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets&action=generate-summary" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">↩ Generate</a>
-        <button class="btn btn-print" onclick="if(validateTicket()) window.print()">🖨 Print / Save PDF</button>
+        <button class="btn btn-print" onclick="if(validateTicket()) { resizeItineraryTextareas(); requestAnimationFrame(function () { window.print(); }); }">🖨 Print / Save PDF</button>
         <button class="btn btn-reset" onclick="resetForm()">↺ Reset Form</button>
     </div>
     <?php if ($__verifyUrl): ?>
@@ -755,7 +774,7 @@ if ($__verifyUrl) {
                             <td><input type="time" value="<?= date('H:i', strtotime($t->end_date)) ?>"></td>
                             <td><input class="left" type="text" value="Tuguegarao City" placeholder="Origin"></td>
                             <td><textarea class="left" rows="<?= tripTicketTextareaRows($t->destination, 22) ?>" placeholder="Destination"><?= e($t->destination) ?></textarea></td>
-                            <td><textarea class="left" rows="<?= tripTicketTextareaRows($t->purpose, 26) ?>" placeholder="Purpose"><?= e($t->purpose) ?></textarea></td>
+                            <td><textarea class="left" rows="<?= tripTicketTextareaRows($t->purpose, 22) ?>" placeholder="Purpose"><?= e($t->purpose) ?></textarea></td>
                             <td><input type="text" placeholder="Name"></td>
                         </tr>
                     <?php endforeach; ?>
@@ -997,6 +1016,7 @@ if ($__verifyUrl) {
                     el.style.height = el.scrollHeight + 'px';
                 });
             }
+            document.addEventListener('DOMContentLoaded', resizeItineraryTextareas); // Plan #29
             resizeItineraryTextareas();
             document.querySelectorAll('.tbl-itinerary textarea').forEach(function (el) {
                 el.addEventListener('input', function () { resizeItineraryTextareas(); });

@@ -413,7 +413,17 @@ if ($__verifyUrl) {
             background: transparent;
             box-sizing: border-box;
             display: block;
+            /* Plan #29: never paint scrollbar chrome (screen or PDF) */
+            overflow: hidden !important;
+            scrollbar-width: none;              /* Firefox */
+            -ms-overflow-style: none;           /* old Edge/IE */
             }
+
+        .tbl-trip textarea.auto-expand::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+            display: none;                      /* Chromium / Safari */
+        }
 
         .tbl-trip textarea.auto-expand::placeholder {
             color: #ccc;
@@ -431,12 +441,25 @@ if ($__verifyUrl) {
             .tbl-trip textarea {
                 -webkit-appearance: none;
                 appearance: none;
-                overflow: visible !important;
+                /* Plan #29: hidden beats visible in Chromium PDF — a visible
+                   box taller than its content paints scrollbar chrome */
+                overflow: hidden !important;
+                height: auto !important;      /* size from the rows attribute */
+                max-height: none !important;  /* never clip mid-text */
                 white-space: pre-wrap !important;
                 word-break: break-word !important;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+                field-sizing: content;        /* progressive: size to content where supported */
             }
             .tbl-trip textarea.auto-expand {
-                overflow: visible !important;
+                overflow: hidden !important;
+                max-height: none !important;
+            }
+            .tbl-trip textarea.auto-expand::-webkit-scrollbar {
+                width: 0;
+                height: 0;
+                display: none;
             }
             .tbl-trip td {
                 height: auto !important;
@@ -824,7 +847,7 @@ if ($__verifyUrl) {
         <a href="<?= APP_URL ?>/" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><span>🏠</span> Home</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">← Back to My Trip Tickets</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets&action=generate-summary" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">↩ Generate</a>
-        <button class="btn btn-print" onclick="if(validateTicket()) window.print()">🖨 Print / Save PDF</button>
+        <button class="btn btn-print" onclick="if(validateTicket()) { resizeTripTextareas(); requestAnimationFrame(function () { window.print(); }); }">🖨 Print / Save PDF</button>
         <button class="btn btn-reset" onclick="resetForm()">↺ Clear Form</button>
     </div>
     <?php if ($__verifyUrl): ?>
@@ -957,8 +980,8 @@ if ($__verifyUrl) {
                                 <td rowspan="<?= $peopleCount ?>"><input type="time" value="<?= date('H:i', strtotime($t->end_date)) ?>"></td>
                                 <td rowspan="<?= $peopleCount ?>"><input type="text" placeholder="km" value="<?= $t->start_mileage ?>"></td>
                                 <td rowspan="<?= $peopleCount ?>"><input type="text" placeholder="km" value="<?= $t->end_mileage ?>"></td>
-                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Destination" rows="<?= tripTicketTextareaRows($t->destination, 26) ?>"><?= e($t->destination) ?></textarea></td>
-                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Purpose" rows="<?= tripTicketTextareaRows($t->purpose, 26) ?>"><?= e($t->purpose) ?></textarea></td>
+                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Destination" rows="<?= tripTicketTextareaRows($t->destination, 22) ?>"><?= e($t->destination) ?></textarea></td>
+                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Purpose" rows="<?= tripTicketTextareaRows($t->purpose, 22) ?>"><?= e($t->purpose) ?></textarea></td>
                             <?php endif; ?>
                             <td style="padding:1px 3px;">
                                 <div style="display:flex; align-items:center; justify-content:flex-start; gap:0; white-space:nowrap; width:100%;">
@@ -1248,6 +1271,7 @@ if ($__verifyUrl) {
         function resizeTripTextareas() {
             document.querySelectorAll('textarea.auto-expand').forEach(el => autoResizeTextarea(el));
         }
+        window.addEventListener('DOMContentLoaded', resizeTripTextareas); // Plan #29: run before first paint of tall text
         window.addEventListener('load', function() {
             resizeTripTextareas();
             document.querySelectorAll('textarea.auto-expand').forEach(el => {
