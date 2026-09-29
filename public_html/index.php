@@ -36,6 +36,7 @@ require_once __DIR__ . '/config/constants.php';
 require_once __DIR__ . '/config/security.php';
 require_once __DIR__ . '/config/mail.php';
 require_once __DIR__ . '/config/sms.php';
+require_once __DIR__ . '/config/channels.php';
 
 // Environment-based error reporting
 // Auto-detect production: check if not localhost and HTTPS is enabled
@@ -67,6 +68,9 @@ require_once __DIR__ . '/classes/Mailer.php';
 require_once __DIR__ . '/classes/EmailQueue.php';
 require_once __DIR__ . '/classes/SmsGateway.php';
 require_once __DIR__ . '/classes/SmsQueue.php';
+require_once __DIR__ . '/classes/ChannelQueue.php';
+require_once __DIR__ . '/classes/TelegramGateway.php';
+require_once __DIR__ . '/classes/ViberGateway.php';
 require_once __DIR__ . '/classes/NotificationService.php';
 
 // Load notification templates
@@ -80,6 +84,7 @@ require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/booking-rules.php';
 require_once __DIR__ . '/includes/view_as.php';
 require_once __DIR__ . '/includes/sms.php';
+require_once __DIR__ . '/includes/channels.php';
 require_once __DIR__ . '/includes/mail_delivery.php';
 require_once __DIR__ . '/includes/badge_counts.php';
 require_once __DIR__ . '/includes/trip-enhancements.php';
@@ -154,7 +159,8 @@ if (
 // Public pages (no auth required)
 // evaluations + ob-requests: only the token-gated actions are public; the
 // case handlers re-gate everything else behind requireAuth().
-$publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'verify-ticket', 'cron', 'evaluations', 'ob-requests'];
+// channels: messenger webhooks (Plan #35) — the endpoint validates secrets itself.
+$publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'verify-ticket', 'cron', 'evaluations', 'ob-requests', 'channels'];
 
 // Route handling
 if (!in_array($page, $publicPages)) {
@@ -484,6 +490,11 @@ switch ($page) {
         } else {
             require_once PAGES_PATH . '/security/rate-limits.php';
         }
+        break;
+
+    case 'channels':
+        // Plan #35 — public messenger webhooks (token-gated / secret-checked inside)
+        require_once PAGES_PATH . '/channels/webhook.php';
         break;
 
     case 'gas-vouchers':

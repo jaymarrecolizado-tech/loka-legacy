@@ -38,6 +38,7 @@
 | #32 | Distinct email/SMS themes for Vehicle, Gas Voucher, OB | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
 | #33 | OB Apply form — sectioned steps UX | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
 | #34 | Gas Voucher UI — Plan #33 styling / fill uniformity | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
+| #35 | Telegram + Viber notifications (phased) | DONE Phase A+B (2026-09-29; branch `vberandtelegramnotif`, localhost QA — NOT deployed; tokens pending) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -2812,4 +2813,122 @@ Gas workflow / role changes; `print.php`; reports export pages; OB module; live 
 ## Status
 
 **DONE (2026-09-28) — implemented, QA'd, and deployed to live `lokafleet.dictr2.cloud`.** UX-only; no migration. Files touched: `public_html/pages/gas-vouchers/create.php`, `index.php`, `view.php`, `approve.php` (header chrome only), `_deploy_tmp/verify_plan34.php` (POST harness), `Plan.md`.
+
+---
+
+# LOKA Plan #35: Telegram + Viber notifications (phased) — ✅ DONE Phase A+B (2026-09-29, branch `vberandtelegramnotif`, localhost QA — NOT deployed)
+
+**Branch:** `vberandtelegramnotif` (from `main` @ Plan #34).
+
+## Goal
+
+Add **Telegram** and **Viber** as soft-fail notification channels beside existing in-app / email / SMS, so end users get LOKA Fleet alerts on messengers they already use — without replacing SMS or changing Plan #32 email themes.
+
+## Problem
+
+Today `notify()` fans out to in-app + EmailQueue + soft-fail SMS only. Users have `email` + `phone` — **no** chat IDs. End users asked for Viber and Telegram delivery.
+
+## Locked decisions
+
+1. **Both channels in one plan, phased:** Phase A = Telegram Bot API; Phase B = Viber Bot API (same queue / binding patterns).
+2. **Linking = both:** Profile “Connect” deep-link **and** Admin can set/clear chat IDs on User create/edit.
+3. **Keep SMS / email / in-app;** new channels are soft-fail extras next to `smsNotifyUser()` in [`includes/functions.php`](public_html/includes/functions.php).
+4. **Events:** mirror SMS allowlist (`*` = same `MAIL_TEMPLATES` types). Reuse Plan #32 family tags via a short text builder (same spirit as `buildSmsMessage()`).
+5. **Opt-in:** send only if a binding exists for that channel **and** the channel is enabled. No blast to unlinked users.
+6. **Secrets:** bot tokens in System Control settings (DB `settings` + optional `.env`), never committed.
+
+## Fan-out (extend, don’t replace)
+
+```
+notify()
+ ├─ notifications (in-app)
+ ├─ EmailQueue
+ ├─ smsNotifyUser → SmsQueue → sms_logs → SmsGateway          [existing]
+ ├─ telegramNotifyUser → ChannelQueue(telegram) → channel_logs → TelegramGateway  [Phase A]
+ └─ viberNotifyUser → ChannelQueue(viber) → channel_logs → ViberGateway           [Phase B]
+```
+
+Never call external messenger APIs during the HTTP page request (queue-only; drain via cron / HTTP cron) — same rule as SMS.
+
+## Data model — Migration `055_channel_notifications.php`
+
+- **`user_channel_bindings`**
+  - `user_id`, `channel` (`telegram`|`viber`), `chat_id` (string), `display_name` nullable, `linked_via` (`self`|`admin`), `linked_at`
+  - unique `(user_id, channel)`
+- **`channel_link_tokens`** (self-link)
+  - `token`, `user_id`, `channel`, `expires_at`, `used_at`
+- **`channel_logs`** (mirror `sms_logs`)
+  - `user_id`, `channel`, `chat_id`, `event_type`, `message`, `status`, `attempts`, `gateway_message_id`, `error`, `request_id`, timestamps
+- **Settings** (`category=telegram` / `viber`): `*_enabled`, bot token / Viber auth token, allowlist, max length, timeout
+
+No change to `users.phone` / `users.email`.
+
+## Phase A — Telegram
+
+1. You create the bot via @BotFather; token goes in All Father → Telegram.
+2. **Gateway:** `TelegramGateway` → `POST https://api.telegram.org/bot{token}/sendMessage` (`chat_id`, `text`, disable_web_page_preview).
+3. **Queue:** enqueue from `notify()`; drain via `cron/process_channel_queue.php` + HTTP cron action.
+4. **Self-link:** Profile “Connect Telegram” → deep link `https://t.me/{bot}?start={token}`; webhook/callback redeems token and stores `chat_id` (`linked_via=self`). Token one-time, short TTL.
+5. **Admin link:** User create/edit “Telegram chat ID” + clear; `linked_via=admin`.
+6. **UI:** System Control → Telegram (enable, token, allowlist, test send, process queue, log browser) — mirror [`pages/security/sms.php`](public_html/pages/security/sms.php).
+7. Message body: family-prefixed short text (Plan #32 tags).
+
+## Phase B — Viber
+
+1. Same bindings / logs / queue; `channel=viber`.
+2. **Gateway:** Viber Bot API `POST https://chatapi.viber.com/pa/send_message` with `auth_token` header; `receiver` = Viber user id from binding.
+3. **Self-link:** Viber deep-link / conversation-started webhook redeems the same `channel_link_tokens` pattern.
+4. **Admin:** “Viber user ID” on User create/edit.
+5. **UI:** System Control → Viber (same controls as Telegram).
+6. Requires a provisioned Viber bot/PA account (out-of-band); code ships **disabled** until token is set.
+
+## Implementation checklist — ✅ DONE (2026-09-29, both phases)
+
+- [x] Append this Plan #35 section (done when documented)
+- [x] **Migration `055_channel_notifications.php`** (run locally 2026-09-29) — `user_channel_bindings` (unique `user_id,channel`; `chat_id`, `display_name`, `linked_via` self|admin, `linked_at`), `channel_link_tokens` (unique token, TTL, `used_at`), `channel_logs` (mirrors `sms_logs` + `channel`, `gateway_response`, `error_message`, `request_id`), and settings defaults for both channels (categories `telegram`/`viber`; ship **disabled** with empty tokens). The three tables were also added to `Database::ALLOWED_TABLES`.
+- [x] **Helpers** — `config/channels.php` (`LOKA_CHANNELS`, per-channel defaults, `CHANNEL_ENV_MAP` .env fallbacks, webhook paths, 30-min token TTL) + `includes/channels.php`: `channelConfig`/`channelSaveSetting`/`channelConfigClearCache` (DB `settings` → `.env` → default, mirroring `smsConfig`), `channelEnabled`, `channelEventAllowed` (`*` = mirror email), `channelSelectableEvents`, binding CRUD (`channelGetBinding(s)`, `channelSetAdminBinding` (empty = clear), `channelClearBinding`, `channelUserByChatId`), token mint/redeem (`channelMintLinkToken` invalidates previous unused tokens; `channelRedeemLinkToken` one-time + TTL; `channelRedeemTelegramUpdates` for the no-webhook poller), `channelBuildMessage` (Plan #32 family tags + absolute link + per-channel max length), `channelNotifyUser` (enabled + allowlist + binding, else silent skip).
+- [x] **Phase A — Telegram**: `TelegramGateway` (`sendMessage` with `disable_web_page_preview`, `getUpdates` for link redemption without a public webhook, `getMe` health) + ChannelQueue + `pages/security/telegram.php` (shared `channel_page.php` + thin wrapper) + Profile connect deep link `https://t.me/{bot}?start={token}` + User admin chat-ID field + public webhook `POST /?page=channels&action=telegram-webhook` (optional `X-Telegram-Bot-Api-Secret-Token` check; `/start {token}` redeems + confirms, `/stop`/`/disconnect` unbinds).
+- [x] **Soft-fail hooks from `notify()`** — after `smsNotifyUser()`, loops `LOKA_CHANNELS` calling `channelNotifyUser()` in its own try/catch per channel; passengers/others all flow through `notify()` so every family is covered. Requires (`config/channels.php`, 3 classes, `includes/channels.php`) added to `index.php` + `config/bootstrap.php`.
+- [x] **Phase B — Viber**: `ViberGateway` (`send_message` with `X-Viber-Auth-Token`, `status===0` = ok, `get_account_info` health) + same bindings/logs/queue (`channel=viber`) + `pages/security/viber.php` + Profile/Admin parity + public webhook `POST /?page=channels&action=viber-webhook[&key=SECRET]` (`conversation_started` welcome, `message`/`subscribed` `/start` redeem + `/stop`). Ships disabled until a token is stored.
+- [x] **Queue + cron** — `ChannelQueue` (`queueForUser` gated on enabled+allowlist+binding; `queueTest` for All Father test sends; `processOne`/`process(channel)` with the SMS claim/retry pattern (max 5 attempts); `getStats` per channel). Drains via `cron/process_channel_queue.php` (CLI, lock file) + HTTP cron `/?page=cron&action=channels&key=SECRET` + per-page "Process queue now".
+- [x] **UI** — System Control → Telegram / Viber pages (stats cards incl. linked-user count, settings form: enable/token/bot-username or sender-name/webhook-secret/timeout/max-length/allowlist with mirror-email default; test send to explicit chat id; process queue; bot health; Telegram "Poll link requests"; paged `channel_logs` browser with filters + delete) + `partials/subnav.php` tabs + System Control sidebar links. Profile "Messenger Alerts" card (Connect → one-time deep link/code, Disconnect, chat id + link source shown). Users create/edit "Messenger chat IDs" fields (prefilled from bindings; unchanged values keep their original linked_via; empty clears).
+- [x] `php -l` clean on all 21 touched/new files; QA below. Live deploy only when explicitly requested.
+
+## QA matrix — verified 2026-09-29 via `_deploy_tmp/verify_plan35.php` (7 scenarios, 24 checks, all PASS; real local DB + high-water cleanup, settings restored to migration defaults and bindings/tokens/logs verified clean afterwards) + live HTTP webhook tests against `?page=channels&action=telegram-webhook`.
+
+- [x] **Unlinked user: no Telegram/Viber queue rows** — both channels enabled, user 15 unlinked → 0 `channel_logs` rows, while the in-app notification and email rows were still created (existing paths unchanged).
+- [x] **Profile Connect Telegram → Start bot → binding saved; Disconnect clears** — harness `redeem`: mint → `channelRedeemLinkToken` → binding `linked_via=self` with the given chat id; token replay fails and is marked used. Live webhook: mint via PHP, `POST /start {token}` update → HTTP 200 + binding `chat_id=777888999, linked_via=self`; `POST /stop` → binding gone. Profile page also renders the Connect/Disconnect card (bindings refreshed per POST).
+- [x] **Admin set/clear Telegram chat ID on User edit** — harness `admin_binding`: set → `linked_via=admin`; update → new chat id; empty → binding cleared. User create/edit pages save through the same helper (unchanged values keep their original link source).
+- [x] **Enabled + linked: `notify()` enqueues `channel_logs` with family-tagged text** — harness `linked_queue`: one row per channel, both carrying `[Gas Voucher]` + `LOKA #9` + absolute link (Plan #32 tags reused). Cron drain with a token set is exercised by the page button / cron actions (curl to api.telegram.org happens only there); with no token the harness `cron_drain` proves rows queue, send attempts fail **gracefully** (no exceptions, zero sends) and rows stay `pending` for later drain.
+- [x] **Disabled channel: no send attempts** — `disabled` scenario: 0 rows even with a binding; gateways return `null` when disabled/unconfigured.
+- [x] **Allowlist respects `*` and specific event keys** — `allowlist` scenario: non-listed event skipped, listed event queued; `*` mirrors `MAIL_TEMPLATES` (default settings).
+- [x] **SMS / email / in-app unchanged** — asserted per scenario (notifications + email_queue rows still created alongside channel rows; `smsNotifyUser` untouched).
+- [x] **Viber parity after Phase B** — same enqueue/gate path exercised (`linked_queue` queues both channels; `unlinked` proves Viber gating) — real Viber delivery still needs a provisioned bot token (below).
+- [x] **Webhook security** — wrong `X-Telegram-Bot-Api-Secret-Token` → HTTP 403; Viber webhook honours `?key=` secret when configured.
+
+## Files (planned)
+
+- `Plan.md` (this section)
+- `public_html/migrations/055_channel_notifications.php`
+- `public_html/includes/functions.php` (fan-out hooks)
+- `public_html/includes/channels.php` (new) + `public_html/config/channels.php` (new)
+- `public_html/classes/ChannelQueue.php`, `TelegramGateway.php`, `ViberGateway.php` (new)
+- `public_html/cron/process_channel_queue.php` + cron HTTP action
+- `public_html/pages/security/telegram.php`, `viber.php` + sidebar links
+- `public_html/pages/profile/index.php` (Connect / Disconnect)
+- `public_html/pages/users/create.php`, `edit.php` (admin chat IDs)
+- Public link webhook/callback route(s) under existing router
+
+## Out of scope
+
+WhatsApp; replacing SMS; rewriting `MAIL_TEMPLATES`; changing Plan #32 email themes; production deploy until explicitly requested; creating BotFather / Viber accounts in-app (you supply tokens after UI exists).
+
+## You will need to provide later
+
+- Telegram bot username + token (Phase A QA)
+- Viber bot auth token (Phase B QA)
+
+## Status
+
+**DONE Phase A+B (2026-09-29) — implemented + QA'd on localhost (`old_loka_db`, migration 055 applied), NOT deployed; on branch `vberandtelegramnotif`.** Files: `migrations/055_channel_notifications.php` (new), `config/channels.php` (new), `includes/channels.php` (new), `classes/ChannelQueue.php` / `TelegramGateway.php` / `ViberGateway.php` (new), `cron/process_channel_queue.php` (new), `pages/channels/webhook.php` (new), `pages/security/telegram.php` / `viber.php` / `channel_page.php` (new), `pages/profile/index.php`, `pages/users/create.php` / `edit.php`, `pages/cron/index.php`, `includes/functions.php` / `sidebar.php`, `classes/Database.php` (table allowlist), `index.php` + `config/bootstrap.php` (requires + routes), `_deploy_tmp/verify_plan35.php` (QA harness), `Plan.md`. Deploy checklist per env: run migration 055, then store the bot tokens in System Control (Telegram first), set the Telegram webhook with the secret, and add the channel cron (`process_channel_queue.php` every 2 min, or HTTP cron `?page=cron&action=channels&key=SECRET`).
 

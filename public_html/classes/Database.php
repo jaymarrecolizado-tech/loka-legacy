@@ -47,7 +47,10 @@ class Database
         'driver_evaluations',
         'ob_requests',
         'ob_approvals',
-        'ob_request_participants'
+        'ob_request_participants',
+        'user_channel_bindings',
+        'channel_link_tokens',
+        'channel_logs'
     ];
 
     private function __construct()

@@ -763,6 +763,19 @@ function notify(int $userId, string $type, string $title, string $message, ?stri
     } catch (Throwable $e) {
         error_log("NOTIFY ERROR: SMS queue failed for user #{$userId}: " . $e->getMessage());
     }
+
+    // Soft-fail messenger channels (Plan #35): Telegram + Viber extras beside
+    // SMS. Each skips silently when the channel is disabled or the user has
+    // no binding — never blast unlinked users.
+    if (function_exists('channelNotifyUser') && defined('LOKA_CHANNELS')) {
+        foreach (LOKA_CHANNELS as $__channel) {
+            try {
+                channelNotifyUser($userId, $__channel, $type, $title, $message, $link, $requestId);
+            } catch (Throwable $e) {
+                error_log("NOTIFY ERROR: " . ucfirst($__channel) . " queue failed for user #{$userId}: " . $e->getMessage());
+            }
+        }
+    }
 }
 
 /**

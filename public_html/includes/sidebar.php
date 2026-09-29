@@ -356,6 +356,24 @@
                 </a>
             </li>
 
+            <!-- Telegram (Plan #35) -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'security' && get('action') === 'telegram') ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=security&action=telegram">
+                    <i class="bi bi-telegram"></i>
+                    <span>Telegram</span>
+                </a>
+            </li>
+
+            <!-- Viber (Plan #35) -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'security' && get('action') === 'viber') ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=security&action=viber">
+                    <i class="bi bi-chat-dots"></i>
+                    <span>Viber</span>
+                </a>
+            </li>
+
             <!-- Email -->
             <li class="nav-item">
                 <a class="nav-link <?= (get('page') === 'security' && get('action') === 'email') ? 'active' : '' ?>"

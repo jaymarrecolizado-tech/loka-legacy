@@ -73,6 +73,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'updated_at' => date(DATETIME_FORMAT)
             ]);
 
+            // Messenger bindings set by the admin (Plan #35) — after the insert
+            foreach (LOKA_CHANNELS as $plChannel) {
+                $plChatId = trim(postSafe($plChannel . '_chat_id', '', 100));
+                if ($plChatId !== '') {
+                    channelSetAdminBinding((int) $userId, $plChannel, $plChatId);
+                }
+            }
+
             auditLog('user_created', 'user', $userId);
             $security->logSecurityEvent('user_created', "New user: $email ($role)", userId());
 
@@ -198,6 +206,22 @@ require_once INCLUDES_PATH . '/header.php';
                                         Can act as <strong>OIC Budget Officer</strong> on gas vouchers
                                     </label>
                                 </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label d-block">Messenger chat IDs <span class="text-muted fw-normal">(Plan #35 — optional)</span></label>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1">Telegram chat ID</label>
+                                        <input type="text" class="form-control form-control-sm" name="telegram_chat_id"
+                                               value="<?= e(postSafe('telegram_chat_id', '', 100)) ?>" placeholder="e.g. 123456789">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1">Viber user ID</label>
+                                        <input type="text" class="form-control form-control-sm" name="viber_chat_id"
+                                               value="<?= e(postSafe('viber_chat_id', '', 100)) ?>" placeholder="Viber member id">
+                                    </div>
+                                </div>
+                                <small class="text-muted">Set to deliver LOKA alerts over that messenger. Users can also self-link from their Profile.</small>
                             </div>
                         </div>
                         <hr class="my-4">

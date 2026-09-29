@@ -38,6 +38,30 @@ try {
         exit;
     }
 
+    if ($action === 'channels') {
+        // Plan #35 — drain Telegram + Viber outbound queues
+        if (!class_exists('ChannelQueue')) {
+            http_response_code(500);
+            echo "ChannelQueue unavailable\n";
+            exit;
+        }
+        $queue = new ChannelQueue();
+        $overall = ['sent' => 0, 'failed' => 0, 'skipped' => 0];
+        foreach (LOKA_CHANNELS as $channel) {
+            if (!channelEnabled($channel)) {
+                echo date('c') . " " . ucfirst($channel) . " disabled\n";
+                continue;
+            }
+            $r = $queue->process($channel, $batch);
+            $overall['sent'] += $r['sent'];
+            $overall['failed'] += $r['failed'];
+            $overall['skipped'] += $r['skipped'];
+            echo date('c') . " " . ucfirst($channel) . " ok sent={$r['sent']} failed={$r['failed']} skipped={$r['skipped']}\n";
+        }
+        echo date('c') . " CHANNELS total sent={$overall['sent']} failed={$overall['failed']} skipped={$overall['skipped']}\n";
+        exit;
+    }
+
     if ($action === 'care') {
         if (!is_file(BASE_PATH . '/cron/process_care_reminders.php')) {
             http_response_code(500);

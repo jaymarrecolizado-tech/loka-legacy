@@ -76,6 +76,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 db()->commit();
                 clearUserCache(); // Clear user cache after updating user
 
+                // Messenger bindings set/cleared by the admin (Plan #35).
+                // Unchanged chat ids keep their original linked_via/linked_at.
+                foreach (LOKA_CHANNELS as $plChannel) {
+                    $plChatId = trim(postSafe($plChannel . '_chat_id', '', 100));
+                    $plExisting = channelGetBinding($userId, $plChannel);
+                    if ($plExisting && (string) $plExisting->chat_id === $plChatId) {
+                        continue;
+                    }
+                    channelSetAdminBinding($userId, $plChannel, $plChatId);
+                }
+
                 // Specimen e-sign (Plan #23) — file writes after commit
                 $esignError = null;
                 if (post('clear_signature') === '1') {
@@ -209,6 +220,28 @@ require_once INCLUDES_PATH . '/header.php';
                                         Can act as <strong>OIC Budget Officer</strong> on gas vouchers
                                     </label>
                                 </div>
+                            </div>
+                            <?php $editChannelBindings = [];
+                            foreach (channelGetBindings($userId) as $ecb) {
+                                $editChannelBindings[$ecb->channel] = $ecb;
+                            } ?>
+                            <div class="col-12">
+                                <label class="form-label d-block">Messenger chat IDs <span class="text-muted fw-normal">(Plan #35 — optional)</span></label>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1">Telegram chat ID</label>
+                                        <input type="text" class="form-control form-control-sm" name="telegram_chat_id"
+                                               value="<?= e(postSafe('telegram_chat_id', $editChannelBindings['telegram']->chat_id ?? '', 100)) ?>"
+                                               placeholder="e.g. 123456789">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1">Viber user ID</label>
+                                        <input type="text" class="form-control form-control-sm" name="viber_chat_id"
+                                               value="<?= e(postSafe('viber_chat_id', $editChannelBindings['viber']->chat_id ?? '', 100)) ?>"
+                                               placeholder="Viber member id">
+                                    </div>
+                                </div>
+                                <small class="text-muted">Clear a field to unlink that messenger. Unchanged values keep the original link source (self / administrator).</small>
                             </div>
                         </div>
                         <hr class="my-4">

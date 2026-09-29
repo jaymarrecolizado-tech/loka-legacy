@@ -47,6 +47,10 @@ require_once __DIR__ . '/../classes/EmailQueue.php';
 require_once __DIR__ . '/sms.php';
 require_once __DIR__ . '/../classes/SmsGateway.php';
 require_once __DIR__ . '/../classes/SmsQueue.php';
+require_once __DIR__ . '/../config/channels.php';
+require_once __DIR__ . '/../classes/ChannelQueue.php';
+require_once __DIR__ . '/../classes/TelegramGateway.php';
+require_once __DIR__ . '/../classes/ViberGateway.php';
 
 // Load session (needs Security class)
 require_once __DIR__ . '/session.php';
@@ -56,6 +60,7 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/booking-rules.php';
 require_once __DIR__ . '/../includes/view_as.php';
 require_once __DIR__ . '/../includes/sms.php';
+require_once __DIR__ . '/../includes/channels.php';
 require_once __DIR__ . '/../includes/mail_delivery.php';
 require_once __DIR__ . '/../includes/badge_counts.php';
 require_once __DIR__ . '/../includes/vehicle_care.php';
