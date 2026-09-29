@@ -50,7 +50,6 @@ require_once __DIR__ . '/../classes/SmsQueue.php';
 require_once __DIR__ . '/../config/channels.php';
 require_once __DIR__ . '/../classes/ChannelQueue.php';
 require_once __DIR__ . '/../classes/TelegramGateway.php';
-require_once __DIR__ . '/../classes/ViberGateway.php';
 
 // Load session (needs Security class)
 require_once __DIR__ . '/session.php';

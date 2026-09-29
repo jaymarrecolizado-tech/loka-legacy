@@ -12,7 +12,6 @@ $secNavItems = [
     'sms' => ['bi-phone', 'SMS'],
     'email' => ['bi-envelope', 'Email'],
     'telegram' => ['bi-telegram', 'Telegram'],
-    'viber' => ['bi-chat-dots', 'Viber'],
 ];
 ?>
 <ul class="nav nav-tabs mb-4">

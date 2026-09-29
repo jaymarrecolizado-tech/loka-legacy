@@ -70,7 +70,6 @@ require_once __DIR__ . '/classes/SmsGateway.php';
 require_once __DIR__ . '/classes/SmsQueue.php';
 require_once __DIR__ . '/classes/ChannelQueue.php';
 require_once __DIR__ . '/classes/TelegramGateway.php';
-require_once __DIR__ . '/classes/ViberGateway.php';
 require_once __DIR__ . '/classes/NotificationService.php';
 
 // Load notification templates
@@ -486,8 +485,6 @@ switch ($page) {
             require_once PAGES_PATH . '/security/email.php';
         } elseif ($action === 'telegram') {
             require_once PAGES_PATH . '/security/telegram.php';
-        } elseif ($action === 'viber') {
-            require_once PAGES_PATH . '/security/viber.php';
         } elseif ($action === 'odometer') {
             require_once INCLUDES_PATH . '/odometer.php';
             require_once PAGES_PATH . '/security/odometer.php';

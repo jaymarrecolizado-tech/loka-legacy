@@ -1,8 +1,7 @@
 <?php
 /**
- * All Father — messenger channel settings & logs (Plan #35).
- * Shared implementation for security/telegram.php + security/viber.php,
- * parameterized by $channel ('telegram' | 'viber').
+ * All Father — Telegram settings & logs (Plan #35).
+ * Included by security/telegram.php with $channel = 'telegram'.
  */
 
 if (!isset($channel) || !in_array($channel, LOKA_CHANNELS, true)) {
@@ -11,7 +10,7 @@ if (!isset($channel) || !in_array($channel, LOKA_CHANNELS, true)) {
 
 requireSystemControl();
 
-$pageTitle = ucfirst($channel) === 'Telegram' ? 'Telegram Notifications' : 'Viber Notifications';
+$pageTitle = 'Telegram Notifications';
 $flash = null;
 $queue = new ChannelQueue();
 $label = CHANNEL_DEFAULTS[$channel]['label'];
@@ -28,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if ($op === 'save_settings') {
             $enabled = post($channel . '_enabled', '0') === '1' ? '1' : '0';
-            $tokenKey = $channel === 'telegram' ? 'telegram_bot_token' : 'viber_auth_token';
+            $tokenKey = 'telegram_bot_token';
             $token = trim(postSafe($tokenKey, '', 255));
             $secret = trim(postSafe($channel . '_webhook_secret', '', 120));
             $timeout = max(5, min(60, (int) post($channel . '_timeout', 15)));
@@ -54,11 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             channelSaveSetting($channel, $channel . '_timeout', (string) $timeout, 'integer');
             channelSaveSetting($channel, $channel . '_max_length', (string) $maxLen, 'integer');
             channelSaveSetting($channel, $channel . '_event_allowlist', $allowlist);
-            if ($channel === 'telegram') {
-                channelSaveSetting($channel, 'telegram_bot_username', trim(postSafe('telegram_bot_username', '', 64)));
-            } else {
-                channelSaveSetting($channel, 'viber_sender_name', trim(postSafe('viber_sender_name', '', 60)) ?: 'LOKA Fleet');
-            }
+            channelSaveSetting($channel, 'telegram_bot_username', trim(postSafe('telegram_bot_username', '', 64)));
             channelConfigClearCache($channel);
 
             auditLog('channel_settings_updated', 'settings', null, null, [
@@ -75,26 +70,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new InvalidArgumentException('Chat ID is required.');
             }
             // Telegram bots cannot message themselves — catch the common "@BotUsername" mistake early.
-            if ($channel === 'telegram') {
-                $botUser = ltrim((string) channelConfig('telegram', 'telegram_bot_username', ''), '@');
-                $targetUser = ltrim($chatId, '@');
-                if ($botUser !== '' && strcasecmp($botUser, $targetUser) === 0) {
-                    throw new InvalidArgumentException(
-                        'Use your personal Telegram chat ID (numeric), not the bot username @' . $botUser . '. '
-                        . 'Connect via Profile → Messenger Alerts, then Poll link requests, or look up your chat id with @userinfobot.'
-                    );
-                }
+            $botUser = ltrim((string) channelConfig('telegram', 'telegram_bot_username', ''), '@');
+            $targetUser = ltrim($chatId, '@');
+            if ($botUser !== '' && strcasecmp($botUser, $targetUser) === 0) {
+                throw new InvalidArgumentException(
+                    'Use your personal Telegram chat ID (numeric), not the bot username @' . $botUser . '. '
+                    . 'Connect via Profile → Messenger Alerts, then Poll link requests, or look up your chat id with @userinfobot.'
+                );
             }
             // Telegram Bot API needs a numeric chat ID (or @channel where the bot is admin).
             // A phone number is NOT a chat_id — catch that mistake early.
-            if ($channel === 'telegram') {
-                if (preg_match('/^\+?[0-9][0-9\s\-]{5,}$/', $chatId) && str_starts_with(ltrim($chatId, '+'), '0')) {
-                    throw new InvalidArgumentException(
-                        'That looks like a phone number — Telegram bots cannot message phone numbers. '
-                        . 'Use your numeric chat ID instead: message @userinfobot on Telegram to get it, '
-                        . 'or use Profile → Messenger Alerts → Connect.'
-                    );
-                }
+            if (preg_match('/^\+?[0-9][0-9\s\-]{5,}$/', $chatId) && str_starts_with(ltrim($chatId, '+'), '0')) {
+                throw new InvalidArgumentException(
+                    'That looks like a phone number — Telegram bots cannot message phone numbers. '
+                    . 'Use your numeric chat ID instead: message @userinfobot on Telegram to get it, '
+                    . 'or use Profile → Messenger Alerts → Connect.'
+                );
             }
             $msg = trim(postSafe('test_message', 'LOKA ' . $label . ' test — ' . date('Y-m-d H:i'), 4000));
             $id = $queue->queueTest($channel, $chatId, $msg, userId());
@@ -113,25 +104,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($op === 'process_queue') {
             $r = $queue->process($channel, 30);
             $flash = ['success', "Processed queue: sent {$r['sent']}, failed {$r['failed']}, skipped {$r['skipped']}."];
-        } elseif ($op === 'register_webhook' && $channel === 'viber') {
-            // Viber has no getUpdates polling — callbacks only arrive after set_webhook.
-            $gw = ViberGateway::fromConfig();
-            if (!$gw) {
-                throw new RuntimeException('Viber is disabled or the auth token is not configured.');
-            }
-            $url = rtrim((string) SITE_URL, '/') . VIBER_WEBHOOK_PATH;
-            $secretNow = trim((string) channelConfig('viber', 'viber_webhook_secret', ''));
-            if ($secretNow !== '') {
-                $url .= '?key=' . $secretNow;
-            }
-            $reg = $gw->setWebhook($url);
-            if (!$reg['ok']) {
-                throw new RuntimeException('set_webhook failed: ' . ($reg['error'] ?: 'unknown'));
-            }
-            auditLog('channel_webhook_registered', 'settings', null, null, ['channel' => 'viber', 'url' => $url]);
-            $flash = ['success', 'Viber webhook registered: ' . $url];
         } elseif ($op === 'health_check') {
-            $gw = $channel === 'telegram' ? TelegramGateway::fromConfig() : ViberGateway::fromConfig();
+            $gw = TelegramGateway::fromConfig();
             if (!$gw) {
                 $flash = ['danger', $label . ' is disabled or the bot token is not configured.'];
             } else {
@@ -141,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ? ['success', $label . ' health OK' . $who . '.']
                     : ['danger', $label . ' health failed: ' . ($h['error'] ?: 'unknown')];
             }
-        } elseif ($op === 'poll_updates' && $channel === 'telegram') {
+        } elseif ($op === 'poll_updates') {
             // Redeem pending /start {token} connect codes without a public webhook.
             $gw = TelegramGateway::fromConfig();
             if (!$gw) {
@@ -200,10 +174,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $enabled = channelEnabled($channel);
-$tokenKey = $channel === 'telegram' ? 'telegram_bot_token' : 'viber_auth_token';
+$tokenKey = 'telegram_bot_token';
 $hasToken = channelConfig($channel, $tokenKey) !== '';
 $botUsername = channelConfig('telegram', 'telegram_bot_username');
-$senderName = channelConfig('viber', 'viber_sender_name', 'LOKA Fleet');
 $webhookSecret = channelConfig($channel, $channel . '_webhook_secret');
 $timeout = channelConfig($channel, $channel . '_timeout', '15');
 $maxLen = channelConfig($channel, $channel . '_max_length', (string) CHANNEL_DEFAULTS[$channel]['max_length']);
@@ -348,7 +321,6 @@ require_once INCLUDES_PATH . '/header.php';
                             <label class="form-check-label" for="chEnabled">Enable <?= e($label) ?> notifications</label>
                         </div>
 
-                        <?php if ($channel === 'telegram'): ?>
                         <div class="mb-3">
                             <label class="form-label">Bot token <span class="text-muted small">(from @BotFather)</span></label>
                             <input type="password" name="telegram_bot_token" class="form-control" value="" autocomplete="new-password"
@@ -358,22 +330,11 @@ require_once INCLUDES_PATH . '/header.php';
                             <label class="form-label">Bot username <span class="text-muted small">(without @ — used for Profile deep links)</span></label>
                             <input type="text" name="telegram_bot_username" class="form-control" value="<?= e($botUsername) ?>" placeholder="LOKAFleetBot">
                         </div>
-                        <?php else: ?>
-                        <div class="mb-3">
-                            <label class="form-label">Viber auth token <span class="text-muted small">(bot / PA account)</span></label>
-                            <input type="password" name="viber_auth_token" class="form-control" value="" autocomplete="new-password"
-                                   placeholder="<?= $hasToken ? '•••••••• (unchanged if blank)' : 'Required' ?>">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Sender name</label>
-                            <input type="text" name="viber_sender_name" class="form-control" value="<?= e($senderName) ?>">
-                        </div>
-                        <?php endif; ?>
 
                         <div class="mb-3">
                             <label class="form-label">Webhook secret <span class="text-muted small">(optional)</span></label>
                             <input type="text" name="<?= e($channel) ?>_webhook_secret" class="form-control" value="<?= e($webhookSecret) ?>">
-                            <p class="form-text small mb-0">Telegram: validated against <code>X-Telegram-Bot-Api-Secret-Token</code>. Viber: required as <code>?key=</code> on the webhook URL when set.</p>
+                            <p class="form-text small mb-0">Validated against <code>X-Telegram-Bot-Api-Secret-Token</code> when set on the webhook.</p>
                         </div>
 
                         <div class="row g-2 mb-3">
@@ -421,10 +382,8 @@ require_once INCLUDES_PATH . '/header.php';
                         <input type="hidden" name="op" value="test_send">
                         <div class="mb-3">
                             <label class="form-label">Test chat ID</label>
-                            <input type="text" name="test_chat_id" class="form-control" placeholder="<?= $channel === 'telegram' ? 'Your numeric chat ID (not the bot @username)' : 'Viber member id' ?>" required>
-                            <?php if ($channel === 'telegram'): ?>
+                            <input type="text" name="test_chat_id" class="form-control" placeholder="Your numeric chat ID (not the bot @username)" required>
                             <div class="form-text">Must be <em>your</em> chat id (e.g. <code>123456789</code>), not <code>@<?= e(ltrim((string) channelConfig('telegram', 'telegram_bot_username', 'BotUsername'), '@')) ?></code>. Prefer Profile → Connect → open the bot link → Poll link requests.</div>
-                            <?php endif; ?>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Message</label>
@@ -439,22 +398,14 @@ require_once INCLUDES_PATH . '/header.php';
                         <form method="POST"><?= csrfField() ?><input type="hidden" name="op" value="health_check">
                             <button type="submit" class="btn btn-secondary btn-sm">Bot health</button>
                         </form>
-                        <?php if ($channel === 'telegram'): ?>
                         <form method="POST"><?= csrfField() ?>
                             <input type="hidden" name="op" value="poll_updates">
                             <input type="hidden" name="offset" value="<?= e(channelConfig('telegram', 'telegram_last_update_id', '0')) ?>">
                             <button type="submit" class="btn btn-secondary btn-sm" title="Redeem pending /start connect codes without a public webhook">Poll link requests</button>
                         </form>
-                        <?php else: ?>
-                        <form method="POST" onsubmit="return confirm('Register this staging URL as the Viber webhook? Viber will start calling it for conversation events.');"><?= csrfField() ?>
-                            <input type="hidden" name="op" value="register_webhook">
-                            <button type="submit" class="btn btn-secondary btn-sm" title="Viber has no polling fallback — callbacks only arrive after set_webhook">Register webhook</button>
-                        </form>
-                        <?php endif; ?>
                     </div>
                     <p class="form-text small mt-3 mb-0">
-                        Webhook URL: <code><?= e(rtrim((string) SITE_URL, '/') . ($channel === 'telegram' ? TELEGRAM_WEBHOOK_PATH : VIBER_WEBHOOK_PATH)) ?></code>
-                        <?= $channel === 'viber' && $webhookSecret !== '' ? '?key=…' : '' ?><br>
+                        Webhook URL: <code><?= e(rtrim((string) SITE_URL, '/') . TELEGRAM_WEBHOOK_PATH) ?></code><br>
                         Outbound is queued on notify(); drain with <strong>Process queue now</strong>, HTTP cron
                         (<code>?page=cron&amp;action=channels&amp;key=SECRET</code>), or the CLI cron.
                     </p>

@@ -39,27 +39,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('op', '') !== '') {
             if (!channelEnabled($opChannel)) {
                 throw new RuntimeException(ucfirst($label) . ' notifications are not enabled yet. Ask an administrator.');
             }
-            if ($opChannel === 'telegram') {
-                $botUser = trim(channelConfig('telegram', 'telegram_bot_username'));
-                if ($botUser === '') {
-                    throw new RuntimeException('The Telegram bot is not configured yet. Ask an administrator to set the bot username.');
-                }
-                $token = channelMintLinkToken((int) userId(), 'telegram');
-                $connectLinks['telegram'] = [
-                    'token' => $token,
-                    'link'  => 'https://t.me/' . $botUser . '?start=' . $token,
-                    'code'  => '/start ' . $token,
-                ];
-                $channelFlash = ['info', 'Open the link below (or send the code to the bot) within 30 minutes to link this account.'];
-            } else {
-                $token = channelMintLinkToken((int) userId(), 'viber');
-                $connectLinks['viber'] = [
-                    'token' => $token,
-                    'link'  => 'viber://forward?text=' . rawurlencode('/start ' . $token),
-                    'code'  => '/start ' . $token,
-                ];
-                $channelFlash = ['info', 'Send the code below to the LOKA Viber bot within 30 minutes to link this account.'];
+            $botUser = trim(channelConfig('telegram', 'telegram_bot_username'));
+            if ($botUser === '') {
+                throw new RuntimeException('The Telegram bot is not configured yet. Ask an administrator to set the bot username.');
             }
+            $token = channelMintLinkToken((int) userId(), 'telegram');
+            $connectLinks['telegram'] = [
+                'token' => $token,
+                'link'  => 'https://t.me/' . $botUser . '?start=' . $token,
+                'code'  => '/start ' . $token,
+            ];
+            $channelFlash = ['info', 'Open the link below (or send the code to the bot) within 30 minutes to link this account.'];
             auditLog('channel_connect_started', 'user', (int) userId(), null, ['channel' => $opChannel]);
         } elseif ($op === 'disconnect_channel') {
             channelClearBinding((int) userId(), $opChannel);

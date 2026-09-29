@@ -1,10 +1,9 @@
 <?php
 /**
- * LOKA - Messenger webhook receiver (Plan #35)
+ * LOKA - Telegram webhook receiver (Plan #35)
  *
- * Public endpoints (no login; Telegram/Viber call these):
+ * Public endpoint (no login; Telegram calls this):
  *   POST /?page=channels&action=telegram-webhook
- *   POST /?page=channels&action=viber-webhook[&key=SECRET]
  *
  * Redeems one-time Profile connect codes (deep-link `/start {token}`) into
  * user_channel_bindings and handles /stop / /disconnect unbinds. Queue-only
@@ -30,7 +29,7 @@ function channelWebhookReply(array $payload, int $code = 200): void
     exit;
 }
 
-if (!in_array($action, ['telegram-webhook', 'viber-webhook'], true)) {
+if ($action !== 'telegram-webhook') {
     channelWebhookReply(['ok' => false, 'description' => 'Unknown webhook'], 404);
 }
 
@@ -94,49 +93,6 @@ try {
 
         channelWebhookReply(['ok' => true]);
     }
-
-    // ---- Viber ----
-    $secret = trim(channelConfig('viber', 'viber_webhook_secret'));
-    if ($secret !== '') {
-        $given = (string) (get('key', '') ?? '');
-        if (!hash_equals($secret, $given)) {
-            channelWebhookReply(['status' => 3, 'status_message' => 'Forbidden'], 403);
-        }
-    }
-
-    $event = (string) ($update->event ?? '');
-    if ($event === 'conversation_started') {
-        // Viber allows one welcome message here; nudge the user to /start.
-        channelWebhookReply([
-            'status' => 0,
-            'sender' => ['name' => (string) channelConfig('viber', 'viber_sender_name', 'LOKA Fleet')],
-            'message' => ['type' => 'text', 'text' => 'Welcome! Send /start to link your LOKA Fleet account.'],
-        ]);
-    }
-
-    if (in_array($event, ['message', 'subscribed'], true) && isset($update->message->text, $update->sender->id)) {
-        $chatId = (string) $update->sender->id;
-        $text = trim((string) $update->message->text);
-        $name = $update->sender->name ?? null;
-
-        if (preg_match('#^/start(?:\s+([A-Za-z0-9]+))?#i', $text, $m)) {
-            if (empty($m[1])) {
-                channelWebhookReply(['status' => 0]);
-            }
-            [$ok, $msg] = channelRedeemLinkToken('viber', $m[1], $chatId, is_string($name) ? $name : null);
-            channelWebhookReply(['status' => 0, 'message' => $ok ? 'connected' : $msg]);
-        }
-
-        if (strcasecmp($text, '/stop') === 0 || strcasecmp($text, '/disconnect') === 0) {
-            $binding = channelUserByChatId('viber', $chatId);
-            if ($binding) {
-                channelClearBinding((int) $binding->user_id, 'viber');
-            }
-            channelWebhookReply(['status' => 0]);
-        }
-    }
-
-    channelWebhookReply(['status' => 0]);
 } catch (Throwable $e) {
     error_log('channel webhook: ' . $e->getMessage());
     channelWebhookReply(['ok' => false, 'description' => 'Webhook error'], 500);

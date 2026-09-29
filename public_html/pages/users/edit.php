@@ -234,12 +234,6 @@ require_once INCLUDES_PATH . '/header.php';
                                                value="<?= e(postSafe('telegram_chat_id', $editChannelBindings['telegram']->chat_id ?? '', 100)) ?>"
                                                placeholder="e.g. 123456789">
                                     </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label small mb-1">Viber user ID</label>
-                                        <input type="text" class="form-control form-control-sm" name="viber_chat_id"
-                                               value="<?= e(postSafe('viber_chat_id', $editChannelBindings['viber']->chat_id ?? '', 100)) ?>"
-                                               placeholder="Viber member id">
-                                    </div>
                                 </div>
                                 <small class="text-muted">Clear a field to unlink that messenger. Unchanged values keep the original link source (self / administrator).</small>
                             </div>

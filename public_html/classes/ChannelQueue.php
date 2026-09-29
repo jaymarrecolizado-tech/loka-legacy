@@ -1,6 +1,6 @@
 <?php
 /**
- * LOKA - Messenger Channel Queue (Plan #35: Telegram + Viber)
+ * LOKA - Messenger Channel Queue (Plan #35: Telegram)
  *
  * Outbound notify-only queue over channel_logs, mirroring SmsQueue/sms_logs.
  * Queue-only: gateways are never called during the HTTP page request — drain
@@ -226,8 +226,6 @@ class ChannelQueue
     /** Gateway for a channel, or null when not configured/enabled. */
     private function gatewayFor(string $channel): ?object
     {
-        return $channel === 'telegram'
-            ? TelegramGateway::fromConfig()
-            : ViberGateway::fromConfig();
+        return $channel === 'telegram' ? TelegramGateway::fromConfig() : null;
     }
 }

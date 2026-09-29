@@ -764,8 +764,8 @@ function notify(int $userId, string $type, string $title, string $message, ?stri
         error_log("NOTIFY ERROR: SMS queue failed for user #{$userId}: " . $e->getMessage());
     }
 
-    // Soft-fail messenger channels (Plan #35): Telegram + Viber extras beside
-    // SMS. Each skips silently when the channel is disabled or the user has
+    // Soft-fail messenger channel (Plan #35): Telegram extra beside
+    // SMS. Skips silently when the channel is disabled or the user has
     // no binding — never blast unlinked users.
     if (function_exists('channelNotifyUser') && defined('LOKA_CHANNELS')) {
         foreach (LOKA_CHANNELS as $__channel) {

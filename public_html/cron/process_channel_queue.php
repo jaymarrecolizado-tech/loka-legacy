@@ -1,6 +1,6 @@
 <?php
 /**
- * LOKA - Channel Queue Processor (Telegram + Viber, Plan #35)
+ * LOKA - Channel Queue Processor (Telegram, Plan #35)
  *
  * CLI only. Schedule every 2 minutes (same pattern as email/SMS queues).
  *
@@ -28,7 +28,6 @@ require_once __DIR__ . '/../config/channels.php';
 require_once __DIR__ . '/../classes/Database.php';
 require_once __DIR__ . '/../classes/ChannelQueue.php';
 require_once __DIR__ . '/../classes/TelegramGateway.php';
-require_once __DIR__ . '/../classes/ViberGateway.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/sms.php';
 require_once __DIR__ . '/../includes/channels.php';

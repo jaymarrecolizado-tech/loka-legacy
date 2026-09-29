@@ -39,7 +39,7 @@ try {
     }
 
     if ($action === 'channels') {
-        // Plan #35 — drain Telegram + Viber outbound queues
+        // Plan #35 — drain Telegram outbound queue
         if (!class_exists('ChannelQueue')) {
             http_response_code(500);
             echo "ChannelQueue unavailable\n";

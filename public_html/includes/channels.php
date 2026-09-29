@@ -1,6 +1,6 @@
 <?php
 /**
- * LOKA - Messenger channel helpers (Plan #35: Telegram + Viber)
+ * LOKA - Messenger channel helpers (Plan #35: Telegram)
  *
  * Soft-fail extras beside in-app / email / SMS (notify() fan-out). Channels
  * send only when (a) the channel is enabled in System Control, (b) the event
@@ -12,7 +12,7 @@
 require_once BASE_PATH . '/classes/ChannelQueue.php';
 
 /**
- * Read a channel setting: DB settings (category telegram/viber) first, then
+ * Read a channel setting: DB settings (category telegram) first, then
  * .env, then default. Mirrors smsConfig().
  */
 function channelConfig(string $channel, string $key, string $default = ''): string
