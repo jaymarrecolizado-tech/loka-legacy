@@ -74,14 +74,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($chatId === '') {
                 throw new InvalidArgumentException('Chat ID is required.');
             }
+            // Telegram bots cannot message themselves — catch the common "@BotUsername" mistake early.
+            if ($channel === 'telegram') {
+                $botUser = ltrim((string) channelConfig('telegram', 'telegram_bot_username', ''), '@');
+                $targetUser = ltrim($chatId, '@');
+                if ($botUser !== '' && strcasecmp($botUser, $targetUser) === 0) {
+                    throw new InvalidArgumentException(
+                        'Use your personal Telegram chat ID (numeric), not the bot username @' . $botUser . '. '
+                        . 'Connect via Profile → Messenger Alerts, then Poll link requests, or look up your chat id with @userinfobot.'
+                    );
+                }
+            }
+            // Telegram Bot API needs a numeric chat ID (or @channel where the bot is admin).
+            // A phone number is NOT a chat_id — catch that mistake early.
+            if ($channel === 'telegram') {
+                if (preg_match('/^\+?[0-9][0-9\s\-]{5,}$/', $chatId) && str_starts_with(ltrim($chatId, '+'), '0')) {
+                    throw new InvalidArgumentException(
+                        'That looks like a phone number — Telegram bots cannot message phone numbers. '
+                        . 'Use your numeric chat ID instead: message @userinfobot on Telegram to get it, '
+                        . 'or use Profile → Messenger Alerts → Connect.'
+                    );
+                }
+            }
             $msg = trim(postSafe('test_message', 'LOKA ' . $label . ' test — ' . date('Y-m-d H:i'), 4000));
             $id = $queue->queueTest($channel, $chatId, $msg, userId());
-            $processed = $queue->process($channel, 1);
+            // Send THIS test row immediately — process($channel, 1) would grab the
+            // oldest pending row instead (ORDER BY id ASC) and leave the test unsent.
+            $sent = $id ? $queue->processOne($id) : false;
             $row = $id ? db()->fetch("SELECT status, error_message FROM channel_logs WHERE id = ?", [$id]) : null;
-            if ($row && $row->status === 'sent') {
+            if ($sent && $row && $row->status === 'sent') {
                 $flash = ['success', 'Test ' . $label . ' message sent.'];
             } elseif ($row && $row->status === 'pending') {
-                $flash = ['warning', 'Test queued (pending). Run Process queue or wait for cron. Sent=' . $processed['sent']];
+                $flash = ['warning', 'Test queued (pending). Run Process queue or wait for cron.'];
             } else {
                 $err = $row->error_message ?? 'Unknown error';
                 $flash = ['danger', 'Test failed: ' . $err];
@@ -360,7 +384,10 @@ require_once INCLUDES_PATH . '/header.php';
                         <input type="hidden" name="op" value="test_send">
                         <div class="mb-3">
                             <label class="form-label">Test chat ID</label>
-                            <input type="text" name="test_chat_id" class="form-control" placeholder="<?= $channel === 'telegram' ? '123456789 or @channelname' : 'Viber member id' ?>" required>
+                            <input type="text" name="test_chat_id" class="form-control" placeholder="<?= $channel === 'telegram' ? 'Your numeric chat ID (not the bot @username)' : 'Viber member id' ?>" required>
+                            <?php if ($channel === 'telegram'): ?>
+                            <div class="form-text">Must be <em>your</em> chat id (e.g. <code>123456789</code>), not <code>@<?= e(ltrim((string) channelConfig('telegram', 'telegram_bot_username', 'BotUsername'), '@')) ?></code>. Prefer Profile → Connect → open the bot link → Poll link requests.</div>
+                            <?php endif; ?>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Message</label>
