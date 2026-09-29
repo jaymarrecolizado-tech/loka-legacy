@@ -154,4 +154,25 @@ class ViberGateway
             'username' => $username,
         ];
     }
+
+    /**
+     * Register (or refresh) the Viber webhook so Viber delivers
+     * conversation_started / message / subscribed callbacks to us.
+     * Unlike Telegram there is no getUpdates polling fallback.
+     *
+     * @param list<string> $eventTypes
+     * @return array{ok:bool,error:?string,http_code:int}
+     */
+    public function setWebhook(string $url, array $eventTypes = ['conversation_started', 'message', 'subscribed']): array
+    {
+        $r = $this->call('set_webhook', [
+            'url' => $url,
+            'event_types' => array_values($eventTypes),
+        ]);
+        return [
+            'ok' => $r['ok'],
+            'error' => $r['error'],
+            'http_code' => $r['http_code'],
+        ];
+    }
 }

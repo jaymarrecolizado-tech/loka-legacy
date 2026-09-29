@@ -113,6 +113,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($op === 'process_queue') {
             $r = $queue->process($channel, 30);
             $flash = ['success', "Processed queue: sent {$r['sent']}, failed {$r['failed']}, skipped {$r['skipped']}."];
+        } elseif ($op === 'register_webhook' && $channel === 'viber') {
+            // Viber has no getUpdates polling — callbacks only arrive after set_webhook.
+            $gw = ViberGateway::fromConfig();
+            if (!$gw) {
+                throw new RuntimeException('Viber is disabled or the auth token is not configured.');
+            }
+            $url = rtrim((string) SITE_URL, '/') . VIBER_WEBHOOK_PATH;
+            $secretNow = trim((string) channelConfig('viber', 'viber_webhook_secret', ''));
+            if ($secretNow !== '') {
+                $url .= '?key=' . $secretNow;
+            }
+            $reg = $gw->setWebhook($url);
+            if (!$reg['ok']) {
+                throw new RuntimeException('set_webhook failed: ' . ($reg['error'] ?: 'unknown'));
+            }
+            auditLog('channel_webhook_registered', 'settings', null, null, ['channel' => 'viber', 'url' => $url]);
+            $flash = ['success', 'Viber webhook registered: ' . $url];
         } elseif ($op === 'health_check') {
             $gw = $channel === 'telegram' ? TelegramGateway::fromConfig() : ViberGateway::fromConfig();
             if (!$gw) {
@@ -427,6 +444,11 @@ require_once INCLUDES_PATH . '/header.php';
                             <input type="hidden" name="op" value="poll_updates">
                             <input type="hidden" name="offset" value="<?= e(channelConfig('telegram', 'telegram_last_update_id', '0')) ?>">
                             <button type="submit" class="btn btn-secondary btn-sm" title="Redeem pending /start connect codes without a public webhook">Poll link requests</button>
+                        </form>
+                        <?php else: ?>
+                        <form method="POST" onsubmit="return confirm('Register this staging URL as the Viber webhook? Viber will start calling it for conversation events.');"><?= csrfField() ?>
+                            <input type="hidden" name="op" value="register_webhook">
+                            <button type="submit" class="btn btn-secondary btn-sm" title="Viber has no polling fallback — callbacks only arrive after set_webhook">Register webhook</button>
                         </form>
                         <?php endif; ?>
                     </div>
