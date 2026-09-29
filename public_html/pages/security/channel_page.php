@@ -165,6 +165,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'p' => postSafe('ret_p', '', 10),
             ], static fn($v) => $v !== null && $v !== ''));
             redirectWith('/?' . $qs, 'success', ucfirst($label) . " log #{$logId} deleted.");
+        } elseif ($op === 'unlink_user') {
+            $targetUserId = postInt('target_user_id');
+            $binding = $targetUserId
+                ? db()->fetch("SELECT * FROM user_channel_bindings WHERE user_id = ? AND channel = ?", [$targetUserId, $channel])
+                : null;
+            if (!$binding) {
+                throw new InvalidArgumentException('Binding not found.');
+            }
+            channelClearBinding($targetUserId, $channel);
+            auditLog('channel_binding_removed', 'user', $targetUserId, (array) $binding, null);
+            $flash = ['success', $label . ' alerts disconnected for user #' . $targetUserId . '.'];
         }
     } catch (Throwable $e) {
         $flash = ['danger', $e->getMessage()];
@@ -252,6 +263,15 @@ try {
 
 $bindingsCount = (int) db()->fetchColumn(
     "SELECT COUNT(*) FROM user_channel_bindings WHERE channel = ?",
+    [$channel]
+);
+
+$bindings = db()->fetchAll(
+    "SELECT b.*, u.name AS user_name, u.email AS user_email
+     FROM user_channel_bindings b
+     LEFT JOIN users u ON u.id = b.user_id
+     WHERE b.channel = ?
+     ORDER BY b.linked_at DESC",
     [$channel]
 );
 
@@ -522,6 +542,59 @@ require_once INCLUDES_PATH . '/header.php';
                     </div>
                     <?= listPaginationFooter($pag, $logBaseParams) ?>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="mb-3">Linked users <span class="badge bg-secondary"><?= count($bindings) ?></span></h5>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle no-datatable" id="channelBindingsTable">
+                    <thead>
+                        <tr>
+                            <th>User ID</th>
+                            <th>User</th>
+                            <th>Chat ID</th>
+                            <th>Linked via</th>
+                            <th>Linked at</th>
+                            <th class="text-center" style="width:4rem;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($bindings)): ?>
+                            <tr><td colspan="6" class="text-center text-muted py-4">No users have linked <?= e($label) ?> yet. Users link via Profile → Messenger Alerts → Connect.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($bindings as $bd): ?>
+                                <tr>
+                                    <td><?= (int) $bd->user_id ?></td>
+                                    <td>
+                                        <?= e($bd->user_name ?? ('User #' . (int) $bd->user_id)) ?>
+                                        <?php if (!empty($bd->user_email)): ?>
+                                            <div class="small text-muted"><?= e($bd->user_email) ?></div>
+                                        <?php endif; ?>
+                                        <?php if (!empty($bd->display_name)): ?>
+                                            <div class="small text-muted"><?= e($bd->display_name) ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="font-monospace small"><?= e($bd->chat_id) ?></td>
+                                    <td class="small"><?= e($bd->linked_via === 'admin' ? 'administrator' : 'self-link') ?></td>
+                                    <td class="small text-nowrap"><?= e($bd->linked_at) ?></td>
+                                    <td class="text-center">
+                                        <form method="POST" class="d-inline" onsubmit="return confirm('Disconnect <?= e($label) ?> alerts for user #<?= (int) $bd->user_id ?>?');">
+                                            <?= csrfField() ?>
+                                            <input type="hidden" name="op" value="unlink_user">
+                                            <input type="hidden" name="target_user_id" value="<?= (int) $bd->user_id ?>">
+                                            <button type="submit" class="btn btn-link btn-sm text-danger p-0" title="Disconnect user">
+                                                <i class="bi bi-person-x"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
