@@ -484,6 +484,10 @@ switch ($page) {
             require_once PAGES_PATH . '/security/sms.php';
         } elseif ($action === 'email') {
             require_once PAGES_PATH . '/security/email.php';
+        } elseif ($action === 'telegram') {
+            require_once PAGES_PATH . '/security/telegram.php';
+        } elseif ($action === 'viber') {
+            require_once PAGES_PATH . '/security/viber.php';
         } elseif ($action === 'odometer') {
             require_once INCLUDES_PATH . '/odometer.php';
             require_once PAGES_PATH . '/security/odometer.php';
