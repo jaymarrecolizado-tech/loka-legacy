@@ -276,6 +276,61 @@ if (!defined('OB_REQUESTS_LOADED')) {
         ], 'id = ?', [$obId]);
     }
 
+    // ------------------------------------------------------------------
+    // CoA verification QR (Plan #36) — same HMAC pattern as gas vouchers.
+    // ------------------------------------------------------------------
+
+    /** Canonical acknowledgment time: new slips use coa_acknowledged_at; old rows fall back to coa_signed_at. */
+    function obCoaAcknowledgedAt(object $ob): ?string
+    {
+        if (!empty($ob->coa_acknowledged_at)) {
+            return (string) $ob->coa_acknowledged_at;
+        }
+        return !empty($ob->coa_signed_at) ? (string) $ob->coa_signed_at : null;
+    }
+
+    /** True when the client acknowledgment (Plan #36) or a legacy signature exists. */
+    function obCoaReceived(object $ob): bool
+    {
+        return !empty($ob->coa_acknowledged_at)
+            || !empty($ob->coa_signed_at)
+            || !empty($ob->coa_signature_path);
+    }
+
+    function obCoaVerifySecret(): string
+    {
+        $key = getenv('APP_KEY') ?: ($_ENV['APP_KEY'] ?? '');
+        $key = is_string($key) ? trim($key) : '';
+        return $key !== '' ? $key : 'LOKA_SECRET';
+    }
+
+    /** Truncated HMAC for CoA QR links (keeps QR modules sparse enough to scan). */
+    function obCoaVerifyHash(object $ob): string
+    {
+        return substr(hash_hmac(
+            'sha256',
+            'ob-coa-' . $ob->id . '-' . $ob->pass_slip_no,
+            obCoaVerifySecret()
+        ), 0, 16);
+    }
+
+    function obCoaVerifyHashValid(object $ob, string $hash): bool
+    {
+        return $hash !== '' && hash_equals(obCoaVerifyHash($ob), $hash);
+    }
+
+    /** Signed public verification URL for the CoA (encoded in the QR). */
+    function obCoaVerifyUrl(object $ob): string
+    {
+        $base = rtrim((string) SITE_URL, '/');
+        if ($base === '') {
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $base = $scheme . '://' . $host . rtrim((string) APP_URL, '/');
+        }
+        return $base . '/?page=verify-coa&id=' . (int) $ob->id . '&hash=' . urlencode(obCoaVerifyHash($ob));
+    }
+
     /** Persist one timeline row in ob_approvals. */
     function obLog(int $obId, string $type, string $action, ?int $actorId = null, ?string $comments = null): void
     {

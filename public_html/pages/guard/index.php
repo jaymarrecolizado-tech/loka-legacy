@@ -85,7 +85,6 @@ $tabCounts = db()->fetch(
 );
 
 $obBoundByRequest = obBoundPassSlipsByRequestId();
-$guardEsign = obUserEsignPath(userId());
 
 $pageTitle = 'Guard Dashboard';
 require_once INCLUDES_PATH . '/header.php';

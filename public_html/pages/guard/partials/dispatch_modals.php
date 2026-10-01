@@ -25,7 +25,7 @@
                             <div class="alert alert-warning py-2 px-3 small">
                                 <i class="bi bi-file-earmark-text me-1"></i>
                                 This will also stamp <strong>Pass Slip <?= e($tripOb->pass_slip_no) ?></strong>
-                                (OB departure<?= $guardEsign !== null ? ' with your saved e-sign' : ' + your signature below' ?>).
+                                (OB departure — your guard identity and the time are recorded).
                             </div>
                             <?php endif; ?>
 
@@ -79,21 +79,6 @@
                             $obsPhase = 'dispatch';
                             require __DIR__ . '/observation_fields.php';
                             ?>
-
-                            <?php if ($tripOb !== null && $guardEsign === null): ?>
-                            <div class="mb-3 border rounded bg-white p-2" id="obSigPad<?= $trip->id ?>" style="touch-action:none;">
-                                <label class="form-label fw-semibold mb-1">
-                                    <i class="bi bi-vector-pen me-1"></i>Pass Slip Signature <span class="text-danger">*</span>
-                                    <small class="text-muted fw-normal">— no saved e-sign on file</small>
-                                </label>
-                                <canvas id="obSigCanvas<?= $trip->id ?>" class="w-100 d-block ob-guard-sig" style="height:130px; cursor:crosshair;"></canvas>
-                                <button type="button" class="btn btn-sm btn-outline-secondary mt-1" id="obSigClear<?= $trip->id ?>"><i class="bi bi-eraser me-1"></i>Clear</button>
-                                <div class="form-check mt-1">
-                                    <input class="form-check-input" type="checkbox" name="ob_save_esign" value="1" id="obSaveEsign<?= $trip->id ?>">
-                                    <label class="form-check-label small" for="obSaveEsign<?= $trip->id ?>">Save as my e-sign for next time</label>
-                                </div>
-                            </div>
-                            <?php endif; ?>
 
                             <div class="mb-3">
                                 <label for="guard_notes<?= $trip->id ?>" class="form-label">Notes (Optional)</label>
@@ -198,40 +183,6 @@
         </div>
     <?php endif; ?>
 <?php endforeach; ?>
-
-<?php if (!empty($obBoundByRequest)): ?>
-<script src="<?= ASSETS_PATH ?>/js/ob-signature.js?v=<?= e(APP_VERSION) ?>"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    if (!window.ObSignature) return;
-    document.querySelectorAll('.modal[id^="dispatchModal"]').forEach(function (m) {
-        var canvas = m.querySelector('canvas.ob-guard-sig');
-        if (!canvas) return;
-        m.addEventListener('show.bs.modal', function () {
-            ObSignature.init({
-                canvas: '#' + canvas.id,
-                pad: '#obSigPad' + canvas.id.replace('obSigCanvas', ''),
-                clear: '#obSigClear' + canvas.id.replace('obSigCanvas', '')
-            });
-            ObSignature.clear();
-        });
-        var form = m.querySelector('form');
-        form.addEventListener('submit', function (e) {
-            if (ObSignature.isEmpty()) {
-                e.preventDefault();
-                alert('Please sign to stamp the Pass Slip (no saved e-sign on file).');
-                return;
-            }
-            var input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'ob_guard_signature';
-            input.value = ObSignature.toDataUrl();
-            form.appendChild(input);
-        });
-    });
-});
-</script>
-<?php endif; ?>
 
 <script>
 function toggleTravelOrderInput(id) {

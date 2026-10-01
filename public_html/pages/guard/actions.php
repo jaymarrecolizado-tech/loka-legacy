@@ -73,24 +73,10 @@ switch ($action) {
         // Format the datetime
         $formattedDispatchTime = date('Y-m-d H:i:s', strtotime($dispatchTime));
 
-        // Bound OB Pass Slip (Plan #24): dispatching the vehicle stamps the
-        // slip's departure. The signature is resolved BEFORE the dispatch is
-        // recorded — an unresolvable signature blocks the dispatch.
+        // Bound OB Pass Slip (Plan #24, revised by #36): dispatching the
+        // vehicle stamps the slip's departure — guard identity + timestamp,
+        // no signature required.
         $obBound = obBoundObForRequest((int) $requestId);
-        $obDepartSig = null;
-        if ($obBound !== null && empty($obBound->ob_departure_datetime)) {
-            $res = obResolveStaffSignature(
-                (int) $obBound->id,
-                'guard_departure',
-                (int) userId(),
-                (string) post('ob_guard_signature', ''),
-                post('ob_save_esign') === '1'
-            );
-            if ($res['error'] !== null) {
-                redirectWith('/?page=guard', 'danger', 'Dispatch blocked: ' . $res['error']);
-            }
-            $obDepartSig = $res['path'];
-        }
 
         // Odometer reading (skip gracefully when broken/unreadable)
         $vehicleBroken = vehicleOdometerIsBroken(
@@ -154,7 +140,7 @@ switch ($action) {
         // dispatch datetime. Already-stamped slips are skipped, never overwritten.
         $obStampNote = '';
         if ($obBound !== null) {
-            $stamp = obApplyGuardDepartureStamp($obBound, $formattedDispatchTime, (int) userId(), $obDepartSig);
+            $stamp = obApplyGuardDepartureStamp($obBound, $formattedDispatchTime, (int) userId());
             if ($stamp['ok'] && !$stamp['skipped']) {
                 $obStampNote = ' Pass Slip ' . $obBound->pass_slip_no . ' stamped.';
             } elseif (!$stamp['ok']) {

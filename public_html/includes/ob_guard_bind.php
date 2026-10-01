@@ -81,10 +81,7 @@ function obCopyTripTimesFromRequest(int $obId, int $requestId, ?int $actorId = n
         $stamp = obStampGuardDeparture(
             $ob,
             (string) $trip->actual_dispatch_datetime,
-            (int) ($trip->dispatch_guard_id ?: ($actorId ?? 0)),
-            '',
-            false,
-            false
+            (int) ($trip->dispatch_guard_id ?: ($actorId ?? 0))
         );
         if ($stamp['ok'] && !$stamp['skipped']) {
             $copied[] = 'departure';
@@ -108,12 +105,13 @@ function obCopyTripTimesFromRequest(int $obId, int $requestId, ?int $actorId = n
 }
 
 /**
- * Stamp OB departure with a caller-supplied datetime (vehicle dispatch).
- * Already-stamped slips are skipped. $requireSignature=false = late-bind time-only.
+ * Stamp OB departure with a caller-supplied datetime (Plan #36: button only —
+ * the logged-in guard's identity + timestamp are the record; no canvas).
+ * Already-stamped slips are skipped.
  *
  * @return array{ok:bool,skipped:bool,error:?string,ob:?object}
  */
-function obStampGuardDeparture(object $ob, string $datetime, int $guardId, string $canvasSig = '', bool $saveEsign = false, bool $requireSignature = true): array
+function obStampGuardDeparture(object $ob, string $datetime, int $guardId): array
 {
     $out = ['ok' => false, 'skipped' => false, 'error' => null, 'ob' => null];
 
@@ -129,26 +127,15 @@ function obStampGuardDeparture(object $ob, string $datetime, int $guardId, strin
         return $out;
     }
 
-    $res = obResolveStaffSignature((int) $ob->id, 'guard_departure', $guardId, $canvasSig, $saveEsign);
-    $sigPath = $res['path'];
-    if ($res['error'] !== null) {
-        if ($requireSignature) {
-            $out['error'] = $res['error'] . ' (Pass Slip ' . $ob->pass_slip_no . ')';
-            return $out;
-        }
-        $sigPath = null;
-    }
-
-    return obApplyGuardDepartureStamp($ob, $datetime, $guardId, $sigPath);
+    return obApplyGuardDepartureStamp($ob, $datetime, $guardId);
 }
 
 /**
- * Apply a pre-resolved departure stamp. Resolve the signature BEFORE vehicle
- * dispatch so a missing signature can block the dispatch itself.
+ * Apply the departure stamp (time + guard identity, no signature since #36).
  *
  * @return array{ok:bool,skipped:bool,error:?string,ob:?object}
  */
-function obApplyGuardDepartureStamp(object $ob, string $datetime, int $guardId, ?string $sigPath): array
+function obApplyGuardDepartureStamp(object $ob, string $datetime, int $guardId): array
 {
     $out = ['ok' => false, 'skipped' => false, 'error' => null, 'ob' => null];
 
@@ -170,7 +157,6 @@ function obApplyGuardDepartureStamp(object $ob, string $datetime, int $guardId, 
         'status' => $status,
         'ob_departure_datetime' => $datetime,
         'departure_guard_id' => $guardId,
-        'guard_departure_signature_path' => $sigPath,
         'updated_at' => date(DATETIME_FORMAT),
     ], 'id = ?', [$fresh->id]);
     obLog((int) $fresh->id, 'guard', 'departed', $guardId, null);

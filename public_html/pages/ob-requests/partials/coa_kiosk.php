@@ -70,7 +70,7 @@ $h = static fn($v): string => htmlspecialchars((string) $v, ENT_QUOTES);
                 <div class="coa-thanks__icon"><i class="bi bi-check-lg"></i></div>
                 <div>
                     <h2>Thank you!</h2>
-                    <p>The Certificate of Appearance has been recorded securely.</p>
+                    <p>The Certificate of Appearance acknowledgment has been recorded securely.</p>
                 </div>
             </div>
             <p class="coa-note mb-3">The requester has been notified and will finalize the pass slip. You may close this page now.</p>
@@ -123,72 +123,37 @@ $h = static fn($v): string => htmlspecialchars((string) $v, ENT_QUOTES);
                 </div>
 
                 <div class="coa-field">
-                    <label class="form-label fw-semibold fs-5">Representative Signature <span class="text-danger">*</span></label>
-                    <div class="coa-pad" id="obSigPad">
-                        <canvas id="obSigCanvas" class="ob-coa-canvas"></canvas>
-                        <span class="coa-pad__hint">Sign with your finger</span>
+                    <label class="form-label" for="coaMobile">Mobile number <span class="text-muted">(for future validation)</span></label>
+                    <input type="tel" class="form-control" id="coaMobile" name="coa_mobile"
+                        maxlength="20" autocomplete="tel" placeholder="09171234567">
+                </div>
+
+                <div class="coa-field">
+                    <label class="form-label" for="coaEmail">Official email <span class="text-muted">(for future validation)</span></label>
+                    <input type="email" class="form-control" id="coaEmail" name="coa_email"
+                        maxlength="150" autocomplete="email" placeholder="name@office.gov.ph">
+                    <div class="form-text small">Provide at least one — mobile and/or official email. DICT may contact you to validate this record.</div>
+                </div>
+
+                <div class="coa-field">
+                    <div class="form-check border rounded p-3 bg-white">
+                        <input class="form-check-input fs-5" type="checkbox" value="1" id="coaAcknowledge" name="coa_acknowledge" required>
+                        <label class="form-check-label small" for="coaAcknowledge">
+                            <strong>Proof of service.</strong> I confirm that the DICT Regional Office II personnel named above
+                            appeared at our office on the date and times stated, and I am authorized to acknowledge their visit.
+                        </label>
                     </div>
-                    <div class="coa-pad__tools">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" id="obSigClear">
-                            <i class="bi bi-eraser me-1"></i>Clear
-                        </button>
-                        <span class="text-muted small" id="coaSigState">Waiting for signature…</span>
-                    </div>
-                    <div class="coa-error" id="coaSigError">Please ask the representative to sign before submitting.</div>
                 </div>
 
                 <button type="submit" class="btn btn-primary coa-submit">
-                    <i class="bi bi-check-lg me-1"></i>Sign &amp; Submit
+                    <i class="bi bi-check-lg me-1"></i>Acknowledge &amp; Submit
                 </button>
-                <p class="coa-note"><i class="bi bi-lock me-1"></i>One-time link · expires after use or in <?= $kioskDays ?> day(s)</p>
+                <p class="coa-note"><i class="bi bi-lock me-1"></i>One-time link · expires after use or in <?= $kioskDays ?> day(s) · submit time and device are recorded</p>
             </form>
         <?php endif; ?>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="<?= ASSETS_PATH ?>/js/ob-signature.js?v=<?= e(APP_VERSION) ?>"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    var form = document.getElementById('coaForm');
-    if (!form) return;
-
-    ObSignature.init({
-        canvas: '#obSigCanvas',
-        pad: '#obSigPad',
-        clear: '#obSigClear',
-        fit: true // finger-sized bitmap; export downscaled to ~800px
-    });
-
-    var sigError = document.getElementById('coaSigError');
-    var sigState = document.getElementById('coaSigState');
-    // live "signed" hint (no alert())
-    ['mouseup', 'touchend', 'mouseleave'].forEach(function (ev) {
-        document.getElementById('obSigCanvas').addEventListener(ev, function () {
-            var signed = !ObSignature.isEmpty();
-            if (sigState) {
-                sigState.textContent = signed ? 'Signature captured ✓' : 'Waiting for signature…';
-                sigState.classList.toggle('text-success', signed);
-            }
-            if (signed && sigError) sigError.classList.remove('is-visible');
-        });
-    });
-
-    form.addEventListener('submit', function (e) {
-        if (ObSignature.isEmpty()) {
-            e.preventDefault();
-            if (sigError) sigError.classList.add('is-visible');
-            document.getElementById('obSigPad').scrollIntoView({ behavior: 'smooth', block: 'center' });
-            return;
-        }
-        if (sigError) sigError.classList.remove('is-visible');
-        var input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'coa_signature';
-        input.value = ObSignature.toDataUrl();
-        form.appendChild(input);
-    });
-});
-</script>
 </body>
 </html>

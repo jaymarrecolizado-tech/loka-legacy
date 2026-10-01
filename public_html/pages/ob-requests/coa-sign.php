@@ -1,10 +1,14 @@
 <?php
 /**
- * LOKA - Certificate of Appearance Signing Kiosk (Plans #22 + #25)
+ * LOKA - Certificate of Appearance acknowledgment kiosk (Plans #22/#25/#36)
  * The ONE CoA surface: public one-time token link, and the destination of
  * the on-device "Fill Certificate" button. No login; the token is the
  * capability. Expires after submit or after ob_coa_token_days.
  * Rate-limited per session.
+ *
+ * Plan #36: the kiosk is a PROOF-OF-SERVICE acknowledgment — notice tick-box
+ * + representative name/office/purpose/times + a mobile and/or official email
+ * for future spot-check validation. No signature is collected.
  *
  * Route: ?page=ob-requests&action=coa-sign&token=RAW
  * The form posts to the CURRENT URL and also carries a hidden token, so a
@@ -27,11 +31,11 @@ $done = false;
 $errors = [];
 
 if (!$raw || !$ob) {
-    $error = 'This signing link is invalid or has expired.';
+    $error = 'This link is invalid or has expired.';
 } elseif (!in_array($ob->status, ['approved', 'departed'], true)) {
     $error = 'This pass slip is no longer awaiting a Certificate of Appearance.';
-} elseif ($ob->coa_signature_path !== null) {
-    $done = true; // already signed
+} elseif (obCoaReceived($ob)) {
+    $done = true; // already acknowledged
 }
 
 // Simple per-session rate limit on attempts (token is the capability)
@@ -46,41 +50,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error && !$done && $ob) {
         $purpose = trim((string) post('coa_purpose', ''));
         $from = trim((string) post('coa_time_from', ''));
         $to = trim((string) post('coa_time_to', ''));
-        $signature = (string) post('coa_signature', '');
+        $mobile = trim((string) post('coa_mobile', ''));
+        $email = trim((string) post('coa_email', ''));
+        $acknowledged = post('coa_acknowledge', '') === '1';
 
         if ($office === '' || mb_strlen($office) > 200) $errors[] = 'Office / Establishment is required (max 200).';
         if ($rep === '' || mb_strlen($rep) > 150) $errors[] = 'Representative name is required (max 150).';
         if (mb_strlen($purpose) > 300) $errors[] = 'Purpose of visit is too long (max 300).';
         if ($from === '' || $to === '') $errors[] = 'From and To times are required.';
-        if ($signature === '') $errors[] = 'The representative signature is required.';
+        if (!$acknowledged) $errors[] = 'Please tick the proof-of-service confirmation before submitting.';
+
+        // Mobile and/or official email — format-validated, at least one (Plan #36)
+        $mobileOk = $mobile !== '' && preg_match('/^(\+?63|0)9\d{9}$/', preg_replace('/[\s\-()]/', '', $mobile)) === 1;
+        $emailOk = $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+        if ($mobile !== '' && !$mobileOk) $errors[] = 'The mobile number does not look valid (e.g. 09171234567).';
+        if ($email !== '' && !$emailOk) $errors[] = 'The email address does not look valid.';
+        if ($mobile === '' && $email === '') $errors[] = 'Provide a mobile number and/or an official email for future validation.';
 
         if (empty($errors)) {
-            $sigPath = obSaveSignature((int) $ob->id, 'coa', $signature);
-            if ($sigPath === null) {
-                $errors[] = 'Could not save the signature. Please sign again.';
-            } else {
-                $now = date(DATETIME_FORMAT);
-                db()->update('ob_requests', [
-                    'coa_office' => $office,
-                    'coa_representative' => $rep,
-                    'coa_purpose' => $purpose !== '' ? $purpose : null,
-                    'coa_time_from' => substr($from, 0, 20),
-                    'coa_time_to' => substr($to, 0, 20),
-                    'coa_signature_path' => $sigPath,
-                    'coa_signed_at' => $now,
-                    'status' => 'coa_received',
-                    'updated_at' => $now,
-                ], 'id = ?', [$ob->id]);
-                // one-time use
-                obClearCoaToken((int) $ob->id);
-                obLog((int) $ob->id, 'client', 'coa_signed', null, 'Public link — ' . $rep);
-                obNotify((int) $ob->user_id, 'ob_coa_signed', 'OB Pass Slip Ready to Finalize',
-                    'The Certificate of Appearance for Pass Slip ' . $ob->pass_slip_no . ' was signed by ' . $rep
-                    . '. It is ready to finalize.',
+            $now = date(DATETIME_FORMAT);
+            db()->update('ob_requests', [
+                'coa_office' => $office,
+                'coa_representative' => $rep,
+                'coa_purpose' => $purpose !== '' ? $purpose : null,
+                'coa_time_from' => substr($from, 0, 20),
+                'coa_time_to' => substr($to, 0, 20),
+                'coa_acknowledged_at' => $now,
+                'coa_contact_mobile' => $mobileOk ? preg_replace('/[\s\-()]/', '', $mobile) : null,
+                'coa_contact_email' => $emailOk ? $email : null,
+                'status' => 'coa_received',
+                'updated_at' => $now,
+            ], 'id = ?', [$ob->id]);
+            // one-time use
+            obClearCoaToken((int) $ob->id);
+            obLog((int) $ob->id, 'client', 'coa_acknowledged', null,
+                'Public link — ' . $rep . '; IP ' . ($_SERVER['REMOTE_ADDR'] ?? '-')
+                . '; ' . ($_SERVER['HTTP_USER_AGENT'] ?? 'unknown agent'));
+            obNotify((int) $ob->user_id, 'ob_coa_signed', 'OB Pass Slip Ready to Finalize',
+                'The Certificate of Appearance for Pass Slip ' . $ob->pass_slip_no . ' was acknowledged by ' . $rep
+                . '. It is ready to finalize.',
+                '/?page=ob-requests&action=view&id=' . $ob->id);
+            // Supervisor is a watcher, not a gatekeeper (Plan #36 decision 3)
+            if (!empty($ob->supervisor_user_id)) {
+                obNotify((int) $ob->supervisor_user_id, 'ob_coa_signed', 'OB CoA Acknowledged',
+                    'Pass Slip ' . $ob->pass_slip_no . ' was acknowledged by ' . $rep . ' (' . $office . ').',
                     '/?page=ob-requests&action=view&id=' . $ob->id);
-                auditLog('ob_coa_signed', 'ob_request', (int) $ob->id, null, ['mode' => 'public-token']);
-                $done = true;
             }
+            auditLog('ob_coa_acknowledged', 'ob_request', (int) $ob->id, null, ['mode' => 'public-token', 'rep' => $rep]);
+            $done = true;
         }
     }
 }

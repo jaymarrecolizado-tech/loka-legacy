@@ -39,6 +39,7 @@
 | #33 | OB Apply form — sectioned steps UX | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
 | #34 | Gas Voucher UI — Plan #33 styling / fill uniformity | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
 | #35 | Telegram + Viber notifications (phased) | DONE Phase A+B (2026-09-29; branch `vberandtelegramnotif`, localhost QA — NOT deployed; tokens pending) |
+| #36 | OB Pass Slip workflow revision (button approvals, CoA acknowledgment + QR) | DONE (2026-10-01; branch `ob-slip-revision`, localhost QA — staging only) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -2931,4 +2932,72 @@ WhatsApp; replacing SMS; rewriting `MAIL_TEMPLATES`; changing Plan #32 email the
 ## Status
 
 **DONE Phase A+B (2026-09-29) — implemented + QA'd on localhost (`old_loka_db`, migration 055 applied), NOT deployed; on branch `vberandtelegramnotif`.** Files: `migrations/055_channel_notifications.php` (new), `config/channels.php` (new), `includes/channels.php` (new), `classes/ChannelQueue.php` / `TelegramGateway.php` / `ViberGateway.php` (new), `cron/process_channel_queue.php` (new), `pages/channels/webhook.php` (new), `pages/security/telegram.php` / `viber.php` / `channel_page.php` (new), `pages/profile/index.php`, `pages/users/create.php` / `edit.php`, `pages/cron/index.php`, `includes/functions.php` / `sidebar.php`, `classes/Database.php` (table allowlist), `index.php` + `config/bootstrap.php` (requires + routes), `_deploy_tmp/verify_plan35.php` (QA harness), `Plan.md`. Deploy checklist per env: run migration 055, then store the bot tokens in System Control (Telegram first), set the Telegram webhook with the secret, and add the channel cron (`process_channel_queue.php` every 2 min, or HTTP cron `?page=cron&action=channels&key=SECRET`).
+
+---
+
+# LOKA Plan #36: OB Pass Slip workflow revision — ✅ DONE (2026-10-01, branch `ob-slip-revision`, localhost QA — staging only)
+
+## Why
+
+Fraud and friction review of the Pass Slip + CoA flow: (1) supervisor/motorpool
+e-signatures add ceremony without adding trust (logged-in identity + audit log
+already prove who clicked); (2) guard departure demanded a signature that
+blocked the gate flow; (3) the client CoA signature can be self-signed by the
+agent — the signature proves nothing about the visit.
+
+## Locked decisions (2026-10-01, with owner)
+
+1. **Supervisor and Motorpool Head: buttons only, no signatures.** Both get
+   Approve / Revise (→ `revision`, comments required) / Cancel (terminal
+   `cancelled`, comments required, requester notified). Motorpool Reject is
+   retired. Employee filing signature stays (requester's own attestation).
+   Old slips keep rendering saved signature images (columns retained).
+2. **Guard: Depart + Arrive buttons, no canvases.** Logged-in guard identity +
+   timestamp recorded (`departure_guard_id` / `arrival_guard_id`); both shown
+   on view and print pages. Already-stamped idempotency kept.
+3. **CoA: client acknowledgment + contact replaces the signature.** One-time
+   token link stays; the kiosk form becomes a proof-of-service notice
+   tick-box + representative name/office/purpose/times + **mobile and/or
+   official email for future validation** (format-validated, ≥1 required).
+   Submit records timestamp/IP/user-agent, burns the token, sets
+   `coa_received`, notifies the requester. Supervisor is notified (watcher,
+   not gatekeeper). No OTP/SMS machinery.
+4. **QR per CoA.** HMAC-signed `?page=verify-coa&id=&hash=` QR on print + view
+   (same `TCPDF2DBarcode` pattern as gas vouchers); new public
+   `pages/public/verify-coa.php` shows limited fields with masked contact.
+5. **Spot-check habit (recommended):** recent-CoA-contacts list on the OB index
+   so Motorpool/admin can call 3–5 numbers monthly. No code beyond the list.
+
+## Flow after revision
+
+`pending_supervisor` → (supervisor Approve) → `pending_motorpool` (official
+only; private skips to `approved`) → (motorpool Approve) → `approved` →
+(guard Depart) → `departed` → (guard Arrive) → (client link: notice tick +
+contact) → `coa_received` + QR → (requester Finalize) → `completed`.
+Revise loops to requester resubmit; Cancel is terminal from either approver.
+
+## Data
+
+Migration `057_ob_coa_acknowledgment.php`: add `coa_acknowledged_at`,
+`coa_contact_mobile`, `coa_contact_email`. Old `coa_*_signature/token`
+columns kept (history), stop being written. `finalize` gate requires
+acknowledgment + contact instead of `coa_signature_path`.
+
+## Status
+
+**DONE (2026-10-01) — implemented + QA'd on localhost, on branch `ob-slip-revision` (from `vberandtelegramnotif`). Staging only; no prod until asked.**
+
+Implemented per the locked decisions:
+
+1. **Supervisor/Motorpool: buttons only.** `process.php` approvals drop `obResolveStaffSignature()` and stop writing `supervisor_signature_path` / `motorpool_signature_path` (columns retained; old slips keep rendering saved images — view.php marks the card "legacy slips" and print.php still embeds old images). **Reject is retired**: `process.php` has no `reject` case; approvers get Approve / Return-for-Revision (comments required) / terminal **Cancel** (approver cancel added: comments required, requester notified with the reason; requester cancel unchanged). view.php: direct Approve buttons with confirm, combined Revise/Cancel modal, no canvas/`ob-signature.js`.
+2. **Guard: Depart + Arrive buttons, no canvases.** `obStampGuardDeparture()` / `obApplyGuardDepartureStamp()` simplified to time + `departure_guard_id` (no signature resolution — also unblocks the vehicle-dispatch path: `guard/actions.php` no longer resolves/pre-blocks on a guard signature; the saved-e-sign branch in `guard/partials/ob_section.php` is gone — plain Depart/Arrive buttons everywhere). Idempotency (already-stamped skip) kept; guard id + timestamps shown on view + print.
+3. **CoA: acknowledgment + contact replaces the signature.** Kiosk (`coa-sign.php` + partial) = proof-of-service notice tick-box (required) + representative/office/purpose/times + **mobile and/or official email** (PH mobile regex / `FILTER_VALIDATE_EMAIL`, ≥1 required). Submit records `coa_acknowledged_at`, burns the token, sets `coa_received`, writes IP + user-agent into the `ob_approvals` timeline row (`coa_acknowledged`), notifies requester (`ob_coa_signed`) **and supervisor (watcher)**. Legacy `coa_signature_path`/`coa_signed_at`/token columns kept, never written.
+4. **QR per CoA.** `obCoaVerifyHash/HashValid/VerifyUrl` (HMAC `APP_KEY`, same pattern as gas vouchers) + QR (TCPDF2DBarcode PNG/SVG) on view.php CoA card and print.php CoA block (absolutely positioned bottom-left — no flow-height change on the fixed 284 mm sheet). Public `pages/public/verify-coa.php` (`?page=verify-coa&id=&hash=`, added to `$publicPages`) shows pass slip/date/personnel/office/rep/times/status with the contact **masked** (••••last4 / ab•••@domain) and no details on hash failure.
+5. **Spot-check habit** — "Recent CoA contacts — spot-check" card on the OB index (Motorpool/Admin only): latest 10 acknowledged slips with click-to-call mobile + mailto email + acknowledged date.
+
+Flow after revision (verified end-to-end): `pending_supervisor` → supervisor Approve → `pending_motorpool` (private skips to `approved`) → motorpool Approve → `approved` → guard Depart → `departed` → guard Arrive → client acknowledgment → `coa_received` (+ QR) → requester Finalize → `completed`. Revise loops to requester resubmit; Cancel terminal from either approver.
+
+**Files:** `migrations/057_ob_coa_acknowledgment.php` (new; run locally), `includes/ob_requests.php` (verify helpers + `obCoaReceived`/`obCoaAcknowledgedAt`), `includes/ob_guard_bind.php`, `pages/ob-requests/process.php` / `view.php` / `print.php` / `coa-sign.php` / `index.php` / `partials/coa_kiosk.php`, `pages/guard/actions.php` / `partials/ob_section.php`, `pages/public/verify-coa.php` (new), `index.php` (router + public page), `_deploy_tmp/verify_plan36.php` (QA harness), `Plan.md`.
+
+**QA (2026-10-01, `_deploy_tmp/verify_plan36.php` — 13-step lifecycle chain, 37 checks, all green; marker OBs `36T%` cleaned, DB verified pristine):** official happy path (buttons leave signature columns NULL at every step; guard id + times recorded; kiosk HTTP POST → `coa_received` + contacts + burned token + valid QR hash + requester AND supervisor notified; finalize → completed), finalize gate blocked pre-acknowledgment, private skip, revise → resubmit loop, approver cancel with requester notification, verify-coa good/bad hash + contact masking. Render checks: view.php shows Verify QR + contacts + legacy-sig note with no canvas; print.php embeds the QR PNG + acknowledgment hint. `php -l` clean on all touched files.
 

@@ -159,7 +159,7 @@ if (
 // evaluations + ob-requests: only the token-gated actions are public; the
 // case handlers re-gate everything else behind requireAuth().
 // channels: messenger webhooks (Plan #35) — the endpoint validates secrets itself.
-$publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'verify-ticket', 'cron', 'evaluations', 'ob-requests', 'channels'];
+$publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'verify-ticket', 'verify-coa', 'cron', 'evaluations', 'ob-requests', 'channels'];
 
 // Route handling
 if (!in_array($page, $publicPages)) {
@@ -209,6 +209,11 @@ switch ($page) {
 
     case 'verify-ticket':
         require_once PAGES_PATH . '/public/verify-ticket.php';
+        break;
+
+    case 'verify-coa':
+        // Plan #36 — public Certificate of Appearance QR verification
+        require_once PAGES_PATH . '/public/verify-coa.php';
         break;
 
     case 'cron':

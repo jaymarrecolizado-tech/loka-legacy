@@ -17,6 +17,9 @@ $pageTitle = 'OB Pass Slips';
 
 $isGuardQueue = isGuard() && !isAdmin();
 $showStampBoard = $isGuardQueue || isAdmin();
+// Plan #36 decision 5: recent CoA contacts for the monthly Motorpool/admin
+// spot-check calls (3–5 numbers).
+$showSpotCheck = !$isGuardQueue && (isMotorpool() || isAdmin());
 
 if (!$isGuardQueue) {
     $statusFilter = (string) get('status', '');
@@ -47,6 +50,21 @@ if (!$isGuardQueue) {
     $printedByOb = obPrintedLinesForIds(array_map(static fn($s) => (int) $s->id, $slips));
 }
 
+$spotCheckSlips = [];
+if ($showSpotCheck) {
+    $spotCheckSlips = db()->fetchAll(
+        "SELECT o.id, o.pass_slip_no, o.ob_date, o.coa_office, o.coa_representative,
+                o.coa_contact_mobile, o.coa_contact_email, o.coa_acknowledged_at, o.coa_signed_at,
+                u.name AS employee_name
+         FROM ob_requests o
+         JOIN users u ON o.user_id = u.id
+         WHERE o.deleted_at IS NULL
+           AND (o.coa_acknowledged_at IS NOT NULL OR o.coa_signed_at IS NOT NULL)
+         ORDER BY COALESCE(o.coa_acknowledged_at, o.coa_signed_at) DESC
+         LIMIT 10"
+    );
+}
+
 require_once INCLUDES_PATH . '/header.php';
 ?>
 
@@ -73,6 +91,54 @@ require_once INCLUDES_PATH . '/header.php';
 
     <?php if ($showStampBoard): ?>
     <?php require PAGES_PATH . '/guard/partials/ob_section.php'; // gate stamp queue (Plans #22 + #27) ?>
+    <?php endif; ?>
+
+    <?php if ($showSpotCheck && !empty($spotCheckSlips)): ?>
+    <!-- Recent CoA contacts — monthly spot-check list (Plan #36 decision 5) -->
+    <div class="card mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <strong><i class="bi bi-telephone-outbound me-2"></i>Recent CoA contacts — spot-check</strong>
+            <span class="badge bg-secondary">latest <?= count($spotCheckSlips) ?></span>
+        </div>
+        <div class="card-body py-2">
+            <p class="text-muted small mb-2">Call 3–5 of these numbers monthly to validate the Certificates of Appearance.</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light"><tr>
+                        <th>Pass Slip</th><th>Employee</th><th>Office / Representative</th><th>Contact</th><th>Acknowledged</th>
+                    </tr></thead>
+                    <tbody>
+                    <?php foreach ($spotCheckSlips as $sc): ?>
+                        <?php $scAt = $sc->coa_acknowledged_at ?: $sc->coa_signed_at; ?>
+                        <tr>
+                            <td class="text-nowrap">
+                                <a href="<?= APP_URL ?>/?page=ob-requests&action=view&id=<?= (int) $sc->id ?>" class="fw-semibold"><?= e($sc->pass_slip_no) ?></a>
+                                <div class="small text-muted"><?= e(date('M j, Y', strtotime($sc->ob_date))) ?></div>
+                            </td>
+                            <td><?= e($sc->employee_name) ?></td>
+                            <td>
+                                <?= e($sc->coa_office ?: '—') ?>
+                                <div class="small text-muted"><?= e($sc->coa_representative ?: '') ?></div>
+                            </td>
+                            <td class="small">
+                                <?php if ($sc->coa_contact_mobile): ?>
+                                <a href="tel:<?= e($sc->coa_contact_mobile) ?>" class="d-block"><i class="bi bi-phone me-1"></i><?= e($sc->coa_contact_mobile) ?></a>
+                                <?php endif; ?>
+                                <?php if ($sc->coa_contact_email): ?>
+                                <a href="mailto:<?= e($sc->coa_contact_email) ?>" class="d-block"><i class="bi bi-envelope me-1"></i><?= e($sc->coa_contact_email) ?></a>
+                                <?php endif; ?>
+                                <?php if (!$sc->coa_contact_mobile && !$sc->coa_contact_email): ?>
+                                <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="small text-nowrap"><?= $scAt ? e(date('M j, Y', strtotime($scAt))) : '—' ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
     <?php endif; ?>
 
     <?php if (!$isGuardQueue): ?>

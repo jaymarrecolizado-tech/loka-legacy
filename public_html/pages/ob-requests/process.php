@@ -1,8 +1,10 @@
 <?php
 /**
- * LOKA - OB Pass Slip actions (Plan #22)
- * Single POST handler for approve/reject/revision/cancel, guard departure and
- * arrival stamps, finalize and the delayed vehicle-request bind.
+ * LOKA - OB Pass Slip actions (Plans #22 + #36)
+ * Single POST handler. Plan #36 revision: supervisor/motorpool approvals are
+ * buttons (logged-in identity + audit log — no canvases); Reject is retired
+ * (Revise + terminal Cancel replace it); guard depart/arrive record identity +
+ * time only; finalize is gated on the client CoA acknowledgment.
  * Route: POST ?page=ob-requests&action=process
  */
 
@@ -19,7 +21,6 @@ requireCsrf();
 $obId = (int) post('ob_id', 0);
 $action = (string) post('action', '');
 $comments = trim((string) post('comments', ''));
-$signature = (string) post('signature', '');
 
 $ob = obFind($obId);
 if (!$ob) {
@@ -43,16 +44,10 @@ switch ($action) {
         if ((int) $ob->supervisor_user_id !== (int) userId() || $ob->status !== 'pending_supervisor') {
             redirectWith($link, 'danger', 'You cannot approve this slip right now.');
         }
-        $res = obResolveStaffSignature((int) $ob->id, 'supervisor', (int) userId(), $signature, post('save_esign') === '1');
-        if ($res['error'] !== null) {
-            redirectWith($link, 'danger', $res['error']);
-        }
-        $sigPath = $res['path'];
         // Private vehicles skip Motorpool entirely: supervisor approval completes the flow
         $official = obUsesOfficialVehicle($ob);
         db()->update('ob_requests', [
             'status' => $official ? 'pending_motorpool' : 'approved',
-            'supervisor_signature_path' => $sigPath,
             'updated_at' => $now,
         ], 'id = ?', [$ob->id]);
         obLog($ob->id, 'supervisor', 'approved', userId(), $comments ?: null);
@@ -82,14 +77,8 @@ switch ($action) {
         if (!isMotorpool() || $ob->status !== 'pending_motorpool') {
             redirectWith($link, 'danger', 'You cannot approve this slip right now.');
         }
-        $res = obResolveStaffSignature((int) $ob->id, 'motorpool', (int) userId(), $signature, post('save_esign') === '1');
-        if ($res['error'] !== null) {
-            redirectWith($link, 'danger', $res['error']);
-        }
-        $sigPath = $res['path'];
         db()->update('ob_requests', [
             'status' => 'approved',
-            'motorpool_signature_path' => $sigPath,
             'updated_at' => $now,
         ], 'id = ?', [$ob->id]);
         obLog($ob->id, 'motorpool', 'approved', userId(), $comments ?: null);
@@ -106,24 +95,23 @@ switch ($action) {
     }
 
     // ------------------------------------------------------------------
-    case 'reject':
     case 'revision':
     {
+        // Either approver may return the slip for revision (Reject is retired — #36)
         $isSupervisor = (int) $ob->supervisor_user_id === (int) userId() && $ob->status === 'pending_supervisor';
         $isMotorpoolStage = isMotorpool() && $ob->status === 'pending_motorpool';
         if (!$isSupervisor && !$isMotorpoolStage) {
             redirectWith($link, 'danger', 'You cannot act on this slip right now.');
         }
         if ($comments === '') {
-            redirectWith($link, 'danger', 'Comments are required when rejecting or returning for revision.');
+            redirectWith($link, 'danger', 'Comments are required when returning a slip for revision.');
         }
-        $newStatus = $action === 'reject' ? 'rejected' : 'revision';
-        db()->update('ob_requests', ['status' => $newStatus, 'updated_at' => $now], 'id = ?', [$ob->id]);
-        obLog($ob->id, $isSupervisor ? 'supervisor' : 'motorpool', $action, userId(), $comments);
-        obNotify((int) $ob->user_id, $newStatus === 'rejected' ? 'ob_rejected' : 'ob_revision',
-            $newStatus === 'rejected' ? 'OB Pass Slip Rejected' : 'OB Pass Slip Sent Back for Revision',
+        db()->update('ob_requests', ['status' => 'revision', 'updated_at' => $now], 'id = ?', [$ob->id]);
+        obLog($ob->id, $isSupervisor ? 'supervisor' : 'motorpool', 'revision', userId(), $comments);
+        obNotify((int) $ob->user_id, 'ob_revision',
+            'OB Pass Slip Sent Back for Revision',
             'Pass Slip ' . $ob->pass_slip_no . ': ' . $comments, $link);
-        $finish($newStatus === 'rejected' ? 'warning' : 'info', $newStatus === 'rejected' ? 'Slip rejected.' : 'Slip returned for revision.');
+        $finish('info', 'Slip returned for revision.');
     }
 
     // ------------------------------------------------------------------
@@ -142,29 +130,47 @@ switch ($action) {
     // ------------------------------------------------------------------
     case 'cancel':
     {
-        if ((int) $ob->user_id !== (int) userId() || !in_array($ob->status, ['pending_supervisor', 'pending_motorpool', 'approved', 'revision'], true)) {
+        // Terminal cancel: the requester, or the approver currently holding
+        // the slip (Plan #36 decision 1 — comments required, requester told).
+        $isOwner = (int) $ob->user_id === (int) userId();
+        $isSupStage = (int) $ob->supervisor_user_id === (int) userId() && $ob->status === 'pending_supervisor';
+        $isMpStage = isMotorpool() && $ob->status === 'pending_motorpool';
+        $ownerCancellable = $isOwner && in_array($ob->status, ['pending_supervisor', 'pending_motorpool', 'approved', 'revision'], true);
+        if (!$ownerCancellable && !$isSupStage && !$isMpStage) {
             redirectWith($link, 'danger', 'You cannot cancel this slip right now.');
         }
-        db()->update('ob_requests', ['status' => 'cancelled', 'updated_at' => $now], 'id = ?', [$ob->id]);
-        obLog($ob->id, 'requester', 'cancelled', userId(), $comments ?: null);
-        obNotify((int) $ob->supervisor_user_id, 'ob_cancelled', 'OB Pass Slip Cancelled',
-            'Pass Slip ' . $ob->pass_slip_no . ' was cancelled by the requester.', $link);
-        if ($ob->motorpool_head_id) {
-            obNotify((int) $ob->motorpool_head_id, 'ob_cancelled', 'OB Pass Slip Cancelled',
-                'Pass Slip ' . $ob->pass_slip_no . ' was cancelled by the requester.', $link);
+        if (!$isOwner && $comments === '') {
+            redirectWith($link, 'danger', 'Comments are required when cancelling a slip.');
         }
-        $finish('warning', 'Slip cancelled.');
+
+        db()->update('ob_requests', ['status' => 'cancelled', 'updated_at' => $now], 'id = ?', [$ob->id]);
+        obLog($ob->id, $isOwner ? 'requester' : ($isSupStage ? 'supervisor' : 'motorpool'), 'cancelled', userId(), $comments ?: null);
+
+        if ($isOwner) {
+            obNotify((int) $ob->supervisor_user_id, 'ob_cancelled', 'OB Pass Slip Cancelled',
+                'Pass Slip ' . $ob->pass_slip_no . ' was cancelled by the requester.', $link);
+            if ($ob->motorpool_head_id) {
+                obNotify((int) $ob->motorpool_head_id, 'ob_cancelled', 'OB Pass Slip Cancelled',
+                    'Pass Slip ' . $ob->pass_slip_no . ' was cancelled by the requester.', $link);
+            }
+            $finish('warning', 'Slip cancelled.');
+        }
+
+        obNotify((int) $ob->user_id, 'ob_cancelled', 'OB Pass Slip Cancelled',
+            'Pass Slip ' . $ob->pass_slip_no . ' was cancelled by ' . ($isSupStage ? 'your immediate supervisor' : 'the Motorpool Head')
+            . ($comments !== '' ? '. Reason: ' . $comments : '.'), $link);
+        $finish('warning', 'Slip cancelled — the requester has been notified.');
     }
 
     // ------------------------------------------------------------------
     case 'guard_departure':
     {
         if (!canAccessGuardDashboard()) {
-            redirectWith($link, 'danger', 'Only guards can stamp departures.');
+            redirectWith($link, 'danger', 'Only guards can record departures.');
         }
-        $stamp = obStampGuardDeparture($ob, $now, (int) userId(), $signature, post('save_esign') === '1', true);
+        $stamp = obStampGuardDeparture($ob, $now, (int) userId());
         if (!$stamp['ok']) {
-            redirectWith($link, 'danger', $stamp['error'] ?? 'Departure could not be stamped.');
+            redirectWith($link, 'danger', $stamp['error'] ?? 'Departure could not be recorded.');
         }
         $finish('success', $stamp['skipped'] ? 'Departure was already recorded — nothing changed.' : 'Departure recorded.');
     }
@@ -190,7 +196,7 @@ switch ($action) {
         }
         $raw = obCreateCoaToken((int) $ob->id);
         auditLog('ob_coa_token_issued', 'ob_request', (int) $ob->id, null, null);
-        redirectWith($link . '&token=' . urlencode($raw), 'success', 'Client signing link generated below.');
+        redirectWith($link . '&token=' . urlencode($raw), 'success', 'Client link generated below.');
     }
 
     // ------------------------------------------------------------------
@@ -199,8 +205,10 @@ switch ($action) {
         if ((int) $ob->user_id !== (int) userId() || !in_array($ob->status, ['approved', 'departed', 'coa_received'], true)) {
             redirectWith($link, 'danger', 'Only the requester can finalize, after approval.');
         }
-        if ($ob->coa_signature_path === null || $ob->coa_signature_path === '') {
-            redirectWith($link, 'danger', 'The Certificate of Appearance must be signed before finalizing.');
+        // Plan #36: the client acknowledgment (+ contact, enforced at the
+        // kiosk) is the gate; legacy signed slips keep finalizing.
+        if (!obCoaReceived($ob)) {
+            redirectWith($link, 'danger', 'The Certificate of Appearance acknowledgment is required before finalizing.');
         }
         if (empty($ob->ob_departure_datetime) || empty($ob->ob_arrival_datetime)) {
             // warn-but-allow is surfaced in the UI; log it for the record

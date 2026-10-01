@@ -45,6 +45,48 @@ $sigSrc = static function (?string $rel): ?string {
     return APP_URL . '/?page=file-view&file=' . rawurlencode($rel);
 };
 
+// Plan #36 — CoA acknowledgment + verification QR (only once acknowledged)
+$coaAckAt = obCoaAcknowledgedAt($ob);
+$coaAck = obCoaReceived($ob);
+$coaVerifyUrl = $coaAck ? obCoaVerifyUrl($ob) : null;
+$coaQrHtml = '';
+if ($coaAck) {
+    require_once BASE_PATH . '/vendor/tecnickcom/tcpdf/tcpdf_barcodes_2d.php';
+    $obQrBarcode = new TCPDF2DBarcode($coaVerifyUrl, 'QRCODE,M');
+    $obQrPng = function_exists('imagecreate') ? $obQrBarcode->getBarcodePngData(5, 5, [0, 0, 0]) : false;
+    if (is_string($obQrPng) && $obQrPng !== '' && function_exists('imagecreatefromstring')) {
+        $obQrSrc = @imagecreatefromstring($obQrPng);
+        if ($obQrSrc !== false) {
+            $sw = imagesx($obQrSrc);
+            $sh = imagesy($obQrSrc);
+            $pad = (int) max(10, round(min($sw, $sh) * 0.12));
+            $flat = imagecreatetruecolor($sw, $sh);
+            imagefilledrectangle($flat, 0, 0, $sw, $sh, imagecolorallocate($flat, 255, 255, 255));
+            imagecopy($flat, $obQrSrc, 0, 0, 0, 0, $sw, $sh);
+            imagedestroy($obQrSrc);
+            $dst = imagecreatetruecolor($sw + ($pad * 2), $sh + ($pad * 2));
+            imagefilledrectangle($dst, 0, 0, imagesx($dst), imagesy($dst), imagecolorallocate($dst, 255, 255, 255));
+            imagecopy($dst, $flat, $pad, $pad, 0, 0, $sw, $sh);
+            imagedestroy($flat);
+            ob_start();
+            imagepng($dst);
+            $obQrData = ob_get_clean();
+            imagedestroy($dst);
+            $coaQrHtml = '<img class="coa-qr" alt="Verify CoA" width="64" height="64" src="data:image/png;base64,'
+                . base64_encode($obQrData) . '">';
+        }
+    }
+    if ($coaQrHtml === '') {
+        $obQrSvg = $obQrBarcode->getBarcodeSVGcode(3, 3, 'black');
+        $obQrSvg = preg_replace('/<\?xml[^>]*\?>\s*/i', '', $obQrSvg);
+        $obQrSvg = preg_replace('/<!DOCTYPE[^>]*>\s*/i', '', $obQrSvg);
+        if (preg_match('/<svg[^>]+width="([\d.]+)"[^>]+height="([\d.]+)"/i', $obQrSvg, $obQrDims)) {
+            $obQrSvg = preg_replace('/<svg([^>]+)>/i', '<svg$1 viewBox="0 0 ' . $obQrDims[1] . ' ' . $obQrDims[2] . '">', $obQrSvg, 1);
+        }
+        $coaQrHtml = '<div class="coa-qr" style="width:58px;">' . $obQrSvg . '</div>';
+    }
+}
+
 $clock = static function (?string $raw): string {
     $raw = trim((string) $raw);
     if ($raw === '') {
@@ -270,7 +312,7 @@ $logoBp = APP_URL . '/assets/img/bp_logo.png';
         <div class="sig-col">
             <div class="sig-pad"><?php if ($sigs['guard']): ?><img src="<?= e($sigs['guard']) ?>" alt="Guard signature"><?php endif; ?></div>
             <div class="sig-name"><?= e($ob->departure_guard_name ?: '') ?></div>
-            <div class="sig-hint">Guard on Duty (signature / initial)</div>
+            <div class="sig-hint">Guard on Duty</div>
         </div>
         <div class="sig-col right">
             <div class="guard-row" style="justify-content:flex-end;"><span class="lbl">Time of Departure:</span><?= e($depTime) ?></div>
@@ -278,7 +320,7 @@ $logoBp = APP_URL . '/assets/img/bp_logo.png';
         </div>
     </div>
 
-    <div class="coa">
+    <div class="coa" style="position:relative;">
         <div class="coa-note">(Official Business: Please Accomplish the following)</div>
         <div class="coa-title">CERTIFICATE OF APPEARANCE</div>
         <div class="coa-body">
@@ -286,11 +328,17 @@ $logoBp = APP_URL . '/assets/img/bp_logo.png';
             <p style="margin-top:4px;"><?= e($coaLine) ?></p>
             <p class="coa-times">From <?= e($coaFrom) ?> to <?= e($coaTo) ?>.</p>
         </div>
+        <?php if ($coaAck): ?>
+        <div style="position:absolute; left:4px; bottom:3px; text-align:left;">
+            <?= $coaQrHtml ?>
+            <div class="sig-hint" style="margin-top:1px; max-width:120px;">Scan to verify<?= $coaAckAt ? ' · ' . e(date('M j g:ia', strtotime($coaAckAt))) : '' ?></div>
+        </div>
+        <?php endif; ?>
         <div class="sig-row" style="justify-content:flex-end;">
             <div class="sig-col right">
                 <div class="sig-pad"><?php if ($sigs['coa']): ?><img src="<?= e($sigs['coa']) ?>" alt="Certificate of Appearance signature"><?php endif; ?></div>
                 <div class="sig-name"><?= e($ob->coa_representative ?: '') ?></div>
-                <div class="sig-hint">(Representative name and signature)</div>
+                <div class="sig-hint">(Representative name<?= $sigs['coa'] ? ' and signature' : ' · acknowledged via one-time link' ?>)</div>
             </div>
         </div>
     </div>
