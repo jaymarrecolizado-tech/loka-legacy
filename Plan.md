@@ -39,8 +39,8 @@
 | #33 | OB Apply form — sectioned steps UX | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
 | #34 | Gas Voucher UI — Plan #33 styling / fill uniformity | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
 | #35 | Telegram + Viber notifications (phased) | DONE Phase A+B (2026-09-29; branch `vberandtelegramnotif`, localhost QA — NOT deployed; tokens pending) |
-| #36 | OB Pass Slip workflow revision (button approvals, CoA acknowledgment + QR) | DONE (2026-10-01; branch `ob-slip-revision`, localhost QA — staging only) |
-| #37 | OB approval badge for Immediate Supervisor | DONE (2026-10-01; branch `ob-slip-revision`, localhost QA) |
+| #36 | OB Pass Slip workflow revision (button approvals, CoA acknowledgment + QR) | DONE (2026-10-01; branch `ob-slip-revision`, localhost QA + staging deploy — no prod) |
+| #37 | OB approval badge for Immediate Supervisor | DONE (2026-10-01; badge + kiosk checkbox fix, localhost lint + staging deploy — no prod) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -3002,7 +3002,7 @@ Flow after revision (verified end-to-end): `pending_supervisor` → supervisor A
 
 **QA (2026-10-01, `_deploy_tmp/verify_plan36.php` — 13-step lifecycle chain, 37 checks, all green; marker OBs `36T%` cleaned, DB verified pristine):** official happy path (buttons leave signature columns NULL at every step; guard id + times recorded; kiosk HTTP POST → `coa_received` + contacts + burned token + valid QR hash + requester AND supervisor notified; finalize → completed), finalize gate blocked pre-acknowledgment, private skip, revise → resubmit loop, approver cancel with requester notification, verify-coa good/bad hash + contact masking. Render checks: view.php shows Verify QR + contacts + legacy-sig note with no canvas; print.php embeds the QR PNG + acknowledgment hint. `php -l` clean on all touched files.
 
-# LOKA Plan #37: OB approval badge for Immediate Supervisor — ✅ DONE (2026-10-01, branch `ob-slip-revision`, localhost QA)
+# LOKA Plan #37: OB approval badge for Immediate Supervisor — ✅ DONE (2026-10-01, branch `ob-slip-revision`, localhost QA + staging deploy — no prod)
 
 **Problem:** the OB Pass Slips sidebar badge only counts guard stamps
 (`badgeCountObGuardStamps()`, gated by `canAccessGuardDashboard()`), so an
