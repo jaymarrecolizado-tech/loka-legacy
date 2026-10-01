@@ -47,6 +47,10 @@
                     <?= sidebarBadgeHtml($pendingObStamps) ?>
                     <?php endif; ?>
                     <?php endif; ?>
+                    <?php $pendingObApprovals = badgeCountObApprovals(); // Plan #37 — supervisor/motorpool approvals ?>
+                    <?php if ($pendingObApprovals > 0): ?>
+                    <?= sidebarBadgeHtml($pendingObApprovals) ?>
+                    <?php endif; ?>
                 </a>
             </li>
 

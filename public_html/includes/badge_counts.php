@@ -209,6 +209,46 @@ function badgePendingIdsObGuard(): array
     return [];
 }
 
+function badgeCountObApprovals(): int
+{
+    return badgeUnseenCount('ob_approvals', badgePendingIdsObApprovals());
+}
+
+/**
+ * OB slips awaiting MY approval (Plan #37): the named Immediate Supervisor
+ * counts pending_supervisor slips addressed to them; Motorpool/Admin add all
+ * pending_motorpool slips (any motorpool head may approve per process.php,
+ * so no head-ID filter). Self-gating — a user who supervises nobody counts 0.
+ *
+ * @return list<int>
+ */
+function badgePendingIdsObApprovals(): array
+{
+    try {
+        if (!isLoggedIn()) {
+            return [];
+        }
+        $ids = badgeFetchIds(
+            "SELECT id FROM ob_requests
+             WHERE deleted_at IS NULL
+               AND status = 'pending_supervisor'
+               AND supervisor_user_id = ?",
+            [userId()]
+        );
+        if (isMotorpool() || isAdmin()) {
+            $mpIds = badgeFetchIds(
+                "SELECT id FROM ob_requests
+                 WHERE deleted_at IS NULL AND status = 'pending_motorpool'"
+            );
+            $ids = array_values(array_unique(array_merge($ids, $mpIds)));
+        }
+        return $ids;
+    } catch (Throwable $e) {
+        error_log('badgePendingIdsObApprovals: ' . $e->getMessage());
+    }
+    return [];
+}
+
 /** @return list<int> */
 function badgePendingIdsRequestsRevision(): array
 {
@@ -363,11 +403,17 @@ function badgeMarkSeenForCurrentPage(string $page, string $action = 'index'): vo
         'trip-tickets' => ['trip_tickets', badgePendingIdsTripTickets()],
         'maintenance' => $action === 'schedule' ? null : ['maintenance', badgePendingIdsMaintenance()],
         'guard' => ['guard', badgePendingIdsGuard()],
-        'ob-requests' => ['ob_guard_stamps', badgePendingIdsObGuard()],
         'requests' => ['requests_revision', badgePendingIdsRequestsRevision()],
         'vehicles' => ['vehicles', badgePendingIdsVehiclesAttention()],
         'security' => ['security_lockouts', badgePendingIdsSecurityLockouts()],
     ];
+
+    // OB Pass Slips clear BOTH sidebar badges (guard stamps + approvals, Plan #37)
+    if ($page === 'ob-requests') {
+        badgeMarkSeen('ob_guard_stamps', badgePendingIdsObGuard());
+        badgeMarkSeen('ob_approvals', badgePendingIdsObApprovals());
+        return;
+    }
 
     if (!isset($map[$page]) || $map[$page] === null) {
         return;

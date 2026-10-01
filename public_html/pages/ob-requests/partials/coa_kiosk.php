@@ -136,8 +136,8 @@ $h = static fn($v): string => htmlspecialchars((string) $v, ENT_QUOTES);
                 </div>
 
                 <div class="coa-field">
-                    <div class="form-check border rounded p-3 bg-white">
-                        <input class="form-check-input fs-5" type="checkbox" value="1" id="coaAcknowledge" name="coa_acknowledge" required>
+                    <div class="d-flex align-items-start gap-2 border rounded p-3 bg-white">
+                        <input class="form-check-input flex-shrink-0 mt-1" type="checkbox" value="1" id="coaAcknowledge" name="coa_acknowledge" required>
                         <label class="form-check-label small" for="coaAcknowledge">
                             <strong>Proof of service.</strong> I confirm that the DICT Regional Office II personnel named above
                             appeared at our office on the date and times stated, and I am authorized to acknowledge their visit.

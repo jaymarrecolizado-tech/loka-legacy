@@ -40,6 +40,7 @@
 | #34 | Gas Voucher UI — Plan #33 styling / fill uniformity | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
 | #35 | Telegram + Viber notifications (phased) | DONE Phase A+B (2026-09-29; branch `vberandtelegramnotif`, localhost QA — NOT deployed; tokens pending) |
 | #36 | OB Pass Slip workflow revision (button approvals, CoA acknowledgment + QR) | DONE (2026-10-01; branch `ob-slip-revision`, localhost QA — staging only) |
+| #37 | OB approval badge for Immediate Supervisor | DONE (2026-10-01; branch `ob-slip-revision`, localhost QA) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -3000,4 +3001,37 @@ Flow after revision (verified end-to-end): `pending_supervisor` → supervisor A
 **Files:** `migrations/057_ob_coa_acknowledgment.php` (new; run locally), `includes/ob_requests.php` (verify helpers + `obCoaReceived`/`obCoaAcknowledgedAt`), `includes/ob_guard_bind.php`, `pages/ob-requests/process.php` / `view.php` / `print.php` / `coa-sign.php` / `index.php` / `partials/coa_kiosk.php`, `pages/guard/actions.php` / `partials/ob_section.php`, `pages/public/verify-coa.php` (new), `index.php` (router + public page), `_deploy_tmp/verify_plan36.php` (QA harness), `Plan.md`.
 
 **QA (2026-10-01, `_deploy_tmp/verify_plan36.php` — 13-step lifecycle chain, 37 checks, all green; marker OBs `36T%` cleaned, DB verified pristine):** official happy path (buttons leave signature columns NULL at every step; guard id + times recorded; kiosk HTTP POST → `coa_received` + contacts + burned token + valid QR hash + requester AND supervisor notified; finalize → completed), finalize gate blocked pre-acknowledgment, private skip, revise → resubmit loop, approver cancel with requester notification, verify-coa good/bad hash + contact masking. Render checks: view.php shows Verify QR + contacts + legacy-sig note with no canvas; print.php embeds the QR PNG + acknowledgment hint. `php -l` clean on all touched files.
+
+# LOKA Plan #37: OB approval badge for Immediate Supervisor — ✅ DONE (2026-10-01, branch `ob-slip-revision`, localhost QA)
+
+**Problem:** the OB Pass Slips sidebar badge only counts guard stamps
+(`badgeCountObGuardStamps()`, gated by `canAccessGuardDashboard()`), so an
+Immediate Supervisor sees no count even with slips awaiting approval. Header
+bell is fine (`obNotify()` rows are created); only the sidebar count is blind.
+
+**Fix — ✅ DONE (2026-10-01; rides branch `ob-slip-revision`):**
+- `includes/badge_counts.php`: new `badgePendingIdsObApprovals()` (supervisor's
+  `pending_supervisor` slips by `supervisor_user_id`; motorpool/admin add all
+  `pending_motorpool` — any motorpool head may approve per `process.php`, so
+  no head-ID filter; self-gating — a user who supervises nobody counts 0) +
+  `badgeCountObApprovals()` via `badgeUnseenCount`, and
+  `badgeMarkSeenForCurrentPage('ob-requests')` now marks **both** keys
+  (`ob_guard_stamps` + `ob_approvals`) via a dedicated branch.
+- `includes/sidebar.php`: the OB Pass Slips entry shows the approvals badge
+  (for supervisors/motorpool/admin) alongside the existing guard-stamp badge.
+- **CoA kiosk checkbox layout** (`pages/ob-requests/partials/coa_kiosk.php`,
+  utilities only, no new CSS): the proof-of-service tick-box is now a flex row
+  (`d-flex align-items-start gap-2` on the bordered box, `flex-shrink-0 mt-1`
+  on the input, plain label) so it stays top-aligned inside its border — the
+  old `form-check` float + `fs-5` let the box hang half-outside the padding.
+  Server-side `coa_acknowledge` enforcement already covers the `novalidate`
+  form; no JS needed.
+
+**QA — verified 2026-10-01 (`_deploy_tmp/verify_plan37.php` badge walk, 15 checks, all green; marker OB `37T01` + test ack rows cleaned, DB verified pristine):**
+- [x] File a slip → supervisor badge counts 1 (pending ids contain it); unrelated employee 0; motorpool 0 pre-approval.
+- [x] Open OB index (`badgeMarkSeenForCurrentPage('ob-requests')`) → supervisor badge clears, ack row stores the seen id.
+- [x] Supervisor approves → slip `pending_motorpool`, supervisor badge 0, **motorpool badge 1**; motorpool's own visit clears it.
+- [x] Sidebar render: badge HTML "1" appears on the OB Pass Slips entry for the supervisor.
+- [x] Kiosk render: flex checkbox markup present, old float markup + `fs-5` gone.
+- [x] `php -l` clean on all three touched files.
 
