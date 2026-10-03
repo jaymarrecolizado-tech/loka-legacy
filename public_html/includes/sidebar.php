@@ -300,17 +300,27 @@
                 </a>
             </li>
 
-            <!-- Request Rollback (admin only) -->
+            <!-- Workflow Rollback (admin only, Plan #39: Trips | OB | Gas) -->
             <?php
-            $rollbackEligible = db()->fetchColumn(
+            $rollbackEligible = (int) db()->fetchColumn(
                 "SELECT COUNT(*) FROM requests
                  WHERE deleted_at IS NULL AND status IN ('pending_motorpool','approved','completed','revision','rejected')"
+            );
+            $rollbackEligible += (int) db()->fetchColumn(
+                "SELECT COUNT(*) FROM ob_requests
+                 WHERE deleted_at IS NULL
+                   AND status IN ('pending_motorpool','approved','departed','coa_received')"
+            );
+            $rollbackEligible += (int) db()->fetchColumn(
+                "SELECT COUNT(*) FROM gas_vouchers
+                 WHERE deleted_at IS NULL
+                   AND status IN ('pending_review','pending_budget','pending_approval')"
             );
             ?>
             <li class="nav-item">
                 <a class="nav-link <?= activeMenu('rollback') ?>" href="<?= APP_URL ?>/?page=rollback">
                     <i class="bi bi-arrow-counterclockwise"></i>
-                    <span>Request Rollback</span>
+                    <span>Workflow Rollback</span>
                     <?php if ($rollbackEligible > 0): ?>
                     <span class="badge bg-secondary ms-auto"><?= $rollbackEligible > 99 ? '99+' : $rollbackEligible ?></span>
                     <?php endif; ?>

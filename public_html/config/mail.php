@@ -330,6 +330,20 @@ define('MAIL_TEMPLATES', [
         'template' => 'The payment status of a gas voucher has been updated.'
     ],
 
+    // Workflow rollback (Plan #39)
+    'request_rolled_back' => [
+        'subject' => 'Request Rolled Back',
+        'template' => 'A vehicle request was rolled back to an earlier workflow stage by an administrator.'
+    ],
+    'ob_rolled_back' => [
+        'subject' => 'OB Pass Slip Rolled Back',
+        'template' => 'An Official Business Pass Slip was rolled back to an earlier workflow stage by an administrator.'
+    ],
+    'gas_voucher_rolled_back' => [
+        'subject' => 'Gas Voucher Rolled Back',
+        'template' => 'A gas voucher was rolled back to an earlier workflow stage by an administrator.'
+    ],
+
     // Repair tickets (Plan #38 — report filed, scheduled, reminder ladder)
     'maintenance_reported' => [
         'subject' => 'New Repair Report',

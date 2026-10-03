@@ -77,6 +77,18 @@ require_once INCLUDES_PATH . '/header.php';
                 <i class="bi bi-printer me-1"></i>Print / PDF
             </a>
             <?php endif; ?>
+            <?php
+            // Plan #39 — admin workflow rollback, only when an earlier stage exists.
+            if (isAdmin()) {
+                require_once INCLUDES_PATH . '/rollback.php';
+                $obTargets = rollbackObTargets($ob);
+                if ($obTargets !== []): ?>
+                    <a href="<?= APP_URL ?>/?page=ob-requests&action=rollback&id=<?= (int) $ob->id ?>"
+                       class="btn btn-outline-warning" title="Roll this slip back to an earlier workflow stage">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Rollback (<?= count($obTargets) ?> stage<?= count($obTargets) > 1 ? 's' : '' ?>)
+                    </a>
+                <?php endif;
+            } ?>
             <a href="<?= APP_URL ?>/?page=ob-requests" class="btn btn-outline-secondary">Back</a>
         </div>
     </div>

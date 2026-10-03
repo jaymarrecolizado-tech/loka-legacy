@@ -165,12 +165,23 @@ require_once INCLUDES_PATH . '/header.php';
                 <?php endif; ?>
             <?php endif; ?>
 
-            <?php if (isAdmin() && in_array($request->status, [STATUS_PENDING_MOTORPOOL, STATUS_APPROVED, STATUS_COMPLETED, STATUS_REVISION, STATUS_REJECTED])): ?>
-                <a href="<?= APP_URL ?>/?page=rollback&action=process&id=<?= $requestId ?>"
-                   class="btn btn-outline-warning" title="Roll this request back to an earlier workflow phase">
-                    <i class="bi bi-arrow-counterclockwise me-1"></i>Rollback
-                </a>
-            <?php endif; ?>
+            <?php
+            // Plan #39 — show the count of earlier workflow stages, and hide the
+            // button entirely when there is nowhere to roll back to.
+            if (isAdmin()) {
+                require_once INCLUDES_PATH . '/rollback.php';
+                $tripRollbackTargets = rollbackTripTargets($request);
+                if ($tripRollbackTargets !== []):
+                    ?>
+                    <a href="<?= APP_URL ?>/?page=rollback&action=process&id=<?= $requestId ?>"
+                       class="btn btn-outline-warning"
+                       title="Roll back to an earlier workflow stage (<?= count($tripRollbackTargets) ?> available)">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Rollback
+                        (<?= count($tripRollbackTargets) ?>)
+                    </a>
+                <?php endif;
+            }
+            ?>
 
             <?php
             // Manage Passengers - any Motorpool Head / Admin / All Father can add/remove

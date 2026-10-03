@@ -70,6 +70,19 @@ require_once INCLUDES_PATH . '/header.php';
                 </a>
                 <?php endif; ?>
                 <?php
+                // Plan #39 — admin workflow rollback, only when an earlier stage exists.
+                if (isAdmin()) {
+                    require_once INCLUDES_PATH . '/rollback.php';
+                    $gasTargets = rollbackGasTargets($voucher);
+                    if ($gasTargets !== []): ?>
+                        <a href="<?= APP_URL ?>/?page=gas-vouchers&action=rollback&id=<?= $voucher->id ?>"
+                           class="btn btn-outline-warning" title="Roll this voucher back to an earlier workflow stage">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>Rollback (<?= count($gasTargets) ?> stage<?= count($gasTargets) > 1 ? 's' : '' ?>)
+                        </a>
+                    <?php endif;
+                }
+                ?>
+                <?php
                 $canEditView = false;
                 if ($voucher->status === 'draft' && ($voucher->requested_by_user_id == userId() || isAdmin())) {
                     $canEditView = true;

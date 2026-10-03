@@ -472,8 +472,10 @@ switch ($page) {
     case 'rollback':
         requireRole(ROLE_ADMIN);
         if ($action === 'process') {
+            require_once INCLUDES_PATH . '/rollback.php';
             require_once PAGES_PATH . '/requests/rollback.php';
         } else {
+            require_once INCLUDES_PATH . '/rollback.php';
             require_once PAGES_PATH . '/rollback/index.php';
         }
         break;
@@ -520,7 +522,10 @@ switch ($page) {
 
     case 'gas-vouchers':
         denyGuardAccess();
-        if ($action === 'create') {
+        if ($action === 'rollback') {
+            // Plan #39 — admin gas voucher workflow rollback (page enforces ROLE_ADMIN)
+            require_once PAGES_PATH . '/gas-vouchers/rollback.php';
+        } elseif ($action === 'create') {
             require_once PAGES_PATH . '/gas-vouchers/create.php';
         } elseif ($action === 'view') {
             require_once PAGES_PATH . '/gas-vouchers/view.php';
@@ -590,7 +595,11 @@ switch ($page) {
         break;
 
     case 'ob-requests':
-        if ($action === 'coa-sign') {
+        if ($action === 'rollback') {
+            // Plan #39 — admin OB workflow rollback (page enforces ROLE_ADMIN)
+            requireAuth();
+            require_once PAGES_PATH . '/ob-requests/rollback.php';
+        } elseif ($action === 'coa-sign') {
             // Public Certificate of Appearance (one-time token, no login)
             require_once PAGES_PATH . '/ob-requests/coa-sign.php';
         } else {
