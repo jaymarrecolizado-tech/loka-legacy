@@ -42,7 +42,7 @@
     require_once INCLUDES_PATH . '/nav_search.php';
     $navItems = getNavSearchItems();
     ?>
-    <script>window.LOKA_NAV_ITEMS = <?= json_encode($navItems, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>; window.LOKA_USER_ID = <?= (int) userId() ?>; window.LOKA_APP_URL = "<?= e(rtrim(APP_URL,'/')) ?>"; window.LOKA_ASSETS_VER = "<?= e(APP_VERSION) ?>";</script>
+    <script>window.LOKA_NAV_ITEMS = <?= json_encode($navItems, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>; window.LOKA_USER_ID = <?= (int) userId() ?>; window.LOKA_APP_URL = "<?= e(rtrim(APP_URL,'/')) ?>"; window.LOKA_ASSETS_VER = "<?= e(APP_VERSION) ?>"; window.LOKA_CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;</script>
 </head>
 <body>
     <!-- Top Navigation -->

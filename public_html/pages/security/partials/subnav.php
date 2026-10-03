@@ -12,6 +12,7 @@ $secNavItems = [
     'sms' => ['bi-phone', 'SMS'],
     'email' => ['bi-envelope', 'Email'],
     'telegram' => ['bi-telegram', 'Telegram'],
+    'ai-assistant' => ['bi-stars', 'AI Assistant'],
 ];
 ?>
 <ul class="nav nav-tabs mb-4">

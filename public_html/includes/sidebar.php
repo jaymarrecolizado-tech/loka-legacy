@@ -405,6 +405,15 @@
                 </a>
             </li>
 
+            <!-- AI Assistant (Plan #40, experimental) -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'security' && get('action') === 'ai-assistant') ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=security&action=ai-assistant">
+                    <i class="bi bi-stars"></i>
+                    <span>AI Assistant</span>
+                </a>
+            </li>
+
             <!-- Email -->
             <li class="nav-item">
                 <a class="nav-link <?= (get('page') === 'security' && get('action') === 'email') ? 'active' : '' ?>"

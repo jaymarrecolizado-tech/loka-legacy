@@ -507,6 +507,9 @@ switch ($page) {
             require_once PAGES_PATH . '/security/email.php';
         } elseif ($action === 'telegram') {
             require_once PAGES_PATH . '/security/telegram.php';
+        } elseif ($action === 'ai-assistant') {
+            // Plan #40 — page itself enforces real All Father
+            require_once PAGES_PATH . '/security/ai-assistant.php';
         } elseif ($action === 'odometer') {
             require_once INCLUDES_PATH . '/odometer.php';
             require_once PAGES_PATH . '/security/odometer.php';
@@ -662,7 +665,10 @@ switch ($page) {
 
     case 'api':
         $action = get('action');
-        if ($action === 'global_search') {
+        if ($action === 'ai_chat') {
+            // Plan #40 — AI assistant chat endpoint (session + CSRF enforced inside)
+            require_once PAGES_PATH . '/api/ai-chat.php';
+        } elseif ($action === 'global_search') {
             require_once PAGES_PATH . '/api/global_search.php';
         } elseif ($action === 'check_conflict') {
             require_once PAGES_PATH . '/api/check_conflict.php';

@@ -38,6 +38,46 @@
         <div class="p-2 text-center"><button class="btn btn-sm btn-link text-muted" onclick="localStorage.removeItem('loka_nav_recent_'+window.LOKA_USER_ID); localStorage.removeItem('loka_nav_frequent_'+window.LOKA_USER_ID); location.reload();">Clear history</button></div>
     </div>
 
+    <!-- AI assistant chat panel (Plan #40, experimental) — only when ready -->
+    <?php
+    if (isLoggedIn() && function_exists('aiAssistantStatus')
+        && !isViewingAs()
+        && (function_exists('aiAssistantStatus') ? aiAssistantStatus()['ready'] : false)) {
+        require_once INCLUDES_PATH . '/ai_assistant.php';
+        ?>
+        <button id="lokaAiBubble" type="button" aria-label="Open the AI assistant"
+                class="btn btn-primary rounded-circle shadow d-flex align-items-center justify-content-center p-0"
+                style="position:fixed;right:1.25rem;bottom:1.25rem;width:3.25rem;height:3.25rem;z-index:1040;">
+            <i class="bi bi-stars fs-5"></i>
+        </button>
+
+        <div id="lokaAiPanel" class="card shadow d-none"
+             style="position:fixed;right:1.25rem;bottom:1.25rem;width:min(24rem,calc(100vw - 2rem));z-index:1041;">
+            <div class="card-header d-flex align-items-center py-2">
+                <i class="bi bi-stars me-2"></i>
+                <strong class="small">LOKA assistant</strong>
+                <small class="text-muted ms-2" id="lokaAiStatus"></small>
+                <button id="lokaAiClose" type="button" class="btn-close ms-auto" aria-label="Close the assistant"></button>
+            </div>
+            <div id="lokaAiLog" class="p-2 overflow-auto" style="height:min(24rem,55vh);"></div>
+            <div class="card-footer p-2">
+                <div class="input-group input-group-sm">
+                    <input type="text" id="lokaAiInput" class="form-control" maxlength="2000"
+                           placeholder="Ask about a trip, approval, pass slip, voucher or care…"
+                           aria-label="Message the LOKA assistant">
+                    <button id="lokaAiSend" type="button" class="btn btn-primary"><i class="bi bi-send"></i></button>
+                </div>
+                <small class="text-muted d-block mt-1">Anything that changes data asks for confirmation first.</small>
+            </div>
+        </div>
+
+        <script>
+        window.LOKA_AI_MAX_PROMPT = <?= (int) aiAssistantMaxPromptChars() ?>;
+        window.LOKA_AI_GREETING = <?= json_encode('Ask about your trips, approvals, pass slips, gas vouchers or vehicle care.') ?>;
+        </script>
+        <script src="<?= ASSETS_PATH ?>/js/ai-chat.js?v=<?= e(APP_VERSION) ?>&t=<?= time() ?>"></script>
+    <?php } ?>
+
     <!-- Custom JS -->
     <script src="<?= ASSETS_PATH ?>/js/app.js?v=<?= e(APP_VERSION) ?>&t=<?= time() ?>"></script>
     <script src="<?= ASSETS_PATH ?>/js/nav-search.js?v=<?= e(APP_VERSION) ?>&t=<?= time() ?>"></script>
