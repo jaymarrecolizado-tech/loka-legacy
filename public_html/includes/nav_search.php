@@ -115,7 +115,7 @@ function getNavSearchItems(): array
     }
     if (isAdmin()) {
         $add('Audit Logs', '/?page=audit', 'bi-journal-text', 'Administration', 'audit logs history');
-        $add('Request Rollback', '/?page=rollback', 'bi-arrow-counterclockwise', 'Administration', 'request rollback admin revert');
+        $add('Workflow Rollback', '/?page=rollback', 'bi-arrow-counterclockwise', 'Administration', 'rollback revert admin stage trip ob gas voucher');
         $add('Settings', '/?page=settings', 'bi-gear', 'Administration', 'settings booking rules travel order confirmations');
     }
 
