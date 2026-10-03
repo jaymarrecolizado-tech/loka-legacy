@@ -110,9 +110,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 db()->update('maintenance_requests', $updateData, 'id = ?', [$maintenanceId]);
-                
+
                 auditLog('maintenance_updated', 'maintenance_request', $maintenanceId, ['status' => $maintenance->status], $updateData);
-                
+
+                // Plan #38 — completed repair tickets write a repair-history entry
+                // (no-op while the experimental flag is off, or if the ticket is
+                // re-opened and completed again: the auto-write skips existing rows).
+                if ($newStatus === MAINTENANCE_STATUS_COMPLETED) {
+                    require_once INCLUDES_PATH . '/repair_history.php';
+                    $items = repairHistoryNormalizeItems(repairHistoryItemsFromPost())[0];
+                    $completed = db()->fetch(
+                        "SELECT * FROM maintenance_requests WHERE id = ?",
+                        [$maintenanceId]
+                    );
+                    $entryId = repairHistoryUpsertFromMaintenance($completed, $items);
+                    if ($entryId) {
+                        auditLog('repair_history_auto_written', 'vehicle_repair_entry', $entryId, null, [
+                            'source' => 'maintenance',
+                            'maintenance_request_id' => $maintenanceId,
+                        ]);
+                    }
+                }
+
                 db()->commit();
                 
                 redirectWith('/?page=maintenance&action=view&id=' . $maintenanceId, 'success', 'Maintenance request updated successfully.');
@@ -175,6 +194,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'priority' => $priority,
                     'title' => $title
                 ]);
+
+                // Plan #38 decision 7 — the reporter is told when Motorpool books
+                // the repair in (a scheduled_date appears on a still-open ticket).
+                if ($scheduledDate !== '' && empty($maintenance->scheduled_date)) {
+                    try {
+                        @notify(
+                            (int) $maintenance->reported_by,
+                            'maintenance_scheduled',
+                            'Repair Scheduled',
+                            "Your repair request #{$maintenanceId} (\"{$title}\") is scheduled for "
+                            . formatDate($scheduledDate) . '.',
+                            '/?page=maintenance&action=view&id=' . $maintenanceId
+                        );
+                    } catch (Throwable $e) {
+                        error_log('maintenance schedule notify: ' . $e->getMessage());
+                    }
+                }
                 
                 redirectWith('/?page=maintenance&action=view&id=' . $maintenanceId, 'success', 'Maintenance request updated successfully.');
                 
@@ -264,7 +300,26 @@ require_once INCLUDES_PATH . '/header.php';
                                           placeholder="Notes about the repair or resolution..."><?= e($maintenance->resolution_notes ?? '') ?></textarea>
                             </div>
                         </div>
-                        
+
+                        <?php
+                        // Plan #38 — shared line-item editor, only while the
+                        // experimental Repair History feature is on.
+                        require_once INCLUDES_PATH . '/repair_history.php';
+                        if (repairHistoryEnabled()):
+                            $items = [];
+                            $errors = [];
+                        ?>
+                        <hr class="my-3">
+                        <p class="small text-muted mb-2">
+                            <i class="bi bi-tools me-1"></i>
+                            Completing with the Repair History feature on records these lines
+                            against <strong><?= e($maintenance->title) ?></strong> and rolls their
+                            total up into <em>Actual Cost</em>. Leave empty to record a single
+                            line from Actual Cost.
+                        </p>
+                        <?php require PAGES_PATH . '/repair-history/partials/items_editor.php'; ?>
+                        <?php endif; ?>
+
                         <button type="submit" class="btn btn-primary mt-3">
                             <i class="bi bi-check-lg me-1"></i>Update Status
                         </button>

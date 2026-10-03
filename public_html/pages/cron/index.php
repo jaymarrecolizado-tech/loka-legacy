@@ -62,6 +62,24 @@ try {
         exit;
     }
 
+    if ($action === 'maintenance') {
+        // Plan #38 — repair ticket reminders (same ladder as care)
+        if (!is_file(BASE_PATH . '/cron/process_maintenance_reminders.php')) {
+            http_response_code(500);
+            echo "process_maintenance_reminders.php unavailable\n";
+            exit;
+        }
+        require_once BASE_PATH . '/cron/process_maintenance_reminders.php';
+        if (!function_exists('processMaintenanceReminders')) {
+            http_response_code(500);
+            echo "processMaintenanceReminders() unavailable\n";
+            exit;
+        }
+        $r = processMaintenanceReminders();
+        echo date('c') . " MAINTENANCE ok sent={$r['sent']} skipped={$r['skipped']}\n";
+        exit;
+    }
+
     if ($action === 'care') {
         if (!is_file(BASE_PATH . '/cron/process_care_reminders.php')) {
             http_response_code(500);

@@ -50,7 +50,9 @@ class Database
         'ob_request_participants',
         'user_channel_bindings',
         'channel_link_tokens',
-        'channel_logs'
+        'channel_logs',
+        'vehicle_repair_entries',
+        'vehicle_repair_items'
     ];
 
     private function __construct()

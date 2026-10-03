@@ -186,6 +186,19 @@ else
     echo -e "${YELLOW}  Also available as HTTP fallback: /?page=cron&action=trips&key=SECRET (secured by cron_secret)${NC}"
 fi
 
+# Vehicle care + repair ticket reminders (Plan #38 — 7d/1d/due/daily-overdue ladder)
+for SCRIPT in process_care_reminders process_maintenance_reminders; do
+    CRON_V="$WEB_ROOT/cron/${SCRIPT}.php"
+    CRON_V_JOB="*/2 * * * * $PHP_BIN $CRON_V >> $LOG_DIR/cron.log 2>&1"
+    if crontab -l 2>/dev/null | grep -q "${SCRIPT}.php"; then
+        echo -e "${YELLOW}✓ ${SCRIPT} cron already exists${NC}"
+    else
+        (crontab -l 2>/dev/null; echo "$CRON_V_JOB") | crontab -
+        echo -e "${GREEN}✓ Cron job added: $CRON_V_JOB${NC}"
+    fi
+done
+echo -e "${YELLOW}  HTTP fallbacks: /?page=cron&action=care|maintenance&key=SECRET (secured by cron_secret)${NC}"
+
 # Keep cron.log from growing unbounded (keep 14 days, compress old)
 if [ ! -f /etc/logrotate.d/loka-cron ] && [ -w /etc/logrotate.d ] 2>/dev/null; then
     cat > /etc/logrotate.d/loka-cron <<EOF

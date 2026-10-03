@@ -454,6 +454,21 @@ switch ($page) {
         require_once PAGES_PATH . '/audit/index.php';
         break;
 
+    case 'repair-history':
+        // Plan #38 (experimental). index/toggle/import are All Father; the data
+        // routes also enforce their own feature-flag + role gates.
+        if ($action === 'import') {
+            require_once INCLUDES_PATH . '/repair_history_import.php';
+            require_once PAGES_PATH . '/repair-history/import.php';
+        } elseif ($action === 'create' || $action === 'edit' || $action === 'delete' || $action === 'view' || $action === 'print') {
+            require_once INCLUDES_PATH . '/repair_history.php';
+            require_once PAGES_PATH . '/repair-history/' . $action . '.php';
+        } else {
+            require_once INCLUDES_PATH . '/repair_history.php';
+            require_once PAGES_PATH . '/repair-history/index.php';
+        }
+        break;
+
     case 'rollback':
         requireRole(ROLE_ADMIN);
         if ($action === 'process') {

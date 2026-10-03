@@ -26,4 +26,7 @@ REM 2 min is harmless (only queued rows with scheduled_send_at <= NOW are sent).
 REM Care reminders (daily cadence inside: 7d/1d/due/overdue — safe to run every 2 min)
 "%PHP_BIN%" "%WEB_ROOT%\cron\process_care_reminders.php" >> "%LOG_FILE%" 2>&1
 
+REM Repair ticket reminders (Plan #38 — same 7d/1d/due/daily-overdue ladder)
+"%PHP_BIN%" "%WEB_ROOT%\cron\process_maintenance_reminders.php" >> "%LOG_FILE%" 2>&1
+
 echo [%date% %time%] run-crons finished >> "%LOG_FILE%"

@@ -41,6 +41,10 @@
 | #35 | Telegram + Viber notifications (phased) | DONE Phase A+B (2026-09-29; branch `vberandtelegramnotif`, localhost QA — NOT deployed; tokens pending) |
 | #36 | OB Pass Slip workflow revision (button approvals, CoA acknowledgment + QR) | DONE (2026-10-01; branch `ob-slip-revision`, localhost QA + staging deploy — no prod) |
 | #37 | OB approval badge for Immediate Supervisor | DONE (2026-10-01; badge + kiosk checkbox fix, localhost lint + staging deploy — no prod) |
+| #38 | Vehicle Repair History + costing + escalated maintenance alerts (experimental) | PLANNED (2026-10-03; not built) |
+| #39 | Rollback shows full workflow stages (Trips + OB + Gas) | PLANNED (2026-10-03; not built) |
+| #40 | AI assistant chatbot (experimental, role-scoped actions) | PLANNED (2026-10-03; not built) |
+| #41 | Driver-phone GPS trip tracking (experimental) | PLANNED (2026-10-03; decisions locked — not built) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -3034,4 +3038,212 @@ bell is fine (`obNotify()` rows are created); only the sidebar count is blind.
 - [x] Sidebar render: badge HTML "1" appears on the OB Pass Slips entry for the supervisor.
 - [x] Kiosk render: flex checkbox markup present, old float markup + `fs-5` gone.
 - [x] `php -l` clean on all three touched files.
+
+# LOKA Plan #38: Vehicle Repair History + costing + escalated maintenance alerts — PLANNED (2026-10-03)
+
+**Status:** PLANNED — not implemented. Staging/local only when built; **no prod deploy** until asked.
+**Reference layout:** `Reference/Repair History/` (e.g. CBI8522 workbook).
+
+## Excel shape (locked from CBI8522 sample)
+
+- Header: Agency, Province, Type, Brand/Model, Engine No, Plate Number
+- Rows: **Date** | **Nature of Repair** | purchased items (**Description** / **Unit** / **Quantity** / **Price**)
+- Labor is a normal line item (e.g. Description=`Labor`, Unit=`lot`), not a separate column
+- One workbook per plate; multiple dated events; multiple item rows under one date/nature
+- Pre/post-inspection Request 4 sheets → **out of scope** for #38
+
+## Locked decisions
+
+1. **Experimental flag:** `settings.repair_history_enabled` (`0`/`1`, default **`0` off**). All Father toggles on the Repair History hub (System Control). When off: data routes blocked, auto-write from complete skipped, import disabled. Care/repair **reminder cron** stays independent of this flag.
+2. **All Father nav:** System Control → **Repair History** always visible to `canAccessSystemControl()`; hub shows Enable when off. Motorpool never sees the AF nav; they only get history links from maintenance/vehicle when the feature is on.
+3. **Manual entry (required):** create / edit / soft-delete history events + line items **per vehicle**, `source=manual`, no ticket required.
+4. **Auto history:** completed repair tickets + completed care with costing write entries (`source=maintenance` / `care`) when feature is on.
+5. **Costing:** `vehicle_repair_entries` + `vehicle_repair_items`; roll-up sets linked `maintenance_requests.actual_cost`. Keep existing `estimated_cost` / `actual_cost`.
+6. **Import:** one-time CLI/AF importer for `Reference/Repair History/**/*.xlsx` by plate → `source=import` (feature on).
+7. **Notifications (escalate locked):**
+   - **Normal** (7d / 1d): assigned care drivers + Motorpool (+ Approver).
+   - **Aggressive** (due day + overdue): same **plus** Admin, All Father, CAF, OIC CAF; stronger copy; overdue **daily with no 7-day cap**.
+8. Same reminder ladder for **repair tickets** with `scheduled_date` (today they notify nothing).
+9. Optional `vehicles.engine_number`.
+10. Branch / staging only until asked for prod.
+
+## Data (migration `058`)
+
+- `vehicles.engine_number` VARCHAR(64) NULL
+- `vehicle_repair_entries`: `vehicle_id`, `repair_date`, `nature_of_repair`, `maintenance_request_id` NULL, `care_schedule_id` NULL, `source` ENUM(`maintenance`,`care`,`import`,`manual`), `created_by`, timestamps, `deleted_at`
+- `vehicle_repair_items`: `entry_id`, `description`, `unit`, `quantity`, `unit_price` NULL, `sort_order`
+- Reminder stamps on `maintenance_requests`: `reminded_7d_at`, `reminded_1d_at`, `reminded_due_at`, `reminded_overdue_on`
+- Settings row `repair_history_enabled` (category `experimental`)
+- Register tables in `classes/Database.php`
+
+## UI / routes
+
+- `/?page=repair-history` actions: `index|view|create|edit|delete|print|import|toggle`
+- Hub: vehicle list + search + Enable/Disable + Import
+- Per-vehicle view/print matching Excel header + item grid + Motorpool cert footer
+- Shared line-item editor on repair/care complete when feature on
+- Helpers: `includes/repair_history.php` (`repairHistoryEnabled`, CRUD, upserts from maintenance/care)
+
+## Notifications work
+
+- Extend `notifyCareStakeholders(..., $tier = 'normal'|'escalate')` in `includes/vehicle_care.php`
+- Update `cron/process_care_reminders.php` (tiered audience; lift overdue 7-day cap)
+- New `cron/process_maintenance_reminders.php` + cron index wire-up
+- Notify on repair create / → scheduled (Motorpool + reporter) — independent of history flag
+
+## Out of scope
+
+- Pre/post-inspection Request 4 forms; inventory/stock module; changing care/repair status machines; prod deploy
+
+## Checklist (when implementing)
+
+- [ ] Migration 058 + settings seed + Database allowlist
+- [ ] `repair_history.php` gate + AF System Control nav + hub toggle
+- [ ] Manual create/edit/delete + history view/print
+- [ ] Maintenance/care complete auto-write when feature on
+- [ ] Care escalate + maintenance reminder cron
+- [ ] Reference xlsx importer
+- [ ] Local QA; staging only when asked
+
+---
+
+# LOKA Plan #39: Rollback shows full workflow stages — PLANNED (2026-10-03)
+
+**Status:** PLANNED — not implemented.
+**Problem:** Admin rollback in `pages/requests/rollback.php` labels targets as “phase” and often shows a thin/empty target set. Users need clear **workflow stages** (not vague phases), and OB / Gas have no rollback today.
+
+## Locked approach
+
+### A. Trip-request rollback (fix UI)
+
+Replace the “Roll back to phase” `<select>` with a **workflow stage picker** (visual stepper + radios):
+
+`Pending (Dept)` → `Pending Motorpool` → `Approved` → `Dispatched` → `Arrived` → `Completed`
+
+(side statuses `Revision` / `Rejected` as current-state only, with targets back into the main chain)
+
+**Expanded targets:**
+
+| Current | Allowed rollback targets |
+|---------|--------------------------|
+| `pending_motorpool` | `pending` |
+| `approved` (no dispatch) | `pending_motorpool`, `pending` |
+| `approved` (dispatched, not arrived) | **`approved` (clear dispatch)**, plus `pending_motorpool`, `pending` |
+| `approved` (arrived) | clear arrival/dispatch options + earlier approval stages |
+| `completed` | `approved`, `pending_motorpool`, `pending` (not only `approved`) |
+| `revision` / `rejected` | `pending`, `pending_motorpool` |
+
+Side effects stay explicit in the warning box (release vehicle/driver, void/cancel trip tickets, clear guard fields, reset `approval_workflow.step`, `approvals` row `status=rollback`, notify, `auditLog`). Always render radios; if none, clear message (no blank select). Hub shows **available stage count** per row.
+
+### B. OB Pass Slip rollback (new)
+
+Stages: `pending_supervisor` → `pending_motorpool` → `approved` → `departed` → `coa_received` → `completed`
+
+Targets = any **earlier** stage; clear depart/arrive/CoA fields as needed; reason ≥10 chars; audit + notify. Entry: OB view button + rollback hub tab.
+
+### C. Gas voucher rollback (new)
+
+Stages: `draft` → `pending_review` → `pending_budget` → `pending_approval` → `approved`
+
+Targets = earlier stages; clear approval stamps per stage; Admin/All Father only.
+
+### D. Shared helpers
+
+- `includes/rollback.php`: `rollbackTripTargets`, `rollbackObTargets`, `rollbackGasTargets`, stage labels, side-effect descriptors
+- Hub tabs: **Trips | OB | Gas**
+- Keep `requireRole(ROLE_ADMIN)` (All Father via admin level). No requester self-rollback.
+
+## Out of scope
+
+- Requester-initiated rollback; changing forward approval rules; prod deploy until asked
+
+## Checklist (when implementing)
+
+- [ ] `includes/rollback.php` stage matrices + labels
+- [ ] Trip rollback confirm UI (stage radios + expanded targets)
+- [ ] OB + Gas rollback handlers and view buttons
+- [ ] Rollback hub tabs Trips|OB|Gas
+- [ ] Local QA (completed → Dept/Motorpool selectable; OB departed → earlier; Gas pending_approval → earlier)
+
+---
+
+# LOKA Plan #40: AI assistant chatbot (experimental, role-scoped) — PLANNED (2026-10-03)
+
+**Status:** PLANNED — not implemented. Experimental; default **off**.
+
+## Goal
+
+Logged-in users get an in-app AI chatbot that can **propose and (after confirm) run only actions allowed at their effective access level**. The model never elevates privilege; PHP enforces authz on every tool call.
+
+## Locked decisions
+
+1. **Feature flag:** `settings.ai_assistant_enabled` default `0`. All Father System Control → **AI Assistant** hub (toggle + provider API key storage, same soft-fail pattern as Telegram tokens). View-as uses **effective** role for tools.
+2. **Architecture:** LLM **proposes** `{tool, args}` only. Server tool registry executes after CSRF session auth + role/capability check + optional confirm token. **No** free-form SQL, shell, file write, or raw PHP eval.
+3. **Tool registry** (`includes/ai_tools.php`): each tool declares `id`, description, JSON schema args, `minRole` / capability callback, `mutating` bool, `confirmRequired` bool. Examples (initial set — expand later):
+   - **Read (no confirm):** search my trips / OB / gas by id or plate; list my pending approvals queue; explain request status; “what’s due for care this week” (scoped).
+   - **Mutate (confirm required):** create draft trip/OB (requester+); approve/reject/revise **only if** current user may act on that record; schedule care (Motorpool+); never System Control writes except All Father tools explicitly listed.
+4. **Hardened security (non-negotiable):**
+   - Same-origin chat endpoint; session cookie + CSRF; rate limit per user (e.g. N prompts / hour) + lockout via existing rate-limit patterns
+   - Allowlist tools only; strip/ignore model-requested tools not in registry
+   - Re-check ownership/department/assignee **at execute time** (never trust model-supplied “user may approve X”)
+   - Mutating tools require a second “Confirm” UI step (or signed one-time confirm token TTL ≤ 2 min)
+   - Prompt injection defense: system prompt forbids ignoring auth; tool args sanitized; max token/input length; no secrets in prompts (API keys server-side only)
+   - Full `auditLog` for every tool proposal + execution (success/deny/fail); deny on View-as for dangerous AF-only tools unless real All Father
+   - Provider key in `settings` / env; never expose to browser; disable feature if key missing
+5. **UI:** floating chat panel (authenticated pages); shows proposed action card before mutate; errors are user-safe (no stack traces).
+6. **Out of scope v1:** training on private docs; autonomous multi-step agents without confirm; SMS/Telegram outbound composed by AI without template; rollback/System Control SMS toggles via chat.
+
+## Checklist (when implementing)
+
+- [ ] Migration/settings seed `ai_assistant_enabled` + AF System Control page
+- [ ] Tool registry + chat API endpoint + rate limits + audit
+- [ ] Chat UI with confirm gate for mutating tools
+- [ ] Role matrix QA (requester cannot approve; approver cannot AF settings; AF can only listed tools)
+- [ ] Staging only when asked
+
+---
+
+# LOKA Plan #41: Driver-phone GPS trip tracking (experimental) — PLANNED (2026-10-03)
+
+**Status:** PLANNED — decisions locked with user (2026-10-03). Not implemented. Staging/local only when built; **no prod deploy** until asked.
+
+## Intent
+
+Track active DICT fleet trips using the **driver’s phone** GPS so Motorpool / ops can see where a vehicle is during a dispatched trip.
+
+## Locked decisions
+
+1. **Experimental flag:** `settings.gps_tracking_enabled` (`0`/`1`, default **`0` off**). All Father System Control → **GPS Tracking** hub (Enable/Disable), same pattern as Plan #38 / #40.
+2. **Start / stop:** **Auto** — tracking window opens on guard **Dispatch**, closes on guard **Arrival** (or trip complete/cancel). No driver Start/Stop / pause in v1. Driver opens a **Trip Tracking** page after dispatch, grants location, and keeps the page/PWA open.
+3. **Client:** **Browser / installable PWA, foreground only** (Geolocation while app is open). No native app / true background tracking in v1. If the phone locks or the tab closes, map shows **last seen** timestamp/position. Native/background deferred until ops prove need.
+4. **Who sees the map:** Motorpool Head + Admin + All Father only. **Not** department Approver or requester in v1.
+5. **Cadence:** ping about every **45–60 seconds** while moving; back off when idle / accuracy poor to save battery and data.
+6. **History:** store breadcrumb trail per trip in `trip_gps_points`; retain **~30 days**, then purge (cron or soft retention job).
+7. **Consent:** first-use acknowledgment on the driver tracking page before sharing; if GPS denied or offline, queue last good points client-side briefly and surface “location unavailable” on ops map.
+8. **Privacy:** show **exact lat/lng** to Motorpool/Admin/AF only (ops need). No requester map.
+9. **Scope v1:** **DICT fleet vehicle trips only** (assigned driver on an approved/dispatched request). **Not** private-vehicle OB cars.
+
+## Building blocks
+
+- Driver page: `/?page=gps-tracking` (or similar) — only for the assigned driver of a currently dispatched trip; feature flag required
+- API: `/?page=api&action=gps_ping` — session auth + driver assignment + feature on; rate-limit pings
+- Table `trip_gps_points`: `request_id`, `driver_user_id`, `lat`, `lng`, `accuracy`, `recorded_at`, `received_at`
+- Ops UI: live marker + trail on Live Trip Board and/or request view (Motorpool+)
+- AF System Control nav item + toggle; register table in `classes/Database.php`
+
+## Out of scope (v1)
+
+- Native iOS/Android background tracking; phone MDM; hardware GPS trackers
+- Tracking private OB vehicles; requester/approver map access
+- Driver pause button; prod deploy until asked
+
+## Checklist (when implementing)
+
+- [ ] Migration + `gps_tracking_enabled` seed + Database allowlist
+- [ ] AF System Control GPS Tracking hub (toggle)
+- [ ] Driver Trip Tracking page (consent + geolocation loop)
+- [ ] `gps_ping` API with authz + rate limit
+- [ ] Motorpool/Admin/AF live map + last-seen
+- [ ] 30-day retention purge
+- [ ] Local QA; staging only when asked
 

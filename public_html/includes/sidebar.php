@@ -198,6 +198,24 @@
                     <span>Schedule</span>
                 </a>
             </li>
+            <?php
+            // Plan #38 — Motorpool/Admin reach Repair History from here (never from
+            // the All Father System Control block) and only while the feature is on.
+            $repairHistoryOn = false;
+            if (!isRealAllFather()) {
+                $rhFlag = db()->fetch("SELECT value FROM settings WHERE `key` = 'repair_history_enabled'");
+                $repairHistoryOn = ($rhFlag && (string) $rhFlag->value === '1');
+            }
+            ?>
+            <?php if ($repairHistoryOn && (isMotorpool() || isAdmin())): ?>
+            <li class="nav-item">
+                <a class="nav-link <?= activeMenu('repair-history') ?>" href="<?= APP_URL ?>/?page=repair-history">
+                    <i class="bi bi-tools"></i>
+                    <span>Repair History</span>
+                </a>
+            </li>
+            <?php endif; ?>
+
             <?php if (function_exists('canManageCareAssignments') && canManageCareAssignments()): ?>
             <!-- Care Assignments -->
             <li class="nav-item">
@@ -326,6 +344,14 @@
                    href="<?= APP_URL ?>/?page=settings&action=gas-workflow">
                     <i class="bi bi-cash-coin"></i>
                     <span>Gas Workflow</span>
+                </a>
+            </li>
+
+            <!-- Repair History (Plan #38, experimental) -->
+            <li class="nav-item">
+                <a class="nav-link <?= activeMenu('repair-history') ?>" href="<?= APP_URL ?>/?page=repair-history">
+                    <i class="bi bi-tools"></i>
+                    <span>Repair History</span>
                 </a>
             </li>
 

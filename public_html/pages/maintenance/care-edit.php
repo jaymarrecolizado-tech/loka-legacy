@@ -67,6 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($op === 'complete' && $canComplete && in_array($item->status, [CARE_STATUS_PENDING, CARE_STATUS_SCHEDULED], true)) {
         $mileage = post('completed_mileage') !== '' ? postInt('completed_mileage') : null;
+        require_once INCLUDES_PATH . '/repair_history.php';
+        $careCostItems = repairHistoryNormalizeItems(repairHistoryItemsFromPost())[0];
         db()->update('vehicle_care_schedules', [
             'status' => CARE_STATUS_COMPLETED,
             'completed_at' => date(DATETIME_FORMAT),
@@ -103,6 +105,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             "{$item->title} for {$item->plate_number} was marked completed.",
             '/?page=maintenance&action=schedule'
         );
+
+        // Plan #38 — completed care with costing writes a repair-history entry
+        // (skipped entirely while the experimental flag is off).
+        $completedCare = db()->fetch(
+            "SELECT * FROM vehicle_care_schedules WHERE id = ?",
+            [$id]
+        );
+        $careEntryId = repairHistoryUpsertFromCare($completedCare, $careCostItems);
+        if ($careEntryId) {
+            auditLog('repair_history_auto_written', 'vehicle_repair_entry', $careEntryId, null, [
+                'source' => 'care',
+                'care_schedule_id' => $id,
+            ]);
+        }
+
         auditLog('care_schedule_complete', 'vehicle_care_schedule', $id);
         redirectWith('/?page=maintenance&action=schedule', 'success', 'Marked completed.');
     }
@@ -203,14 +220,26 @@ require_once INCLUDES_PATH . '/header.php';
 
     <div class="d-flex flex-wrap gap-2">
         <?php if ($canComplete && in_array($item->status, [CARE_STATUS_PENDING, CARE_STATUS_SCHEDULED], true)): ?>
-            <form method="POST" class="d-flex flex-wrap gap-2 align-items-end">
+            <form method="POST" class="mb-4">
                 <?= csrfField() ?>
                 <input type="hidden" name="op" value="complete">
-                <div>
+                <div class="mb-3" style="max-width:18rem;">
                     <label class="form-label">Odometer (optional)</label>
                     <input type="number" name="completed_mileage" class="form-control" min="0"
                            value="<?= (int) ($item->mileage ?? 0) ?>">
                 </div>
+                <?php
+                // Plan #38 — costing lines, only while Repair History is on.
+                if (repairHistoryEnabled()):
+                    $items = [];
+                    $disabled = false;
+                ?>
+                <p class="small text-muted">
+                    <i class="bi bi-tools me-1"></i>
+                    Add costing below to record this care item in the vehicle Repair History.
+                </p>
+                <?php require PAGES_PATH . '/repair-history/partials/items_editor.php'; ?>
+                <?php endif; ?>
                 <button type="submit" class="btn btn-primary">Mark completed</button>
             </form>
         <?php endif; ?>

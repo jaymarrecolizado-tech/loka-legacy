@@ -330,6 +330,24 @@ define('MAIL_TEMPLATES', [
         'template' => 'The payment status of a gas voucher has been updated.'
     ],
 
+    // Repair tickets (Plan #38 — report filed, scheduled, reminder ladder)
+    'maintenance_reported' => [
+        'subject' => 'New Repair Report',
+        'template' => 'A repair request has been filed and is awaiting Motorpool attention.'
+    ],
+    'maintenance_scheduled' => [
+        'subject' => 'Repair Scheduled',
+        'template' => 'A repair request you reported has been scheduled by Motorpool.'
+    ],
+    'maintenance_reminder' => [
+        'subject' => 'Repair Reminder',
+        'template' => 'A repair request is approaching or past its scheduled date.'
+    ],
+    'care_schedule_reminder' => [
+        'subject' => 'Vehicle Care Reminder',
+        'template' => 'A vehicle care item is approaching or past its due date.'
+    ],
+
     // Default fallback template
     'default' => [
         'subject' => 'LOKA Notification',

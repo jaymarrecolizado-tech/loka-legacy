@@ -135,6 +135,13 @@ function careVehicleVisibilitySql(string $vehicleColumn = 'vcs.vehicle_id'): arr
 
 /**
  * Notify locked audience: assigned drivers + MH + Approvers + Admin + AF + CAF.
+ *
+ * Plan #38 decision 7 adds a $tier for the reminder ladder:
+ *   'full'     — the original audience above (default; unchanged for the
+ *                care-edit approve/complete/cancel callers).
+ *   'normal'   — assigned drivers + Motorpool Head + Approver (7d / 1d reminders).
+ *   'escalate' — 'normal' plus Admin, All Father, CAF and OIC CAF
+ *                (due-day and overdue reminders).
  */
 function notifyCareStakeholders(
     int $vehicleId,
@@ -142,7 +149,8 @@ function notifyCareStakeholders(
     string $title,
     string $message,
     ?string $link = null,
-    ?int $excludeUserId = null
+    ?int $excludeUserId = null,
+    string $tier = 'full'
 ): void {
     $userIds = [];
 
@@ -158,7 +166,11 @@ function notifyCareStakeholders(
         $userIds[(int) $d->user_id] = true;
     }
 
-    $roles = [ROLE_MOTORPOOL, ROLE_APPROVER, ROLE_ADMIN, ROLE_ALL_FATHER, ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE];
+    $roles = match ($tier) {
+        'normal'   => [ROLE_MOTORPOOL, ROLE_APPROVER],
+        'escalate' => [ROLE_MOTORPOOL, ROLE_APPROVER, ROLE_ADMIN, ROLE_ALL_FATHER, ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE],
+        default    => [ROLE_MOTORPOOL, ROLE_APPROVER, ROLE_ADMIN, ROLE_ALL_FATHER, ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE],
+    };
     $ph = implode(',', array_fill(0, count($roles), '?'));
     $ops = db()->fetchAll(
         "SELECT id FROM users

@@ -14,6 +14,7 @@ if (php_sapi_name() === 'cli') {
 if (!function_exists('notifyCareStakeholders')) {
     /**
      * Fallback audience: assigned drivers + MH + Approvers + Admin + AF + CAF.
+     * Mirrors includes/vehicle_care.php, including the Plan #38 reminder tiers.
      */
     function notifyCareStakeholders(
         int $vehicleId,
@@ -21,7 +22,8 @@ if (!function_exists('notifyCareStakeholders')) {
         string $title,
         string $message,
         ?string $link = null,
-        ?int $excludeUserId = null
+        ?int $excludeUserId = null,
+        string $tier = 'full'
     ): void {
         $userIds = [];
 
@@ -41,7 +43,11 @@ if (!function_exists('notifyCareStakeholders')) {
             error_log('notifyCareStakeholders (driver lookup): ' . $e->getMessage());
         }
 
-        $roles = [ROLE_MOTORPOOL, ROLE_APPROVER, ROLE_ADMIN, ROLE_ALL_FATHER, ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE];
+        $roles = match ($tier) {
+            'normal'   => [ROLE_MOTORPOOL, ROLE_APPROVER],
+            'escalate' => [ROLE_MOTORPOOL, ROLE_APPROVER, ROLE_ADMIN, ROLE_ALL_FATHER, ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE],
+            default    => [ROLE_MOTORPOOL, ROLE_APPROVER, ROLE_ADMIN, ROLE_ALL_FATHER, ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE],
+        };
         $ph = implode(',', array_fill(0, count($roles), '?'));
         $ops = db()->fetchAll(
             "SELECT id FROM users
@@ -93,10 +99,15 @@ function processCareReminders(): array
         $base = "{$label} for {$row->plate_number}: {$row->title} (due " . formatDate($due) . ")";
 
         $kind = null;
+        $tier = 'normal';
         $title = 'Vehicle Care Reminder';
         $message = null;
         $update = [];
 
+        // Plan #38 decision 7: 7d/1d go to the normal audience (assigned care
+        // drivers + Motorpool + Approver); due-day and overdue escalate to Admin,
+        // All Father, CAF and OIC CAF with stronger copy, and overdue repeats
+        // daily with no 7-day cap.
         if ($days === 7 && empty($row->reminded_7d_at)) {
             $kind = '7d';
             $message = "Reminder (7 days): {$base}";
@@ -107,13 +118,18 @@ function processCareReminders(): array
             $update['reminded_1d_at'] = date(DATETIME_FORMAT);
         } elseif ($days === 0 && empty($row->reminded_due_at)) {
             $kind = 'due';
-            $message = "Due today: {$base}";
+            $tier = 'escalate';
+            $title = 'Vehicle Care Due Today';
+            $message = "Due today and awaiting completion: {$base}. Please complete it today.";
             $update['reminded_due_at'] = date(DATETIME_FORMAT);
         } elseif ($days < 0) {
             $overdueOn = $row->reminded_overdue_on ?? null;
-            if ($overdueOn !== $today && $days >= -7) {
+            if ($overdueOn !== $today) {
                 $kind = 'overdue';
-                $message = "Overdue (" . abs($days) . " day(s)): {$base}";
+                $tier = 'escalate';
+                $title = 'OVERDUE Vehicle Care';
+                $message = "Overdue by " . abs($days) . " day(s): {$base}. This item is now past due "
+                    . "and requires immediate action.";
                 $update['reminded_overdue_on'] = $today;
             }
         }
@@ -128,7 +144,9 @@ function processCareReminders(): array
             'care_schedule_reminder',
             $title,
             $message,
-            $link
+            $link,
+            null,
+            $tier
         );
         $update['updated_at'] = date(DATETIME_FORMAT);
         db()->update('vehicle_care_schedules', $update, 'id = ?', [$row->id]);
