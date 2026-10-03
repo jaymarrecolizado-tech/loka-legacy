@@ -52,7 +52,8 @@ class Database
         'channel_link_tokens',
         'channel_logs',
         'vehicle_repair_entries',
-        'vehicle_repair_items'
+        'vehicle_repair_items',
+        'trip_gps_points'
     ];
 
     private function __construct()

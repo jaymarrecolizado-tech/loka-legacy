@@ -236,6 +236,27 @@
                 </a>
             </li>
             <?php endif; ?>
+
+            <?php
+            // Plan #41 — Trip Tracking is offered only to a driver who actually has
+            // a live dispatched trip, and only while the feature is on.
+            if (currentDriverId()) {
+                $gpsFlag = db()->fetch("SELECT value FROM settings WHERE `key` = 'gps_tracking_enabled'");
+                if ($gpsFlag && (string) $gpsFlag->value === '1') {
+                    $gpsTrip = gpsTrackingCurrentTripForDriver();
+                    if ($gpsTrip) {
+                        ?>
+                        <li class="nav-item">
+                            <a class="nav-link <?= activeMenu('gps-tracking') ?>" href="<?= APP_URL ?>/?page=gps-tracking">
+                                <i class="bi bi-geo-alt-fill"></i>
+                                <span>Trip Tracking</span>
+                            </a>
+                        </li>
+                        <?php
+                    }
+                }
+            }
+            ?>
             <?php endif; ?>
             
             <?php if (canAccessReports()): ?>
@@ -402,6 +423,15 @@
                    href="<?= APP_URL ?>/?page=security&action=telegram">
                     <i class="bi bi-telegram"></i>
                     <span>Telegram</span>
+                </a>
+            </li>
+
+            <!-- GPS Tracking (Plan #41, experimental) -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'security' && get('action') === 'gps-tracking') ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=security&action=gps-tracking">
+                    <i class="bi bi-geo-alt"></i>
+                    <span>GPS Tracking</span>
                 </a>
             </li>
 

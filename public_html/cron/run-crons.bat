@@ -29,4 +29,7 @@ REM Care reminders (daily cadence inside: 7d/1d/due/overdue — safe to run ever
 REM Repair ticket reminders (Plan #38 — same 7d/1d/due/daily-overdue ladder)
 "%PHP_BIN%" "%WEB_ROOT%\cron\process_maintenance_reminders.php" >> "%LOG_FILE%" 2>&1
 
+REM GPS breadcrumb retention (Plan #41 — no-op while gps_tracking_enabled=0)
+"%PHP_BIN%" "%WEB_ROOT%\cron\process_gps_retention.php" >> "%LOG_FILE%" 2>&1
+
 echo [%date% %time%] run-crons finished >> "%LOG_FILE%"

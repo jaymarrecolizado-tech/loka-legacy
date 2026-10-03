@@ -143,6 +143,12 @@ require_once INCLUDES_PATH . '/header.php';
         </div>
     </div>
 
+    <?php
+    // Plan #41 — live positions for Motorpool / Admin / All Father only.
+    // Renders nothing unless GPS tracking is on AND at least one fix exists.
+    require __DIR__ . '/partials/gps-panel.php';
+    ?>
+
     <div class="card table-card">
         <div class="card-body p-0">
             <?php if (empty($tableRows)): ?>

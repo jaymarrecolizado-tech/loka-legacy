@@ -81,6 +81,7 @@ require_once __DIR__ . '/config/session.php';
 // Load helpers
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/booking-rules.php';
+require_once __DIR__ . '/includes/gps_tracking.php';
 require_once __DIR__ . '/includes/view_as.php';
 require_once __DIR__ . '/includes/sms.php';
 require_once __DIR__ . '/includes/channels.php';
@@ -510,6 +511,9 @@ switch ($page) {
         } elseif ($action === 'ai-assistant') {
             // Plan #40 — page itself enforces real All Father
             require_once PAGES_PATH . '/security/ai-assistant.php';
+        } elseif ($action === 'gps-tracking') {
+            // Plan #41 — page itself enforces real All Father
+            require_once PAGES_PATH . '/security/gps-tracking.php';
         } elseif ($action === 'odometer') {
             require_once INCLUDES_PATH . '/odometer.php';
             require_once PAGES_PATH . '/security/odometer.php';
@@ -647,6 +651,12 @@ switch ($page) {
         require_once PAGES_PATH . '/live-board/index.php';
         break;
 
+    case 'gps-tracking':
+        // Plan #41 — driver Trip Tracking page (feature flag + driver check in page)
+        require_once INCLUDES_PATH . '/gps_tracking.php';
+        require_once PAGES_PATH . '/gps-tracking/index.php';
+        break;
+
     case 'trip-tickets':
         if ($action === 'view') {
             require_once PAGES_PATH . '/trip-tickets/view.php';
@@ -668,6 +678,9 @@ switch ($page) {
         if ($action === 'ai_chat') {
             // Plan #40 — AI assistant chat endpoint (session + CSRF enforced inside)
             require_once PAGES_PATH . '/api/ai-chat.php';
+        } elseif ($action === 'gps_ping') {
+            // Plan #41 — driver GPS ping intake (session + CSRF enforced inside)
+            require_once PAGES_PATH . '/api/gps-ping.php';
         } elseif ($action === 'global_search') {
             require_once PAGES_PATH . '/api/global_search.php';
         } elseif ($action === 'check_conflict') {

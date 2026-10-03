@@ -62,6 +62,24 @@ try {
         exit;
     }
 
+    if ($action === 'gps') {
+        // Plan #41 — purge GPS breadcrumbs past the retention window
+        if (!is_file(BASE_PATH . '/cron/process_gps_retention.php')) {
+            http_response_code(500);
+            echo "process_gps_retention.php unavailable\n";
+            exit;
+        }
+        require_once BASE_PATH . '/cron/process_gps_retention.php';
+        if (!function_exists('processGpsRetention')) {
+            http_response_code(500);
+            echo "processGpsRetention() unavailable\n";
+            exit;
+        }
+        $r = processGpsRetention();
+        echo date('c') . " GPS ok purged={$r['purged']}\n";
+        exit;
+    }
+
     if ($action === 'maintenance') {
         // Plan #38 — repair ticket reminders (same ladder as care)
         if (!is_file(BASE_PATH . '/cron/process_maintenance_reminders.php')) {

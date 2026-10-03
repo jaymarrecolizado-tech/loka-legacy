@@ -41,10 +41,10 @@
 | #35 | Telegram + Viber notifications (phased) | DONE Phase A+B (2026-09-29; branch `vberandtelegramnotif`, localhost QA — NOT deployed; tokens pending) |
 | #36 | OB Pass Slip workflow revision (button approvals, CoA acknowledgment + QR) | DONE (2026-10-01; branch `ob-slip-revision`, localhost QA + staging deploy — no prod) |
 | #37 | OB approval badge for Immediate Supervisor | DONE (2026-10-01; badge + kiosk checkbox fix, localhost lint + staging deploy — no prod) |
-| #38 | Vehicle Repair History + costing + escalated maintenance alerts (experimental) | PLANNED (2026-10-03; not built) |
-| #39 | Rollback shows full workflow stages (Trips + OB + Gas) | PLANNED (2026-10-03; not built) |
-| #40 | AI assistant chatbot (experimental, role-scoped actions) | PLANNED (2026-10-03; not built) |
-| #41 | Driver-phone GPS trip tracking (experimental) | PLANNED (2026-10-03; decisions locked — not built) |
+| #38 | Vehicle Repair History + costing + escalated maintenance alerts (experimental) | DONE (2026-10-04; branch `plans-38-41-experimental`; localhost QA — NOT deployed) |
+| #39 | Rollback shows full workflow stages (Trips + OB + Gas) | DONE (2026-10-04; same branch; localhost QA — NOT deployed) |
+| #40 | AI assistant chatbot (experimental, role-scoped actions) | DONE (2026-10-04; same branch; localhost QA — NOT deployed) |
+| #41 | Driver-phone GPS trip tracking (experimental) | DONE (2026-10-04; same branch; localhost QA — NOT deployed) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -3039,9 +3039,9 @@ bell is fine (`obNotify()` rows are created); only the sidebar count is blind.
 - [x] Kiosk render: flex checkbox markup present, old float markup + `fs-5` gone.
 - [x] `php -l` clean on all three touched files.
 
-# LOKA Plan #38: Vehicle Repair History + costing + escalated maintenance alerts — PLANNED (2026-10-03)
+# LOKA Plan #38: Vehicle Repair History + costing + escalated maintenance alerts — ✅ DONE (2026-10-04, branch `plans-38-41-experimental`, localhost QA — NOT deployed)
 
-**Status:** PLANNED — not implemented. Staging/local only when built; **no prod deploy** until asked.
+**Status:** implemented + QA'd on localhost. Staging only when asked; **no prod deploy** until asked.
 **Reference layout:** `Reference/Repair History/` (e.g. CBI8522 workbook).
 
 ## Excel shape (locked from CBI8522 sample)
@@ -3095,21 +3095,47 @@ bell is fine (`obNotify()` rows are created); only the sidebar count is blind.
 
 - Pre/post-inspection Request 4 forms; inventory/stock module; changing care/repair status machines; prod deploy
 
-## Checklist (when implementing)
+## Checklist — DONE 2026-10-04
 
-- [ ] Migration 058 + settings seed + Database allowlist
-- [ ] `repair_history.php` gate + AF System Control nav + hub toggle
-- [ ] Manual create/edit/delete + history view/print
-- [ ] Maintenance/care complete auto-write when feature on
-- [ ] Care escalate + maintenance reminder cron
-- [ ] Reference xlsx importer
-- [ ] Local QA; staging only when asked
+- [x] Migration 058 + settings seed + Database allowlist
+- [x] `repair_history.php` gate + AF System Control nav + hub toggle
+- [x] Manual create/edit/delete + history view/print
+- [x] Maintenance/care complete auto-write when feature on
+- [x] Care escalate + maintenance reminder cron
+- [x] Reference xlsx importer
+- [x] Local QA; staging only when asked
+
+## Implementation notes (2026-10-04)
+
+- **Schema deviation — `amount`, not `unit_price`.** The workbook's "Price" column is
+  the **line amount**, not a per-unit price: `SHS 987` row "assorted orring, pc, 12, 360"
+  totals ₱360 for twelve pieces. Verified across all 10 reference workbooks, so
+  `vehicle_repair_items.amount` holds the printed price and the roll-up is a plain `SUM`.
+- **No PhpSpreadsheet.** An `.xlsx` is a zip of XML, so the importer is `ext-zip` +
+  SimpleXML (`includes/repair_history_import.php`). No new dependency, no composer run.
+- **Parser hardens two real workbook quirks:** some sheets put `Plate Number:` in column C
+  (not A), and `SNJ 8786` writes the *nature* one row before its *date*.
+- Decision 9 (`vehicles.engine_number`) was already satisfied by an earlier migration — no-op.
+- `notifyCareStakeholders()` gained a `$tier`; the **default `full` audience is unchanged**
+  so the care-edit approve/complete/cancel callers behave exactly as before.
+  Reminders only: 7d/1d → `normal`; due-day + overdue → `escalate`, and overdue is now
+  daily with no 7-day cap.
+- Hub is reachable by Motorpool/Admin (they get a fleet-menu link while the feature is on);
+  the **toggle and importer stay All Father only** — otherwise Motorpool would be linked to
+  a page that redirects them.
+- New cron `cron/process_maintenance_reminders.php` (+ `action=maintenance` on the HTTP cron,
+  `run-crons.bat`, `setup.sh` — which also gained the previously-missing care entry).
+
+**QA — 2026-10-04 (`_deploy_tmp/verify_plan38.php`, 129 checks green, repeatable):**
+parse (all 10 workbooks), gate, manual CRUD, maintenance auto-write, care auto-write,
+reminder tiers + uncapped overdue, importer, render on/off per role. DB left pristine and
+`repair_history_enabled` back to `0`. `php -l` clean on every touched file.
 
 ---
 
-# LOKA Plan #39: Rollback shows full workflow stages — PLANNED (2026-10-03)
+# LOKA Plan #39: Rollback shows full workflow stages — ✅ DONE (2026-10-04, branch `plans-38-41-experimental`, localhost QA — NOT deployed)
 
-**Status:** PLANNED — not implemented.
+**Status:** implemented + QA'd on localhost. Staging only when asked.
 **Problem:** Admin rollback in `pages/requests/rollback.php` labels targets as “phase” and often shows a thin/empty target set. Users need clear **workflow stages** (not vague phases), and OB / Gas have no rollback today.
 
 ## Locked approach
@@ -3157,19 +3183,45 @@ Targets = earlier stages; clear approval stamps per stage; Admin/All Father only
 
 - Requester-initiated rollback; changing forward approval rules; prod deploy until asked
 
-## Checklist (when implementing)
+## Checklist — DONE 2026-10-04
 
-- [ ] `includes/rollback.php` stage matrices + labels
-- [ ] Trip rollback confirm UI (stage radios + expanded targets)
-- [ ] OB + Gas rollback handlers and view buttons
-- [ ] Rollback hub tabs Trips|OB|Gas
-- [ ] Local QA (completed → Dept/Motorpool selectable; OB departed → earlier; Gas pending_approval → earlier)
+- [x] `includes/rollback.php` stage matrices + labels
+- [x] Trip rollback confirm UI (stage radios + expanded targets)
+- [x] OB + Gas rollback handlers and view buttons
+- [x] Rollback hub tabs Trips|OB|Gas
+- [x] Local QA (completed → Dept/Motorpool selectable; OB departed → earlier; Gas pending_approval → earlier)
+
+## Implementation notes (2026-10-04)
+
+- **`Dispatched` and `Arrived` are stages but never targets.** They exist so the stepper can
+  show where a trip is; you cannot "set" a request to Dispatched — the guard does that.
+  Rolling a dispatched/arrived trip back to `Approved` simply clears the guard transaction
+  and keeps the assignment, which is the decision-A behaviour the plan asked for.
+- Targets are returned **earliest-first** so the picker reads like the stepper.
+- `completed` now reaches `pending_motorpool` and `pending` (it previously only offered
+  `approved`); `revision` / `rejected` reach both approval stages.
+- OB: private-vehicle slips never offer `pending_motorpool` (they skip Motorpool entirely).
+  Leaving the Approved stage clears the guard stamps **and** the CoA acknowledgment, contacts
+  and token. `ob_approvals.approval_type` is an ENUM without `admin`, so a rollback is logged
+  as `approval_type='system'`, `action='rollback'`.
+- Gas: approval stamps are cleared per stage, so rolling back to `pending_budget` re-does the
+  Budget Officer step rather than leaving a stale certification behind.
+- Admin-only throughout; All Father reaches it via their admin level. The hub shows an
+  **available-stage count** per row and hides the button entirely when there is nowhere to go.
+
+**QA — 2026-10-04 (`_deploy_tmp/verify_plan39.php`, 131 checks green over 12 steps, repeatable):**
+trip/OB/gas stage matrices, executed rollbacks (completed→Motorpool, dispatched→Approved,
+revision→Dept, departed→Supervisor, approved voucher→Review), guard rails (short reason,
+forward-only target, stale optimistic lock), the three hub tabs and all three pickers.
+Handlers end in `redirectWith()` → `exit`, so each is driven in a child process that reports
+its post-state as JSON. DB left pristine. `php -l` clean on every touched file.
 
 ---
 
-# LOKA Plan #40: AI assistant chatbot (experimental, role-scoped) — PLANNED (2026-10-03)
+# LOKA Plan #40: AI assistant chatbot (experimental, role-scoped) — ✅ DONE (2026-10-04, branch `plans-38-41-experimental`, localhost QA — NOT deployed)
 
-**Status:** PLANNED — not implemented. Experimental; default **off**.
+**Status:** implemented + QA'd on localhost. Experimental; default **off**; still unusable
+until All Father stores a provider key. Staging only when asked.
 
 ## Goal
 
@@ -3193,19 +3245,53 @@ Logged-in users get an in-app AI chatbot that can **propose and (after confirm) 
 5. **UI:** floating chat panel (authenticated pages); shows proposed action card before mutate; errors are user-safe (no stack traces).
 6. **Out of scope v1:** training on private docs; autonomous multi-step agents without confirm; SMS/Telegram outbound composed by AI without template; rollback/System Control SMS toggles via chat.
 
-## Checklist (when implementing)
+## Checklist — DONE 2026-10-04
 
-- [ ] Migration/settings seed `ai_assistant_enabled` + AF System Control page
-- [ ] Tool registry + chat API endpoint + rate limits + audit
-- [ ] Chat UI with confirm gate for mutating tools
-- [ ] Role matrix QA (requester cannot approve; approver cannot AF settings; AF can only listed tools)
-- [ ] Staging only when asked
+- [x] Migration/settings seed `ai_assistant_enabled` + AF System Control page
+- [x] Tool registry + chat API endpoint + rate limits + audit
+- [x] Chat UI with confirm gate for mutating tools
+- [x] Role matrix QA (requester cannot approve; approver cannot AF settings; AF can only listed tools)
+- [x] Staging only when asked
+
+## Implementation notes (2026-10-04)
+
+- **Deliberate deviation — the assistant does not execute approvals.** Decision 3 asked for
+  "approve/reject/revise **only if** the current user may act on that record". Implemented as
+  *verify + hand off*: `prepare_trip_decision` / `prepare_ob_decision` check the actor against
+  the assigned approver / motorpool head (and audit the refusal), then open the real screen
+  where the decision is confirmed and logged with the user's identity. Copying the 750-line
+  `pages/approvals/process.php` state machine (and the OB equivalent) into a tool would create
+  a second, silently-divergent copy of the most safety-critical code in the app. Say the word
+  if you want the write path anyway.
+- What the assistant *does* write: `create_trip_draft` (a real `draft` — no workflow row, no
+  notifications, so nothing can be triggered by accident) and `propose_care` (a real `pending`
+  care item that an approver must still approve).
+- Tool args are sanitised **from the declared JSON schema** — unknown keys are dropped, types
+  coerced, strings capped. That is the injection boundary; the model's free text never
+  reaches a query.
+- Confirm tokens are HMAC-signed, bound to one user, and expire in **120s**. They are *not*
+  single-use: a replay inside the 120s window re-runs the tool. Both behaviours are asserted
+  in the harness so the choice is conscious rather than accidental.
+- `verifyCsrf()` reads `$_POST`, so the endpoint merges the JSON body into `$_POST` **before**
+  the auth/CSRF gate — otherwise a JSON chat call could never verify its token.
+- `window.LOKA_CSRF_TOKEN` is now exposed to JS (it was already present in every rendered form).
+- The chat panel mounts in `footer.php` only when `aiAssistantStatus()['ready']` is true, so
+  nothing is shipped to the browser while the feature is off.
+
+**QA — 2026-10-04 (`_deploy_plan40.php`, 106 checks green over 8 steps, repeatable):** gate
+(off / no-key), registry shape + unknown-tool rejection + schema arg sanitising, confirm-token
+tamper/cross-user/expiry, the full per-role tool matrix (34 checks) including View-as refusal
+of AF-only tools, real draft + care writes with their audit rows, the confirm gate (forged and
+cross-user tokens create nothing), and the endpoint refusing when off / keyless / CSRF-less.
+The provider was never contacted. DB left pristine, `ai_assistant_enabled` back to `0` and
+`ai_api_key` empty. `php -l` clean on every touched file.
 
 ---
 
-# LOKA Plan #41: Driver-phone GPS trip tracking (experimental) — PLANNED (2026-10-03)
+# LOKA Plan #41: Driver-phone GPS trip tracking (experimental) — ✅ DONE (2026-10-04, branch `plans-38-41-experimental`, localhost QA — NOT deployed)
 
-**Status:** PLANNED — decisions locked with user (2026-10-03). Not implemented. Staging/local only when built; **no prod deploy** until asked.
+**Status:** implemented + QA'd on localhost with every locked decision honoured. Experimental,
+`gps_tracking_enabled` default **off**. Staging only when asked; **no prod deploy** until asked.
 
 ## Intent
 
@@ -3237,13 +3323,41 @@ Track active DICT fleet trips using the **driver’s phone** GPS so Motorpool / 
 - Tracking private OB vehicles; requester/approver map access
 - Driver pause button; prod deploy until asked
 
-## Checklist (when implementing)
+## Checklist — DONE 2026-10-04
 
-- [ ] Migration + `gps_tracking_enabled` seed + Database allowlist
-- [ ] AF System Control GPS Tracking hub (toggle)
-- [ ] Driver Trip Tracking page (consent + geolocation loop)
-- [ ] `gps_ping` API with authz + rate limit
-- [ ] Motorpool/Admin/AF live map + last-seen
-- [ ] 30-day retention purge
-- [ ] Local QA; staging only when asked
+- [x] Migration + `gps_tracking_enabled` seed + Database allowlist
+- [x] AF System Control GPS Tracking hub (toggle)
+- [x] Driver Trip Tracking page (consent + geolocation loop)
+- [x] `gps_ping` API with authz + rate limit
+- [x] Motorpool/Admin/AF live position + last-seen
+- [x] 30-day retention purge
+- [x] Local QA; staging only when asked
+
+## Implementation notes (2026-10-04)
+
+- **No map tiles — deliberate.** A Leaflet/OpenStreetMap map would send tile requests naming
+  the vehicle's rough area to a third party. The trail is drawn on a bare inline SVG grid
+  instead: coordinates stay on this server, there is no new CDN dependency, and the ops panel
+  still shows movement plus the exact lat/lng the plan locked to Motorpool/Admin/AF. Swap in
+  tiles later if ops decides the leak is acceptable.
+- **The trip is derived from the session, never the payload.** `gps_ping` ignores any
+  `request_id` the client sends and resolves the caller's own live dispatched trip, so a
+  driver cannot attach points to someone else's request.
+- Window logic is `approved` **and** dispatched **and** no arrival — arrival, completion or
+  cancellation all close it. No driver start/stop, no pause.
+- Pings are throttled per trip (30s) and fixes worse than 200 m accuracy are dropped, per
+  decision 5. Cadence/quality rejections return 429/422 as *expected client states*, not errors.
+- The retention purge is a **no-op while the feature is off**, so switching GPS off can never
+  silently delete an operator's stored history.
+- The sidebar "Trip Tracking" link only appears for a driver who actually has a live dispatched
+  trip and only while the feature is on — a dead menu entry is worse than no entry.
+- Scope v1 enforced and tested: no fleet vehicle attached → not trackable; private-vehicle OB
+  slips are never in scope.
+
+**QA — 2026-10-04 (`_deploy_tmp/verify_plan41.php`, 67 checks green over 9 steps, repeatable):**
+gate (off blocks everything, retention inert while off), the dispatch→arrival window matrix,
+driver authz, intake (validation, cadence, poor-fix drop, trail + last-seen + SVG incl. the
+single-point no-divide-by-zero case), scope exclusions, per-role panel visibility, retention
+purge + idempotency, and renders for the driver page (no-trip, consent, live) + the AF hub.
+DB left pristine and `gps_tracking_enabled` back to `0`. `php -l` clean on every touched file.
 
