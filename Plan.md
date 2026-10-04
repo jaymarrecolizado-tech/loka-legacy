@@ -3310,6 +3310,56 @@ rate-limiting this app right now. Try again shortly."* The in-app guard
 (`ai_rate_limit_per_hour`, default 30/user/hour) sits on top of that. Treat
 "unlimited" as "no per-request cost", not "no throttling".
 
+## What the assistant may do — 9 tools, and only ONE writes anything
+
+| Tool | Writes | Allowed roles | Does |
+|---|---|---|---|
+| `search_my_trips` | no | everyone | your own trips by plate/destination/status |
+| `explain_request_status` | no | everyone | stage of a request + who acts next |
+| `my_pending_approvals` | no | All Father, Admin, MH, Approver | what is waiting on you |
+| `search_my_ob_slips` | no | everyone | your own pass slips |
+| `search_my_gas_vouchers` | no | everyone | your own gas vouchers |
+| `care_due_this_week` | no | All Father, Admin, MH, Approver | care due in 7 days |
+| `prepare_trip_decision` | no | All Father, Admin, MH, Approver | checks you may decide → opens the real screen |
+| `prepare_ob_decision` | no | All Father, Admin, MH, Approver | same for pass slips |
+| `propose_care` | **yes** | All Father, Admin, MH | creates a **pending** care item an approver must still approve |
+
+Across the whole AI layer there is exactly **one** database write
+(`includes/ai_tools.php` → `db()->insert('vehicle_care_schedules', …)`). Nothing
+else writes; there is no raw SQL, shell, or file access.
+
+**It does not click buttons.** There is no browser automation and no DOM driving
+in the AI path — the only `querySelector`/`.click()` calls are in
+`assets/js/ai-chat.js` binding the *user's own* Run/Cancel buttons. The model
+returns a JSON tool call and PHP executes a function directly, so it cannot be
+tricked into clicking Delete. `prepare_trip_decision` is the closest thing: it
+verifies you may act and hands you the real approval screen, where the decision
+is still made by you and logged with your identity.
+
+## Action trace — every call is visible (2026-10-04)
+
+Read tools used to run silently: the user saw an answer with no indication of
+what produced it. Now **every** tool call, read or write, renders its own trace
+row naming the action and its arguments:
+
+```
+I'll look up the current stage and next actor for that request.
+Checking a trip request — request id: 680            ← trace (spinner, then ✓)
+Request #680 is approved — waiting for the guard…    ← result
+Open in LOKA
+```
+
+To make that possible the endpoint was split: `op=ask` **proposes only** and
+never executes; execution happens on `op=confirm` behind the same signed 120s
+token, for reads and writes alike. That also means read executions now go through
+the same audit path as writes (`ai_tool_executed`).
+
+Each tool declares a short `label` (*"Checking a trip request"*);
+`aiToolTraceLine()` combines it with a readable arg summary — human text, never
+a JSON blob, and truncated so a model cannot spam the row. Verified live in the
+browser: the fetch sequence is `ask` → `confirm`, and the trace row appears
+between the model's reply and the result.
+
 Provider errors are translated into user-safe sentences (`aiProviderError()`):
 401 → key rejected, 429 → provider rate limit, 402 → no credit,
 unknown model → pick another. Never echoes the key, URL or a stack.

@@ -61,17 +61,68 @@
         });
     }
 
-    /* ---------- proposal cards ---------- */
+    /* ---------- action trace ---------- */
+
+    /**
+     * A live "what is the assistant doing right now" row. Every tool call gets
+     * one — reads and writes alike — so nothing happens invisibly.
+     */
+    function addTrace(text) {
+        var row = document.createElement('div');
+        row.className = 'd-flex mb-2 justify-content-start';
+        row.innerHTML =
+            '<div class="p-2 rounded-3 border small lh-sm d-flex align-items-center gap-2"'
+            + ' style="max-width:85%;background:#f1f3f5;">'
+            + '<span class="spinner-border spinner-border-sm flex-shrink-0" role="status" aria-hidden="true"></span>'
+            + '<span data-ai-trace-text>' + esc(text) + '</span></div>';
+        log.appendChild(row);
+        log.scrollTop = log.scrollHeight;
+        return {
+            el: row,
+            finish: function (finalText) {
+                var sp = row.querySelector('.spinner-border');
+                if (sp) { sp.remove(); }
+                var t = row.querySelector('[data-ai-trace-text]');
+                if (t && finalText) {
+                    t.innerHTML = '<i class="bi bi-check2 me-1"></i>' + esc(finalText);
+                }
+                log.scrollTop = log.scrollHeight;
+            },
+            fail: function (msg) {
+                var sp = row.querySelector('.spinner-border');
+                if (sp) { sp.remove(); }
+                var t = row.querySelector('[data-ai-trace-text]');
+                if (t) {
+                    t.innerHTML = '<i class="bi bi-x-circle text-danger me-1"></i>' + esc(msg || 'Failed');
+                }
+                log.scrollTop = log.scrollHeight;
+            }
+        };
+    }
+
+    /* ---------- proposal cards (mutating only) ---------- */
 
     function renderProposal(p) {
-        if (!p) return;
+        if (!p) return Promise.resolve();
 
         if (!p.mutating) {
-            // Read tools already ran server-side.
-            if (p.ok === false) { addError(p.summary || 'That lookup was not permitted.'); return; }
-            if (p.summary) addRow('bot', esc(p.summary));
-            if (p.link) addLink(p.link);
-            return;
+            // Read tool: show the action, then run it immediately. The trace row
+            // is already on screen by the time this fires, so the user watches
+            // the lookup happen instead of seeing an unexplained answer.
+            var readTrace = addTrace(p.trace || p.label || 'Looking something up');
+            return post({ op: 'confirm', confirm_token: p.confirm_token })
+                .then(function (r) {
+                    if (!r.ok) {
+                        readTrace.fail(r.error || 'That lookup was not permitted.');
+                        return;
+                    }
+                    readTrace.finish(r.executed.trace || p.trace);
+                    if (r.executed.summary) addRow('bot', esc(r.executed.summary));
+                    if (r.executed.link) addLink(r.executed.link);
+                })
+                .catch(function () {
+                    readTrace.fail('Could not reach the server.');
+                });
         }
 
         var card = document.createElement('div');
@@ -79,7 +130,8 @@
         card.innerHTML =
             '<div class="card-body p-2">' +
             '<div class="small fw-semibold mb-1"><i class="bi bi-shield-exclamation me-1"></i>Confirm this action</div>' +
-            '<div class="small text-muted mb-2">' + esc(p.label || p.tool) + '</div>' +
+            '<div class="small mb-1">' + esc(p.trace || p.label || '') + '</div>' +
+            '<div class="small text-muted mb-2">' + esc(p.description || '') + '</div>' +
             '<pre class="small bg-light border rounded p-2 mb-2" style="max-height:9rem;overflow:auto;white-space:pre-wrap;margin:0;">'
                 + esc(JSON.stringify(p.args, null, 2)) + '</pre>' +
             '<div class="d-flex gap-2">' +
@@ -96,19 +148,25 @@
         card.querySelector('[data-ai-confirm]').addEventListener('click', function (ev) {
             var btn = ev.currentTarget;
             var token = btn.getAttribute('data-ai-confirm');
+            var trace = addTrace('Running: ' + (p.trace || p.label || ''));
             btn.disabled = true;
             setBusy(true);
             post({ op: 'confirm', confirm_token: token }).then(function (r) {
                 setBusy(false);
-                card.remove();
-                if (!r.ok) { addError(r.error || 'The action was refused.'); return; }
-                addRow('bot', '<strong>Done.</strong> ' + esc(r.executed.summary));
+                btn.disabled = false;
+                if (!r.ok) {
+                    trace.fail(r.error || 'The action was refused.');
+                    return;
+                }
+                trace.finish('Done: ' + (r.executed.trace || p.trace));
+                if (r.executed.summary) addRow('bot', esc(r.executed.summary));
                 if (r.executed.link) addLink(r.executed.link);
             }).catch(function () {
                 setBusy(false);
-                addError('Could not reach the server.');
+                trace.fail('Could not reach the server.');
             });
         });
+        return Promise.resolve();
     }
 
     function addLink(href) {
@@ -136,10 +194,14 @@
             setBusy(false);
             if (!r.ok) { addError(r.error || 'Something went wrong.'); return; }
             if (r.reply) { addRow('bot', esc(r.reply)); history.push({ role: 'assistant', content: r.reply }); }
-            renderProposal(r.proposal);
             if (r.remaining != null) {
                 statusEl.textContent = r.remaining + ' prompt(s) left this hour';
             }
+            // renderProposal returns a promise for read tools (which now run in a
+            // second, separately-audited call so the trace can be seen first).
+            return renderProposal(r.proposal);
+        }).then(function () {
+            setBusy(false);
         }).catch(function () {
             setBusy(false);
             addError('Could not reach the server.');

@@ -80,16 +80,23 @@ if ($op === 'confirm') {
 
     $result = aiToolExecute($verified['tool'], $verified['args']);
     if (!$result['ok']) {
-        $respond(['ok' => false, 'error' => $result['error']], 403);
+        $respond([
+            'ok' => false,
+            'error' => $result['error'],
+            'trace' => aiToolTraceLine($verified['tool'], $verified['args']),
+        ], 403);
     }
 
     $respond([
         'ok' => true,
         'executed' => [
-            'tool' => $verified['tool'],
-            'summary' => $result['summary'],
-            'data' => $result['data'],
-            'link' => $result['link'],
+            'tool'     => $verified['tool'],
+            'label'    => aiToolLabel($verified['tool']),
+            'trace'    => aiToolTraceLine($verified['tool'], $verified['args']),
+            'mutating' => !empty($tools[$verified['tool']]['mutating'] ?? false),
+            'summary'  => $result['summary'],
+            'data'     => $result['data'],
+            'link'     => $result['link'],
         ],
     ]);
 }
@@ -131,34 +138,25 @@ auditLog('ai_prompt', 'ai_assistant', null, null, [
     'proposed_tool' => $answer['tool']['tool'] ?? null,
 ]);
 
+// The endpoint PROPOSES only — it never executes here. That is what lets the UI
+// show "Searching your trips — query: SBY 225" on screen *while* the call runs,
+// instead of the action appearing with its answer already in hand. Execution
+// happens on op=confirm, through the same signed-token + audit path for BOTH
+// read and mutating tools.
 $proposal = null;
 if ($answer['tool'] !== null) {
     $toolId = $answer['tool']['tool'];
     $tool = $tools[$toolId];
-
-    // Read tools run immediately — they only read, and authorisation is
-    // re-checked inside the handler.
-    if (empty($tool['mutating'])) {
-        $result = aiToolExecute($toolId, $answer['tool']['args']);
-        $proposal = [
-            'tool' => $toolId,
-            'mutating' => false,
-            'executed' => true,
-            'ok' => $result['ok'],
-            'summary' => $result['ok'] ? $result['summary'] : $result['error'],
-            'link' => $result['link'],
-            'data' => $result['data'],
-        ];
-    } else {
-        $proposal = [
-            'tool' => $toolId,
-            'mutating' => true,
-            'executed' => false,
-            'label' => $tool['description'],
-            'args' => $answer['tool']['args'],
-            'confirm_token' => aiConfirmToken((int) userId(), $toolId, $answer['tool']['args']),
-        ];
-    }
+    $args = $answer['tool']['args'];
+    $proposal = [
+        'tool'          => $toolId,
+        'mutating'      => !empty($tool['mutating']),
+        'label'         => aiToolLabel($toolId),
+        'trace'         => aiToolTraceLine($toolId, $args),
+        'description'   => $tool['description'],
+        'args'          => $args,
+        'confirm_token' => aiConfirmToken((int) userId(), $toolId, $args),
+    ];
 }
 
 $respond([

@@ -42,6 +42,7 @@ if (!defined('AI_TOOLS_LOADED')) {
         // ---------------------------------------------------------------
 
         $tools['search_my_trips'] = [
+            'label' => 'Searching your trip requests',
             'description' => 'Search the signed-in user\'s own vehicle trip requests by destination, plate, status or request id.',
             'schema' => [
                 'type' => 'object',
@@ -97,6 +98,7 @@ if (!defined('AI_TOOLS_LOADED')) {
         ];
 
         $tools['explain_request_status'] = [
+            'label' => 'Checking a trip request',
             'description' => 'Explain what stage a vehicle trip request is in and who acts next.',
             'schema' => [
                 'type' => 'object',
@@ -147,6 +149,7 @@ if (!defined('AI_TOOLS_LOADED')) {
         ];
 
         $tools['my_pending_approvals'] = [
+            'label' => 'Checking your approval queue',
             'description' => 'List the approvals currently waiting on the signed-in user.',
             'schema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
             'mutating' => false,
@@ -183,6 +186,7 @@ if (!defined('AI_TOOLS_LOADED')) {
         ];
 
         $tools['search_my_ob_slips'] = [
+            'label' => 'Searching your OB pass slips',
             'description' => 'Search the signed-in user\'s own OB Pass Slips by slip number, status or purpose.',
             'schema' => [
                 'type' => 'object',
@@ -216,6 +220,7 @@ if (!defined('AI_TOOLS_LOADED')) {
         ];
 
         $tools['search_my_gas_vouchers'] = [
+            'label' => 'Searching your gas vouchers',
             'description' => 'Search the signed-in user\'s own gas vouchers by voucher number, plate or status.',
             'schema' => [
                 'type' => 'object',
@@ -249,6 +254,7 @@ if (!defined('AI_TOOLS_LOADED')) {
         ];
 
         $tools['care_due_this_week'] = [
+            'label' => 'Checking vehicle care due this week',
             'description' => 'List vehicle care items due in the next 7 days for the vehicles the signed-in user may see.',
             'schema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
             'mutating' => false,
@@ -289,6 +295,7 @@ if (!defined('AI_TOOLS_LOADED')) {
         // ---------------------------------------------------------------
 
         $tools['prepare_trip_decision'] = [
+            'label' => 'Checking whether you can decide a trip request',
             'description' => 'Check whether the signed-in user may approve, reject or revise a trip request, and open that request\'s approval screen.',
             'schema' => [
                 'type' => 'object',
@@ -339,6 +346,7 @@ if (!defined('AI_TOOLS_LOADED')) {
         ];
 
         $tools['prepare_ob_decision'] = [
+            'label' => 'Checking whether you can act on a pass slip',
             'description' => 'Check whether the signed-in user may act on an OB Pass Slip, and open that slip.',
             'schema' => [
                 'type' => 'object',
@@ -387,6 +395,7 @@ if (!defined('AI_TOOLS_LOADED')) {
         // draft -> pending transition.
 
         $tools['propose_care'] = [
+            'label' => 'Proposing a vehicle care item',
             'description' => 'Propose a vehicle care item for Motorpool to schedule. Creates a PENDING care item that an approver must still approve.',
             'schema' => [
                 'type' => 'object',
@@ -526,10 +535,55 @@ if (!defined('AI_TOOLS_LOADED')) {
         foreach (aiToolRegistry() as $id => $tool) {
             $out[] = [
                 'id' => $id,
+                'label' => aiToolLabel($id),
                 'description' => $tool['description'],
                 'mutating' => !empty($tool['mutating']),
             ];
         }
         return $out;
+    }
+
+    /**
+     * Short human phrase for a tool call, shown in the chat as the action trace:
+     *   "Searching your trip requests — query: SBY 225"
+     */
+    function aiToolLabel(string $toolId): string
+    {
+        return aiToolRegistry()[$toolId]['label'] ?? 'Running an action';
+    }
+
+    /**
+     * Render tool arguments as a short, readable fragment (never a JSON blob).
+     * The UI escapes whatever comes back, so a model-supplied value can never
+     * smuggle markup.
+     *
+     * @return string
+     */
+    function aiToolArgSummary(string $toolId, array $args): string
+    {
+        $parts = [];
+        foreach ($args as $k => $v) {
+            $name = str_replace('_', ' ', (string) $k);
+            if (is_bool($v)) {
+                $parts[] = $name . ': ' . ($v ? 'yes' : 'no');
+            } elseif (is_numeric($v)) {
+                $parts[] = $name . ': ' . $v;
+            } else {
+                $s = trim((string) $v);
+                if ($s === '') {
+                    continue;
+                }
+                $parts[] = $name . ': ' . mb_substr($s, 0, 60) . (mb_strlen($s) > 60 ? '…' : '');
+            }
+        }
+        return implode(' · ', $parts);
+    }
+
+    /** The full trace line for a tool call, e.g. "Searching your trips — query: SBY 225". */
+    function aiToolTraceLine(string $toolId, array $args): string
+    {
+        $label = aiToolLabel($toolId);
+        $fragment = aiToolArgSummary($toolId, $args);
+        return $fragment === '' ? $label : $label . ' — ' . $fragment;
     }
 }
