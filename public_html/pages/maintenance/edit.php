@@ -130,6 +130,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'maintenance_request_id' => $maintenanceId,
                         ]);
                     }
+                    // Plan #38 / Decision 5: with line items, the ticket's
+                    // rolled-up actual cost follows the item sum, always.
+                    if ($items !== []) {
+                        db()->query(
+                            "UPDATE maintenance_requests SET actual_cost = ?, updated_at = NOW() WHERE id = ?",
+                            [repairHistoryItemsTotal($items), $maintenanceId]
+                        );
+                    }
                 }
 
                 db()->commit();

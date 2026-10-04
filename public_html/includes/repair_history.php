@@ -53,7 +53,7 @@ if (!defined('REPAIR_HISTORY_LOADED')) {
      */
     function canViewRepairHistory(): bool
     {
-        return isAdmin() || isMotorpool() || isRealAllFather();
+        return isAdmin() || isMotorpool() || (isRealAllFather() && !isViewingAs());
     }
 
     /**
@@ -61,7 +61,7 @@ if (!defined('REPAIR_HISTORY_LOADED')) {
      */
     function canManageRepairHistory(): bool
     {
-        return isMotorpool() || isAdmin() || isRealAllFather();
+        return isMotorpool() || isAdmin() || (isRealAllFather() && !isViewingAs());
     }
 
     function repairHistoryStatusBadge(string $source): string

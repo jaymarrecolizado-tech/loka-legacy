@@ -41,10 +41,10 @@
 | #35 | Telegram + Viber notifications (phased) | DONE Phase A+B (2026-09-29; branch `vberandtelegramnotif`, localhost QA — NOT deployed; tokens pending) |
 | #36 | OB Pass Slip workflow revision (button approvals, CoA acknowledgment + QR) | DONE (2026-10-01; branch `ob-slip-revision`, localhost QA + staging deploy — no prod) |
 | #37 | OB approval badge for Immediate Supervisor | DONE (2026-10-01; badge + kiosk checkbox fix, localhost lint + staging deploy — no prod) |
-| #38 | Vehicle Repair History + costing + escalated maintenance alerts (experimental) | DONE (2026-10-04; branch `plans-38-41-experimental`; localhost + browser QA — NOT deployed) |
-| #39 | Rollback shows full workflow stages (Trips + OB + Gas) | DONE (2026-10-04; same branch; localhost + browser QA — NOT deployed) |
-| #40 | AI assistant chatbot (experimental, role-scoped actions) | DONE (2026-10-04; same branch; OpenRouter provider; needs a real key to exercise) |
-| #41 | Driver-phone GPS trip tracking (experimental) | DONE (2026-10-04; same branch; localhost + browser QA — NOT deployed) |
+| #38 | Vehicle Repair History + costing + escalated maintenance alerts (experimental) | CHECKER GAPS (2026-10-04; built on `plans-38-41-experimental` — fix list below — NOT deployed) |
+| #39 | Rollback shows full workflow stages (Trips + OB + Gas) | DONE + minor polish optional (2026-10-04; checker PASS — NOT deployed) |
+| #40 | AI assistant chatbot (experimental, role-scoped actions) | CHECKER GAPS (2026-10-04; built — security fix list below — NOT deployed) |
+| #41 | Driver-phone GPS trip tracking (experimental) | CHECKER GAPS (2026-10-04; built — fix list below — NOT deployed) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -3131,6 +3131,25 @@ parse (all 10 workbooks), gate, manual CRUD, maintenance auto-write, care auto-w
 reminder tiers + uncapped overdue, importer, render on/off per role. DB left pristine and
 `repair_history_enabled` back to `0`. `php -l` clean on every touched file.
 
+## Checker findings (2026-10-04) — FIX before calling #38 complete
+
+Independent re-audit vs locked decisions. **Overall: PARTIAL.** Implementing agent: close these gaps; checker will re-verify.
+
+### Must fix
+
+- [x] **`actual_cost` roll-up on maintenance complete (Decision 5).** Completing a repair with line items auto-writes `vehicle_repair_entries` but does **not** set `maintenance_requests.actual_cost` from the item sum. UI copy on `pages/maintenance/edit.php` claims the roll-up. History edit (`pages/repair-history/edit.php`) already recomputes — mirror that on the complete path in `maintenance/edit.php` and any shared service (`maintenance_service.php` if used). Care complete: if lines exist, keep entry total consistent (care has no `actual_cost` column unless already added).
+
+### Notes (not blockers — document only unless easy)
+
+- Schema uses `vehicle_repair_items.amount` (line amount), not plan’s `unit_price` — intentional (implementation notes). Keep docs/UI aligned.
+- `vehicles.engine_number` already existed (`varchar(50)`); no create/edit field in vehicles UI — optional follow-up, not required for checker PASS.
+
+### Re-check when fixed
+
+- Complete a repair with 3 parts + labor → `maintenance_requests.actual_cost` equals entry/`SUM(items.amount)`
+- Edit history lines → `actual_cost` stays in sync
+- Feature-off path unchanged (scalar `actual_cost` still works)
+
 ---
 
 # LOKA Plan #39: Rollback shows full workflow stages — ✅ DONE (2026-10-04, branch `plans-38-41-experimental`, localhost QA — NOT deployed)
@@ -3220,6 +3239,13 @@ its post-state as JSON. DB left pristine. `php -l` clean on every touched file.
 `index.php` resolves (161 of them), and `includes/header.php` + `footer.php` + `sidebar.php`
 render clean for all six roles. This is the guard against collateral damage from the shared
 files all four plans touched.
+
+## Checker findings (2026-10-04) — PASS (optional polish only)
+
+Independent re-audit. **Overall: PASS (5/5).** No must-fix gaps. Optional polish for another agent if time allows:
+
+- [ ] OB/Gas hub stage summary counts use the filtered `LIMIT 500` set, not DB `GROUP BY` (Trips already uses real counts) — align OB/Gas with Trips for accuracy on large fleets.
+- [ ] Trip hub summary cards group by **status**, so Dispatched/Arrived both land under Approved; per-row Stage column is correct — optional derived-stage cards if UI clarity matters.
 
 ---
 
@@ -3383,9 +3409,16 @@ unknown model → pick another. Never echoes the key, URL or a stack.
 - Tool args are sanitised **from the declared JSON schema** — unknown keys are dropped, types
   coerced, strings capped. That is the injection boundary; the model's free text never
   reaches a query.
-- Confirm tokens are HMAC-signed, bound to one user, and expire in **120s**. They are *not*
-  single-use: a replay inside the 120s window re-runs the tool. Both behaviours are asserted
-  in the harness so the choice is conscious rather than accidental.
+- Confirm tokens are HMAC-signed, bound to one user, expire in **120s**, and are
+  **single-use** (migration 061 records the nonce on first successful verify; a replay
+  inside the window is refused). `APP_KEY` must be set in `.env`; with no `APP_KEY`
+  minting throws and verifying fails closed — there is no static fallback secret.
+  `op=confirm` and `op=action` have their own per-user burst limit (`ai_mutate_min`).
+- Tool capability predicates gate on the **effective** role: under View-as, `hasRole()`,
+  `isApprover()`, `isMotorpool()`, `isAdmin()`, `isGuard()` and the AI tool/capability
+  predicates all follow the impersonated role. Real All Father stays the actor in
+  `users.id` / audit; AF executing actions still require the real AF session AND no
+  active View-as (`aiActionsAllowed()`).
 - `verifyCsrf()` reads `$_POST`, so the endpoint merges the JSON body into `$_POST` **before**
   the auth/CSRF gate — otherwise a JSON chat call could never verify its token.
 - `window.LOKA_CSRF_TOKEN` is now exposed to JS (it was already present in every rendered form).
@@ -3447,6 +3480,32 @@ marker.
 Still needing a real provider key: the confirm-card *pixels* (CSP forbids
 `eval`, so the script cannot be re-driven in-page to fake a proposal). The
 confirm **endpoint** is covered server-side and over HTTP.
+
+## Checker findings (2026-10-04) — FIX before calling #40 complete
+
+Independent re-audit vs locked decisions (esp. Decision 1 / 4 — View-as effective role). **Overall: PARTIAL.** Implementing agent: close these; checker will re-verify.
+
+### Must fix (security)
+
+- [x] **View-as must use effective role on the API, not only hide the bubble.** `footer.php` hides the chat panel when `isViewingAs()`, but `pages/api/ai-chat.php` does not refuse View-as, and most tool `allowed()` predicates use `isApprover()` / `isMotorpool()` / `isAdmin()` / `hasRole()` against **real** `$_SESSION['user_role']` (All Father), not `effectiveUserRole()`. Under View-as Requester/Guard, a direct API call can still reach ops tools (`my_pending_approvals`, unrestricted lookups, etc.). Fix: gate tools (and preferably the endpoint) on **effective** role helpers; keep real-All-Father-only for AF executing actions. Add harness cases: View-as Requester → ops tools **deny**; View-as Approver → approver tools only.
+
+### Should fix (hardening)
+
+- [x] **Rate-limit `op=confirm` and `op=action`** (today only `op=ask` is gated) so a stolen session cannot burst mutations inside the confirm TTL / AF session.
+- [x] **Confirm tokens: document vs plan.** Plan said one-time; code is HMAC + 120s TTL and **replayable** (asserted intentional). Either make tokens single-use (nonce table / consumed flag) **or** update locked decision text — prefer **single-use** to match original hardening wording.
+- [x] **`aiConfirmSecret()` must not fall back to a static string** if `APP_KEY` is missing — refuse confirm minting / fail closed instead of `'loka-ai-confirm'`.
+
+### Notes (optional)
+
+- Registry uses capability callbacks rather than separate `minRole` / `confirmRequired` fields — functionally OK if View-as fix lands.
+- Settings “loaded at” may read `ai_free_models_at` while cache writes `ai_models_at` — display-only.
+
+### Re-check when fixed
+
+- View-as matrix: Requester/Guard cannot execute ops tools via API; Approver scoped correctly; AF actions still require real All Father
+- Burst confirm/action hits rate limit
+- Replay of a consumed confirm token fails
+- Missing `APP_KEY` → no forgeable confirm HMAC
 
 ---
 
@@ -3538,4 +3597,28 @@ the point is stored, and the All Father Live Board then shows it with exact coor
 accuracy, a staleness badge and an SVG trail. The denied-permission path shows
 *"Permission denied — allow location access for this site"*, and the SVG contains no `http`,
 confirming no tile provider ever sees the coordinates.
+
+## Checker findings (2026-10-04) — FIX before calling #41 complete
+
+Independent re-audit vs locked decisions. Migration is **`060_gps_tracking.php`** (058 repair, 059 AI). **Overall: PARTIAL.** Implementing agent: close these; checker will re-verify.
+
+### Must fix
+
+- [ ] **Cadence (Decision 5):** `GPS_MIN_PING_INTERVAL_SECONDS` is **30**; locked plan is **45–60s**. Raise min interval into that band (e.g. 45 or 60) and align implementation notes / client loop.
+- [ ] **Request-view map (Building blocks / Decision 4 viewers):** Live Trip Board includes `pages/live-board/partials/gps-panel.php`, but `pages/requests/view.php` has **no** GPS panel. Wire the panel for Motorpool/Admin/AF when feature on and the request has (or had) track points — `$gpsSingleRequestId` is already supported by the panel but unused.
+- [ ] **Offline last-good queue (Decision 7):** Denied/offline only shows a message; no brief client-side queue of last good points. Add a small localStorage (or memory) queue that flushes when back online, still session-derived trip only.
+- [ ] **Trail “current” marker order bug:** `gpsTrail()` uses `ORDER BY id DESC` while the SVG treats the **last** array element as current → red marker can land on the **oldest** point. Return oldest-first (or reverse before draw) and assert in harness.
+
+### Should fix
+
+- [ ] **AF hub purge flash:** success message uses single-quoted `'Purged {$r} point(s)...'` → literal `{$r}` shown. Use double quotes or concatenation.
+- [ ] **Retention cron comments:** `process_gps_retention.php` claims opportunistic purge from ping endpoint; `gps-ping.php` never calls it — fix comment or wire opportunistic purge (prefer honest comment unless product wants ping-time purge).
+
+### Re-check when fixed
+
+- Server rejects pings faster than the locked min interval (~45–60s)
+- Request view shows trail/last-seen for Motorpool+; Approver/Requester still no map
+- Airplane-mode then online: queued points flush; ops map updates
+- SVG current marker = newest point
+- Purge flash shows real count
 

@@ -73,6 +73,18 @@ $allTools = aiToolRegistry();
 // requester or guard is never told that ops-only actions exist.
 $tools = aiToolsForCurrentUser();
 
+if ($op === 'confirm' || $op === 'action') {
+    // Mutations get their own burst window: a stolen session must not be
+    // able to fire confirm/action in a tight loop inside the token TTL.
+    $mut = Security::getInstance();
+    $mutUid = (string) userId();
+    if ($mut->isRateLimited('ai_mutate_min', $mutUid, aiAssistantBurstLimit(), 60)) {
+        auditLog('ai_mutate_rate_limited', 'ai_tool', null, null, ['op' => $op]);
+        $respond(['ok' => false, 'error' => 'Too many change requests — slow down.', 'rate_limited' => true, 'scope' => 'minute'], 429);
+    }
+    $mut->recordAttempt('ai_mutate_min', $mutUid);
+}
+
 /* ------------------------------------------------------------------ */
 /* action — execute an All Father action after its typed confirmation   */
 /* ------------------------------------------------------------------ */

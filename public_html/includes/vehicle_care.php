@@ -15,7 +15,7 @@
  */
 function canManageCareAssignments(): bool
 {
-    if (isRealAllFather()) {
+    if (isRealAllFather() && !isViewingAs()) {
         return true;
     }
     $role = userRole();
@@ -29,7 +29,7 @@ function canApproveCareSchedules(): bool
 
 function canAccessMaintenanceSchedule(): bool
 {
-    if (isAdmin() || isMotorpool() || isApprover() || isChiefAdminFinance() || isRealAllFather()) {
+    if (isAdmin() || isMotorpool() || isApprover() || isChiefAdminFinance() || (isRealAllFather() && !isViewingAs())) {
         return true;
     }
     return currentDriverId() !== null && driverHasCareAssignment(currentDriverId());
@@ -75,7 +75,7 @@ function careVehicleIdsForDriver(?int $driverId = null): array
 
 function canViewCareVehicle(int $vehicleId): bool
 {
-    if (isAdmin() || isMotorpool() || isChiefAdminFinance() || isRealAllFather()) {
+    if (isAdmin() || isMotorpool() || isChiefAdminFinance() || (isRealAllFather() && !isViewingAs())) {
         return true;
     }
     if (isApprover()) {
@@ -105,7 +105,7 @@ function canViewCareVehicle(int $vehicleId): bool
  */
 function careVehicleVisibilitySql(string $vehicleColumn = 'vcs.vehicle_id'): array
 {
-    if (isAdmin() || isMotorpool() || isChiefAdminFinance() || isRealAllFather()) {
+    if (isAdmin() || isMotorpool() || isChiefAdminFinance() || (isRealAllFather() && !isViewingAs())) {
         return ['1=1', []];
     }
     if (isApprover()) {

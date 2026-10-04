@@ -129,7 +129,9 @@ function currentUser(): ?object
  */
 function hasRole(string $minRole): bool
 {
-    $userLevel = ROLE_LEVELS[userRole()] ?? 0;
+    // Effective role so "View as" impersonation narrows (never widens) every
+    // capability check app-wide; real identity stays in $_SESSION['user_role'].
+    $userLevel = ROLE_LEVELS[effectiveUserRole()] ?? 0;
     $requiredLevel = ROLE_LEVELS[$minRole] ?? 999;
     return $userLevel >= $requiredLevel;
 }
@@ -140,7 +142,7 @@ function hasRole(string $minRole): bool
 function isAdmin(): bool
 {
     if (isViewingAs()) {
-        return userRole() === ROLE_ADMIN;
+        return effectiveUserRole() === ROLE_ADMIN;
     }
     return userRole() === ROLE_ADMIN || isRealAllFather();
 }
@@ -166,7 +168,7 @@ function isMotorpool(): bool
  */
 function isGuard(): bool
 {
-    return userRole() === ROLE_GUARD;
+    return effectiveUserRole() === ROLE_GUARD;
 }
 
 /**

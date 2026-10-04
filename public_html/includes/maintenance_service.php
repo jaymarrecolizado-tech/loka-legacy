@@ -315,11 +315,18 @@ if (!defined('MAINTENANCE_SERVICE_LOADED')) {
      * Complete a repair ticket: mark done, stamp odometer, release the vehicle,
      * and (Plan #38) write Repair History from the actual cost.
      */
-    function maintenanceServiceCompleteTicket(object $mr, ?int $odometer, ?float $actualCost, int $actorId): array
+    function maintenanceServiceCompleteTicket(object $mr, ?int $odometer, ?float $actualCost, int $actorId, array $costItems = []): array
     {
         $preview = maintenanceServicePreviewCompleteTicket($mr, $odometer);
         if (!$preview['ok']) {
             return $preview;
+        }
+
+        // Plan #38 / Decision 5: with line items, the ticket's actual cost is
+        // the item sum — same rule the History editor applies.
+        require_once INCLUDES_PATH . '/repair_history.php';
+        if ($costItems !== []) {
+            $actualCost = repairHistoryItemsTotal($costItems);
         }
 
         $now = date(DATETIME_FORMAT);
@@ -350,10 +357,9 @@ if (!defined('MAINTENANCE_SERVICE_LOADED')) {
             ['status' => $mr->status], ['status' => MAINTENANCE_STATUS_COMPLETED, 'via' => 'maintenance_service']);
 
         // Plan #38: a completed repair writes Repair History (flag-dependent).
-        require_once INCLUDES_PATH . '/repair_history.php';
         if (repairHistoryEnabled()) {
             $fresh = maintenanceServiceTicket((int) $mr->id);
-            $entryId = repairHistoryUpsertFromMaintenance($fresh);
+            $entryId = repairHistoryUpsertFromMaintenance($fresh, $costItems);
             if ($entryId) {
                 auditLog('repair_history_auto_written', 'vehicle_repair_entry', $entryId, null, [
                     'source' => 'maintenance', 'maintenance_request_id' => (int) $mr->id, 'via' => 'maintenance_service',

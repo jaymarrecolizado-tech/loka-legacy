@@ -315,7 +315,7 @@ if (!defined('AI_TOOLS_LOADED')) {
          * @return list<int>|null
          */
         $visibleVehicleIds = static function (): ?array {
-            if (isAdmin() || isMotorpool() || isApprover() || isRealAllFather()) {
+            if (isAdmin() || isMotorpool() || isApprover() || (isRealAllFather() && !isViewingAs())) {
                 return null;   // unrestricted
             }
             $sql = 'SELECT DISTINCT vehicle_id FROM requests
@@ -416,7 +416,7 @@ if (!defined('AI_TOOLS_LOADED')) {
                 return [
                     'summary' => implode(' · ', $bits),
                     'data' => $out,
-                    'link' => (isApprover() || isAdmin() || isMotorpool() || isRealAllFather())
+                    'link' => (isApprover() || isAdmin() || isMotorpool() || (isRealAllFather() && !isViewingAs()))
                         ? '/?page=vehicles&search=' . rawurlencode($plate)
                         : null,
                 ];
@@ -582,8 +582,9 @@ if (!defined('AI_TOOLS_LOADED')) {
                 'required' => ['reference'],
             ],
             'mutating' => false,
-            // Mirrors the Audit Logs screen (admin / All Father only).
-            'allowed' => static fn(): bool => isAdmin() || isRealAllFather(),
+            // Mirrors the Audit Logs screen (admin / All Father only). View-as
+            // narrows this to the impersonated role, like every other gate.
+            'allowed' => static fn(): bool => isAdmin() || (isRealAllFather() && !isViewingAs()),
             'handler' => static function (array $args): array {
                 $ref = trim((string) ($args['reference'] ?? ''));
                 $entity = strtolower(trim((string) ($args['entity'] ?? ''))) ?: 'request';

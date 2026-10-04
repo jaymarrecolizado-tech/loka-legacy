@@ -232,7 +232,9 @@ if (!defined('AI_ASSISTANT_LOADED')) {
 
     function aiConfirmSecret(): string
     {
-        return (string) (getenv('APP_KEY') ?: 'loka-ai-confirm');
+        // Fail closed: without APP_KEY there is no trustworthy HMAC key, so we
+        // refuse to sign/verify rather than fall back to a public static string.
+        return (string) (getenv('APP_KEY') ?: '');
     }
 
     /**
@@ -240,6 +242,9 @@ if (!defined('AI_ASSISTANT_LOADED')) {
      */
     function aiConfirmToken(int $userId, string $tool, array $args): string
     {
+        if (aiConfirmSecret() === '') {
+            throw new RuntimeException('APP_KEY missing — cannot issue confirm tokens.');
+        }
         $payload = json_encode([
             'u' => $userId,
             't' => $tool,
@@ -257,6 +262,9 @@ if (!defined('AI_ASSISTANT_LOADED')) {
      */
     function aiConfirmTokenVerify(string $token, int $userId): array
     {
+        if (aiConfirmSecret() === '') {
+            return ['ok' => false, 'reason' => 'confirm tokens disabled (APP_KEY missing)'];
+        }
         $parts = explode('.', $token);
         if (count($parts) !== 2) {
             return ['ok' => false, 'reason' => 'malformed token'];
@@ -275,6 +283,20 @@ if (!defined('AI_ASSISTANT_LOADED')) {
         }
         if ((int) $payload['e'] < time()) {
             return ['ok' => false, 'reason' => 'confirm token expired — ask again'];
+        }
+        // Single-use (migration 061): recording the nonce consumes the token.
+        // A replay inside the TTL window fails here. Prune expired rows on the
+        // way through so the table stays small.
+        $nonce = (string) ($payload['n'] ?? '');
+        if ($nonce === '') {
+            return ['ok' => false, 'reason' => 'malformed payload'];
+        }
+        try {
+            db()->query('DELETE FROM ai_confirm_nonces WHERE expires_at < NOW()');
+            db()->query('INSERT INTO ai_confirm_nonces (nonce, expires_at) VALUES (?, FROM_UNIXTIME(?))', [$nonce, (int) $payload['e']]);
+        } catch (Throwable $e) {
+            // Primary-key collision = replay. Any other DB error fails closed.
+            return ['ok' => false, 'reason' => 'confirm token already used'];
         }
         return ['ok' => true, 'reason' => '', 'tool' => (string) $payload['t'], 'args' => (array) ($payload['a'] ?? [])];
     }
