@@ -58,7 +58,8 @@ try {
         ['ai_api_key', '', 'string', 'OpenRouter API key (server-side only; never sent to the browser)'],
         ['ai_base_url', 'https://openrouter.ai/api/v1', 'string', 'OpenAI-compatible API base URL (OpenRouter by default)'],
         ['ai_model', 'qwen/qwen3.8-27b:free', 'string', 'Model id used for chat + tool proposals (must carry the OpenRouter :free tag)'],
-        ['ai_rate_limit_per_hour', '30', 'integer', 'Maximum AI prompts per user per hour'],
+        ['ai_rate_limit_per_hour', '12', 'integer', 'Maximum AI prompts per user per hour (aggressive: the provider is a shared free tier)'],
+        ['ai_rate_limit_per_minute', '4', 'integer', 'Maximum AI prompts per user per minute (burst guard)'],
         ['ai_max_prompt_chars', '2000', 'integer', 'Maximum prompt length accepted from the chat box'],
         ['ai_models', '', 'string', 'Cached OpenRouter model catalogue (JSON, unfiltered)'],
         ['ai_models_at', '0', 'integer', 'Unix time the model catalogue was last fetched'],
@@ -83,6 +84,13 @@ try {
             . ($isDefault ? '' : '  [preserved existing value]')
             . "\n";
     }
+
+    // The rate limits were tightened (the provider is a shared free tier). Only
+    // lower a stored value that is LOOSER than the new default — never raise one
+    // an operator deliberately set tighter.
+    $pdo->exec("UPDATE settings SET value = '12', updated_at = NOW()
+                WHERE `key` = 'ai_rate_limit_per_hour' AND CAST(value AS UNSIGNED) > 12");
+    echo "OK ai_rate_limit_per_hour tightened to 12 where it was looser\n";
 
     echo "\nMIGRATION 059 complete.\n";
 } catch (PDOException $e) {

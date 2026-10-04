@@ -117,11 +117,17 @@ if ($op !== 'ask') {
 // Rate limit before spending a provider call.
 $gate = aiAssistantRateGate();
 if (!$gate['allowed']) {
-    $mins = max(1, (int) ceil($gate['remaining'] / 60));
+    $wait = $gate['scope'] === 'minute'
+        ? max(1, (int) ceil($gate['remaining'] / 60))
+        : max(1, (int) ceil($gate['remaining'] / 60));
     $respond([
         'ok' => false,
-        'error' => 'You have reached the AI assistant limit for this hour. Try again in about ' . $mins . ' minute(s).',
+        'error' => 'You have reached the AI assistant limit'
+            . ($gate['scope'] === 'minute' ? ' for this minute' : ' for this hour')
+            . ' (' . ($gate['scope'] === 'minute' ? aiAssistantBurstLimit() : aiAssistantRateLimit())
+            . ' prompt(s)). Try again in about ' . $wait . ' minute(s).',
         'rate_limited' => true,
+        'scope' => $gate['scope'],
     ], 429);
 }
 

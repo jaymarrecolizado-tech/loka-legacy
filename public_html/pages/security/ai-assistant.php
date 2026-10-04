@@ -41,7 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $enabled = post('ai_assistant_enabled', '0') === '1' ? '1' : '0';
             $baseUrl = trim(postSafe('ai_base_url', '', 200)) ?: AI_DEFAULT_BASE_URL;
             $model = trim(postSafe('ai_model', '', 120)) ?: AI_DEFAULT_MODEL;
-            $limit = max(1, min(600, (int) post('ai_rate_limit_per_hour', 30)));
+            $limit = max(1, min(200, (int) post('ai_rate_limit_per_hour', 12)));
+            $burst = max(1, min(60, (int) post('ai_rate_limit_per_minute', 4)));
 
             // Only allow an http(s) endpoint so the key cannot be exfiltrated.
             if (!preg_match('#^https?://#i', $baseUrl)) {
@@ -64,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // model is a legitimate choice for an All Father.
             $upsert('ai_model', $model);
             $upsert('ai_rate_limit_per_hour', (string) $limit, 'integer');
+            $upsert('ai_rate_limit_per_minute', (string) $burst, 'integer');
             if (aiAssistantApiKey() === '') {
                 throw new InvalidArgumentException('A provider API key is required before the assistant can be switched on.');
             }
@@ -73,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'enabled' => $enabled,
                 'model' => $model,
                 'rate_limit_per_hour' => $limit,
+                'rate_limit_per_minute' => $burst,
             ]);
             redirectWith('/?page=security&action=ai-assistant', 'success', 'AI assistant settings saved.');
         }
@@ -213,14 +216,25 @@ require_once INCLUDES_PATH . '/header.php';
                             <?php endif; ?>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label" for="ai_rate_limit_per_hour">Prompts per user per hour</label>
-                            <input type="number" name="ai_rate_limit_per_hour" class="form-control"
-                                   id="ai_rate_limit_per_hour" min="1" max="600"
-                                   value="<?= aiAssistantRateLimit() ?>">
-                            <div class="form-text">
-                                This app-side limit is separate from OpenRouter's own free-tier limits.
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label class="form-label" for="ai_rate_limit_per_hour">Prompts / hour</label>
+                                <input type="number" name="ai_rate_limit_per_hour" class="form-control"
+                                       id="ai_rate_limit_per_hour" min="1" max="200"
+                                       value="<?= aiAssistantRateLimit() ?>">
                             </div>
+                            <div class="col-6">
+                                <label class="form-label" for="ai_rate_limit_per_minute">Prompts / minute</label>
+                                <input type="number" name="ai_rate_limit_per_minute" class="form-control"
+                                       id="ai_rate_limit_per_minute" min="1" max="60"
+                                       value="<?= aiAssistantBurstLimit() ?>">
+                            </div>
+                        </div>
+                        <div class="form-text mb-3">
+                            These are deliberately tight: the provider is a <em>shared</em> free tier
+                            that throttles per account, so a high ceiling here just means one person
+                            consumes the pool for everyone. The per-minute guard stops the hourly
+                            budget being spent in a few seconds.
                         </div>
 
                         <button type="submit" name="op" value="save" class="btn btn-primary">
@@ -307,7 +321,8 @@ require_once INCLUDES_PATH . '/header.php';
                         <li>Mutating tools require a signed confirm token that expires in <?= AI_CONFIRM_TTL_SECONDS ?>s.</li>
                         <li>View-as is honoured; All Father-only tools are refused while impersonating.</li>
                         <li>Every prompt, proposal, denial and execution is written to <code>audit_logs</code>.</li>
-                        <li>Rate limit: <?= aiAssistantRateLimit() ?> prompt(s) per user per hour.</li>
+                        <li>Rate limit: <?= aiAssistantRateLimit() ?> prompt(s) per user per hour, <?= aiAssistantBurstLimit() ?> per minute.</li>
+                        <li>Only the tools your role may use are advertised to the model at all.</li>
                         <li>The API key stays server-side; the model catalogue is fetched without it.</li>
                     </ul>
                 </div>

@@ -113,9 +113,26 @@ if (!defined('AI_ASSISTANT_LOADED')) {
         return '$' . number_format($perMillion, 4) . '/M';
     }
 
+    /**
+     * Prompts per user per hour.
+     *
+     * Deliberately aggressive: the whole point of this deployment is free
+     * OpenRouter models, and a free tier is a shared resource that throttles
+     * per account, not per key. A high ceiling here just means one person
+     * consumes the pool for everyone.
+     */
     function aiAssistantRateLimit(): int
     {
-        return max(1, min(600, (int) tripSetting('ai_rate_limit_per_hour', '30')));
+        return max(1, min(200, (int) tripSetting('ai_rate_limit_per_hour', '12')));
+    }
+
+    /**
+     * Prompts per user per minute — stops one person burning the hourly budget
+     * in a few seconds, which a per-hour limit alone cannot prevent.
+     */
+    function aiAssistantBurstLimit(): int
+    {
+        return max(1, min(60, (int) tripSetting('ai_rate_limit_per_minute', '4')));
     }
 
     function aiAssistantMaxPromptChars(): int
@@ -171,23 +188,42 @@ if (!defined('AI_ASSISTANT_LOADED')) {
     /* ----------------------------------------------------------------- */
 
     /**
-     * @return array{allowed:bool, remaining:int}
+     * Two windows: a short burst guard and the hourly cap.
+     *
+     * @return array{allowed:bool, remaining:int, scope:string}
      */
     function aiAssistantRateGate(): array
     {
-        $limit = aiAssistantRateLimit();
         $security = Security::getInstance();
-        $blocked = $security->isRateLimited('ai_prompt', (string) userId(), $limit, 3600);
-        if (!$blocked) {
-            return ['allowed' => true, 'remaining' => $limit];
+        $uid = (string) userId();
+
+        $burst = aiAssistantBurstLimit();
+        if ($security->isRateLimited('ai_prompt_min', $uid, $burst, 60)) {
+            return [
+                'allowed' => false,
+                'remaining' => $security->getLockoutRemaining('ai_prompt_min', $uid, 60),
+                'scope' => 'minute',
+            ];
         }
-        $remaining = $security->getLockoutRemaining('ai_prompt', (string) userId(), 3600);
-        return ['allowed' => false, 'remaining' => $remaining];
+
+        $hourly = aiAssistantRateLimit();
+        if ($security->isRateLimited('ai_prompt_hour', $uid, $hourly, 3600)) {
+            return [
+                'allowed' => false,
+                'remaining' => $security->getLockoutRemaining('ai_prompt_hour', $uid, 3600),
+                'scope' => 'hour',
+            ];
+        }
+
+        return ['allowed' => true, 'remaining' => $hourly, 'scope' => ''];
     }
 
     function aiAssistantRecordPrompt(): void
     {
-        Security::getInstance()->recordAttempt('ai_prompt', (string) userId());
+        $security = Security::getInstance();
+        $uid = (string) userId();
+        $security->recordAttempt('ai_prompt_min', $uid);
+        $security->recordAttempt('ai_prompt_hour', $uid);
     }
 
     /* ----------------------------------------------------------------- */

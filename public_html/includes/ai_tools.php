@@ -288,6 +288,344 @@ if (!defined('AI_TOOLS_LOADED')) {
         ];
 
         // ---------------------------------------------------------------
+        // Fleet reference tools. Each one mirrors access the caller already has
+        // in the UI — none of them grant a new permission:
+        //   ops roles  -> the Vehicles / Drivers / Maintenance / Audit screens
+        //   guard      -> approved trips (what the Guard Dashboard lists)
+        //   requester  -> the vehicles and drivers on their own requests
+        // ---------------------------------------------------------------
+
+        /**
+         * Which vehicles may this caller be told about?
+         *
+         * Returns NULL for "unrestricted" (ops roles) and an ARRAY otherwise —
+         * including an EMPTY array, which means "no vehicles at all". Collapsing
+         * those two cases would hand a requester who happens to own no vehicle
+         * unrestricted fleet-wide access.
+         *
+         * Mirrors the UI: ops see the fleet, guards see vehicles on approved
+         * trips (the Guard Dashboard lists every approved trip), requesters see
+         * only their own.
+         *
+         * @return list<int>|null
+         */
+        $visibleVehicleIds = static function (): ?array {
+            if (isAdmin() || isMotorpool() || isApprover() || isRealAllFather()) {
+                return null;   // unrestricted
+            }
+            $sql = 'SELECT DISTINCT vehicle_id FROM requests
+                    WHERE deleted_at IS NULL AND vehicle_id IS NOT NULL';
+            $params = [];
+            if (isGuard()) {
+                $sql .= " AND status = 'approved'";
+            } else {
+                // requester (or anything else): own requests only
+                $sql .= ' AND user_id = ?';
+                $params[] = userId();
+            }
+            return array_map('intval', array_column(db()->fetchAll($sql, $params), 'vehicle_id'));
+        };
+
+        $tools['vehicle_lookup'] = [
+            'label' => 'Looking up a vehicle',
+            'description' => 'Look up a fleet vehicle by plate number: make/model, status, mileage, and which trip it is currently on.',
+            'schema' => [
+                'type' => 'object',
+                'properties' => ['plate' => ['type' => 'string', 'maxLength' => 20]],
+                'required' => ['plate'],
+            ],
+            'mutating' => false,
+            'allowed' => static fn(): bool => userId() !== null,
+            'handler' => static function (array $args) use ($visibleVehicleIds): array {
+                $plate = trim((string) ($args['plate'] ?? ''));
+                if ($plate === '') {
+                    return ['summary' => 'Please give a plate number.', 'data' => [], 'link' => null];
+                }
+                // A plate is an identifier: try an exact (case/space-insensitive)
+                // match first and only fall back to a substring search, otherwise
+                // "SAA" would match half the fleet.
+                $norm = static fn(string $p): string
+                    => strtoupper(str_replace([' ', '-'], '', $p));
+                $normed = $norm($plate);
+                $allowed = $visibleVehicleIds();
+                if ($allowed === []) {
+                    // No vehicles visible to this caller at all. Must NOT fall
+                    // through to an unrestricted lookup.
+                    return ['summary' => 'No vehicle matching "' . $plate . '" is visible to you.', 'data' => [], 'link' => null];
+                }
+                $idClause = '';
+                $extra = [];
+                if ($allowed !== null) {
+                    $idClause = ' AND v.id IN (' . implode(',', array_fill(0, count($allowed), '?')) . ')';
+                    $extra = $allowed;
+                }
+
+                $cols = 'v.id, v.plate_number, v.make, v.model, v.year, v.vin, v.engine_number,
+                         v.status, v.mileage, v.fuel_type, v.transmission,
+                         v.last_maintenance_date, v.odometer_broken';
+                $rows = db()->fetchAll(
+                    "SELECT {$cols} FROM vehicles v
+                     WHERE v.deleted_at IS NULL
+                       AND UPPER(REPLACE(REPLACE(v.plate_number, ' ', ''), '-', '')) = ?{$idClause}
+                     LIMIT 5",
+                    array_merge([$normed], $extra)
+                );
+                if ($rows === []) {
+                    $rows = db()->fetchAll(
+                        "SELECT {$cols} FROM vehicles v
+                         WHERE v.deleted_at IS NULL AND v.plate_number LIKE ?{$idClause}
+                         ORDER BY v.plate_number LIMIT 5",
+                        array_merge(['%' . $plate . '%'], $extra)
+                    );
+                }
+
+                if ($rows === []) {
+                    return ['summary' => 'No vehicle matching "' . $plate . '" is visible to you.', 'data' => [], 'link' => null];
+                }
+                $out = [];
+                $bits = [];
+                foreach ($rows as $v) {
+                    $trip = db()->fetch(
+                        "SELECT r.id, r.status, r.destination, r.start_datetime, r.actual_dispatch_datetime
+                         FROM requests r
+                         WHERE r.vehicle_id = ? AND r.deleted_at IS NULL
+                           AND (r.status = 'approved' OR r.actual_dispatch_datetime IS NOT NULL)
+                         ORDER BY r.actual_dispatch_datetime DESC, r.id DESC LIMIT 1",
+                        [(int) $v->id]
+                    );
+                    $o = [
+                        'plate' => $v->plate_number,
+                        'vehicle' => trim($v->make . ' ' . $v->model . ' ' . ($v->year ?? '')),
+                        'status' => $v->status,
+                        'mileage_km' => (int) $v->mileage,
+                        'odometer_broken' => (int) $v->odometer_broken === 1,
+                        'engine_no' => $v->engine_number ?: null,
+                        'last_service' => $v->last_maintenance_date ?: null,
+                        'active_trip' => $trip ? (int) $trip->id : null,
+                    ];
+                    $out[] = $o;
+                    $bits[] = $o['plate'] . ' (' . $o['vehicle'] . ') — ' . $o['status']
+                        . ', ' . number_format($o['mileage_km']) . ' km'
+                        . ($trip ? ', on trip #' . $trip->id : '');
+                }
+                return [
+                    'summary' => implode(' · ', $bits),
+                    'data' => $out,
+                    'link' => (isApprover() || isAdmin() || isMotorpool() || isRealAllFather())
+                        ? '/?page=vehicles&search=' . rawurlencode($plate)
+                        : null,
+                ];
+            },
+        ];
+
+        $tools['vehicle_service_history'] = [
+            'label' => 'Checking a vehicle\'s repair and service history',
+            'description' => 'Open repair tickets and recorded Repair History for a vehicle — why it was in the shop and what it cost.',
+            'schema' => [
+                'type' => 'object',
+                'properties' => ['plate' => ['type' => 'string', 'maxLength' => 20]],
+                'required' => ['plate'],
+            ],
+            'mutating' => false,
+            // Mirrors the Maintenance screen (approver and above). A requester
+            // cannot open Maintenance in the UI, so they must not get repair
+            // costs (or ticket detail) through the assistant either.
+            'allowed' => static fn(): bool => isApprover() || isAdmin() || isMotorpool() || isRealAllFather(),
+            'handler' => static function (array $args): array {
+                $plate = trim((string) ($args['plate'] ?? ''));
+                if ($plate === '') {
+                    return ['summary' => 'Please give a plate number.', 'data' => [], 'link' => null];
+                }
+                // This tool is ops-only (it mirrors the Maintenance screen), so
+                // every vehicle is visible — no allow-list needed.
+                $veh = db()->fetch(
+                    "SELECT id, plate_number, make, model FROM vehicles
+                     WHERE deleted_at IS NULL AND plate_number LIKE ?
+                     ORDER BY plate_number LIMIT 1",
+                    ['%' . $plate . '%']
+                );
+                if (!$veh) {
+                    return ['summary' => 'No vehicle matching "' . $plate . '" is visible to you.', 'data' => [], 'link' => null];
+                }
+
+                $tickets = db()->fetchAll(
+                    "SELECT id, title, status, priority, type, reported_at, scheduled_date, completed_date,
+                            estimated_cost, actual_cost
+                     FROM maintenance_requests
+                     WHERE vehicle_id = ? AND deleted_at IS NULL
+                     ORDER BY COALESCE(completed_date, reported_at) DESC LIMIT 8",
+                    [(int) $veh->id]
+                );
+
+                // Repair History is Plan #38 and ships OFF by default — say so
+                // rather than silently reporting no history.
+                $history = [];
+                $historyNote = '';
+                if (aiRepairHistoryAvailable()) {
+                    $history = db()->fetchAll(
+                        "SELECT id, repair_date, nature_of_repair, total_amount, source
+                         FROM vehicle_repair_entries
+                         WHERE vehicle_id = ? AND deleted_at IS NULL
+                         ORDER BY repair_date DESC LIMIT 10",
+                        [(int) $veh->id]
+                    );
+                } else {
+                    $historyNote = ' Repair History is switched off (Plan #38 is experimental).';
+                }
+
+                $bits = [];
+                foreach ($tickets as $t) {
+                    $cost = $t->actual_cost !== null ? '₱' . number_format((float) $t->actual_cost, 2)
+                        : ($t->estimated_cost !== null ? 'est ₱' . number_format((float) $t->estimated_cost, 2) : 'no cost');
+                    $bits[] = 'repair #' . $t->id . ' ' . $t->status . ' — ' . $t->title . ' (' . $cost . ')';
+                }
+                foreach ($history as $h) {
+                    $bits[] = $h->repair_date . ' ' . $h->nature_of_repair . ' — ₱'
+                        . number_format((float) $h->total_amount, 2);
+                }
+                if ($bits === []) {
+                    $bits[] = 'no repairs recorded';
+                }
+
+                return [
+                    'summary' => $veh->plate_number . ' — ' . count($tickets) . ' repair ticket(s), '
+                        . count($history) . ' repair-history entr' . (count($history) === 1 ? 'y' : 'ies')
+                        . '. ' . implode(' · ', $bits) . '.' . $historyNote,
+                    'data' => [
+                        'plate' => $veh->plate_number,
+                        'tickets' => array_map(static fn($t) => [
+                            'id' => (int) $t->id, 'title' => $t->title, 'status' => $t->status,
+                            'actual_cost' => $t->actual_cost,
+                        ], $tickets),
+                        'repair_history' => array_map(static fn($h) => [
+                            'date' => $h->repair_date, 'nature' => $h->nature_of_repair,
+                            'amount' => (float) $h->total_amount,
+                        ], $history),
+                    ],
+                    'link' => '/?page=maintenance&action=view&id=' . (int) ($tickets[0]->id ?? 0),
+                ];
+            },
+        ];
+
+        $tools['driver_availability'] = [
+            'label' => 'Checking driver availability',
+            'description' => 'List drivers with their current status — available, on trip, on leave or unavailable.',
+            'schema' => [
+                'type' => 'object',
+                'properties' => ['status' => ['type' => 'string', 'maxLength' => 20]],
+                'required' => [],
+            ],
+            'mutating' => false,
+            // Mirrors the Drivers screen (approver and above).
+            'allowed' => static fn(): bool => isApprover() || isAdmin() || isMotorpool() || isRealAllFather(),
+            'handler' => static function (array $args): array {
+                $status = trim((string) ($args['status'] ?? ''));
+                $allowed = [DRIVER_AVAILABLE, DRIVER_ON_TRIP, DRIVER_ON_LEAVE, DRIVER_UNAVAILABLE];
+                if ($status !== '' && !in_array($status, $allowed, true)) {
+                    $status = '';
+                }
+                $sql = "SELECT d.id, d.license_number, d.status, u.name, u.email, r.id AS trip_id
+                        FROM drivers d
+                        LEFT JOIN users u ON u.id = d.user_id AND u.deleted_at IS NULL
+                        LEFT JOIN requests r ON r.driver_id = d.id AND r.deleted_at IS NULL
+                               AND r.status = 'approved' AND r.actual_dispatch_datetime IS NOT NULL
+                               AND r.actual_arrival_datetime IS NULL
+                        WHERE d.deleted_at IS NULL";
+                $params = [];
+                if ($status !== '') {
+                    $sql .= ' AND d.status = ?';
+                    $params[] = $status;
+                }
+                $sql .= ' ORDER BY d.status, u.name LIMIT 25';
+                $rows = db()->fetchAll($sql, $params);
+
+                $counts = ['available' => 0, 'on_trip' => 0, 'on_leave' => 0, 'unavailable' => 0];
+                foreach (db()->fetchAll(
+                    "SELECT status, COUNT(*) c FROM drivers WHERE deleted_at IS NULL GROUP BY status"
+                ) as $r) {
+                    $counts[(string) $r->status] = (int) $r->c;
+                }
+
+                $bits = array_map(static fn($r) => ($r->name ?: ('driver #' . $r->id))
+                    . ' — ' . $r->status . ($r->trip_id ? ' (trip #' . $r->trip_id . ')' : ''), $rows);
+
+                $headline = sprintf(
+                    'Drivers: %d available, %d on trip, %d on leave, %d unavailable.',
+                    $counts['available'], $counts['on_trip'], $counts['on_leave'], $counts['unavailable']
+                );
+
+                return [
+                    'summary' => $headline . ($bits === [] ? '' : ' ' . implode(' · ', array_slice($bits, 0, 12))),
+                    'data' => ['counts' => $counts, 'drivers' => array_map(static fn($r) => [
+                        'id' => (int) $r->id, 'name' => $r->name, 'status' => $r->status,
+                        'trip_id' => $r->trip_id ? (int) $r->trip_id : null,
+                    ], $rows)],
+                    'link' => '/?page=drivers',
+                ];
+            },
+        ];
+
+        $tools['audit_trail_lookup'] = [
+            'label' => 'Checking the audit trail',
+            'description' => 'Show who did what to a record — approvals, rollbacks, status changes — with timestamps and comments.',
+            'schema' => [
+                'type' => 'object',
+                'properties' => [
+                    'reference' => ['type' => 'string', 'maxLength' => 40],
+                    'entity' => ['type' => 'string', 'maxLength' => 20],
+                ],
+                'required' => ['reference'],
+            ],
+            'mutating' => false,
+            // Mirrors the Audit Logs screen (admin / All Father only).
+            'allowed' => static fn(): bool => isAdmin() || isRealAllFather(),
+            'handler' => static function (array $args): array {
+                $ref = trim((string) ($args['reference'] ?? ''));
+                $entity = strtolower(trim((string) ($args['entity'] ?? ''))) ?: 'request';
+                $map = [
+                    'request' => ['request', 'id'],
+                    'trip' => ['request', 'id'],
+                    'ob' => ['ob_request', 'id'],
+                    'voucher' => ['gas_voucher', 'id'],
+                    'gas' => ['gas_voucher', 'id'],
+                    'maintenance' => ['maintenance_request', 'id'],
+                    'repair' => ['vehicle_repair_entry', 'id'],
+                    'vehicle' => ['vehicle', 'id'],
+                ];
+                if (!isset($map[$entity])) {
+                    return ['summary' => 'Unknown record type. Use request, ob, voucher, maintenance, repair or vehicle.', 'data' => [], 'link' => null];
+                }
+                $ref = ltrim($ref, '#');
+                if (!ctype_digit($ref)) {
+                    return ['summary' => 'That does not look like a record id. Use a number, e.g. 679.', 'data' => [], 'link' => null];
+                }
+                [$type, $col] = $map[$entity];
+                $rows = db()->fetchAll(
+                    "SELECT a.action, a.entity_type, a.entity_id, a.created_at, u.name AS actor, a.new_data
+                     FROM audit_logs a
+                     LEFT JOIN users u ON u.id = a.user_id
+                     WHERE a.entity_type = ? AND a.entity_id = ?
+                     ORDER BY a.id DESC LIMIT 25",
+                    [$type, (int) $ref]
+                );
+
+                if ($rows === []) {
+                    return ['summary' => 'No audit entries for ' . $entity . ' #' . $ref . ' you can see.', 'data' => [], 'link' => null];
+                }
+                $bits = array_map(static fn($r) => formatDateTime($r->created_at) . ' '
+                    . ($r->actor ?: 'system') . ' — ' . $r->action, $rows);
+                return [
+                    'summary' => count($rows) . ' audit entr' . (count($rows) === 1 ? 'y' : 'ies')
+                        . ' for ' . $entity . ' #' . $ref . ': ' . implode(' · ', array_slice($bits, 0, 10)),
+                    'data' => array_map(static fn($r) => [
+                        'at' => $r->created_at, 'actor' => $r->actor, 'action' => $r->action,
+                    ], $rows),
+                    'link' => '/?page=audit&search=' . rawurlencode($ref),
+                ];
+            },
+        ];
+
+        // ---------------------------------------------------------------
         // Guided tools — verify the caller may act, then hand off to the
         // real screen. The approval state machines (pages/approvals/process.php,
         // pages/ob-requests/process.php) are NOT duplicated here: a second copy
@@ -526,6 +864,20 @@ if (!defined('AI_TOOLS_LOADED')) {
             'link' => $result['link'] ?? null,
             'error' => '',
         ];
+    }
+
+    /**
+     * Is Plan #38's Repair History switched on?
+     *
+     * vehicle_service_history must not silently report "no history" when the
+     * feature is simply off — the reply says so instead.
+     */
+    function aiRepairHistoryAvailable(): bool
+    {
+        if (!function_exists('repairHistoryEnabled')) {
+            require_once INCLUDES_PATH . '/repair_history.php';
+        }
+        return repairHistoryEnabled();
     }
 
     /**
