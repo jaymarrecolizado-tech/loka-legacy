@@ -28,10 +28,10 @@
             </li>
 
             <?php
-            // Plan #41 — Trip Tracking is offered to a tagged driver who has a
-            // live dispatched trip, only while the feature is on.
-            $gpsFlag = db()->fetch("SELECT value FROM settings WHERE `key` = 'gps_tracking_enabled'");
-            if ($gpsFlag && (string) $gpsFlag->value === '1' && gpsTrackingCurrentTripForDriver()): ?>
+            // Plan #41 — show Trip Tracking to tagged drivers whenever the
+            // experimental flag is ON. The page itself explains "nothing to
+            // track" until guard Dispatch opens the window.
+            if (function_exists('gpsTrackingEnabled') && gpsTrackingEnabled()): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= activeMenu('gps-tracking') ?>" href="<?= APP_URL ?>/?page=gps-tracking">
                         <i class="bi bi-geo-alt-fill"></i>
