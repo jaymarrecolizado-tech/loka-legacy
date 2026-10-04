@@ -344,9 +344,11 @@ switch ($page) {
 
     case 'reports':
         requireReportsAccess();
-        // Non-approver drivers may only use own Driver Report + anonymous eval rankings/extracts
+        // Non-approver drivers may only use own Driver Report + own eval
+        // extracts. Driver Rankings stay approver+ (canViewDriverRankings);
+        // the page guards enforce it even if the action is requested directly.
         if (isSelfScopedDriverReporter()) {
-            $driverAllowed = ['index', 'driver', 'export-driver', 'export-driver-csv', 'driver-rankings', 'export-driver-rankings-csv', 'export-driver-evaluations-pdf', 'driver-trip-extract', 'export-driver-trip-extract-csv', 'export-driver-trip-extract-pdf'];
+            $driverAllowed = ['index', 'driver', 'export-driver', 'export-driver-csv', 'export-driver-evaluations-pdf', 'driver-trip-extract', 'export-driver-trip-extract-csv', 'export-driver-trip-extract-pdf'];
             if (!in_array($action, $driverAllowed, true)) {
                 redirectWith('/?page=reports', 'danger', 'You do not have permission to access that report.');
             }

@@ -31,7 +31,9 @@ require_once INCLUDES_PATH . '/header.php';
         </div>
         <div class="d-flex gap-3 align-items-center flex-wrap">
             <?= evalReportPdfExportHtml($f) ?>
+            <?php if (canViewDriverRankings()): ?>
             <a href="<?= APP_URL ?>/?page=reports&action=driver-rankings" class="btn btn-primary"><i class="bi bi-trophy me-1"></i>Driver Rankings</a>
+            <?php endif; ?>
             <a href="<?= APP_URL ?>/?page=reports&action=driver-trip-extract&from=<?= e($f['from']) ?>&to=<?= e($f['to']) ?>" class="btn btn-outline-secondary"><i class="bi bi-table me-1"></i>Trip Extract</a>
         </div>
     </div>

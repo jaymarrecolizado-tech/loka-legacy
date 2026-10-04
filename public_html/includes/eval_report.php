@@ -22,6 +22,30 @@ function requireEvalReportAccess(): void
 }
 
 /**
+ * Driver Rankings are for approver+ only — the people being ranked must not
+ * see anonymous peer scores. hasRole() is effective-role-based, so View-as a
+ * driver correctly loses access here too.
+ */
+function canViewDriverRankings(): bool
+{
+    return isApprover();
+}
+
+/**
+ * Gate for the Driver Rankings screen and its CSV export (fleet-wide rows).
+ * The shared evaluations PDF keeps requireEvalReportAccess(): self-scoped
+ * drivers legitimately export their own rows through it.
+ */
+function requireDriverRankingsAccess(): void
+{
+    requireReportsAccess();
+    if (!canViewDriverRankings()) {
+        redirectWith('/?page=reports', 'danger', 'Driver Rankings are only visible to approvers and above.');
+    }
+}
+
+
+/**
  * Parse the shared GET filter set.
  *
  * $defaultCurrentMonth: Rankings + exports default From/To to the current

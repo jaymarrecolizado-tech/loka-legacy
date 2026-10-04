@@ -6,7 +6,7 @@
  */
 
 require_once INCLUDES_PATH . '/eval_report.php';
-requireEvalReportAccess();
+requireDriverRankingsAccess();
 
 $f = evalReportParseFilters(true);
 $data = evalReportRankings($f);

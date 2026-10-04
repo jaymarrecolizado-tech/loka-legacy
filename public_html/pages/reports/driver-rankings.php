@@ -11,7 +11,7 @@
  */
 
 require_once INCLUDES_PATH . '/eval_report.php';
-requireEvalReportAccess();
+requireDriverRankingsAccess();
 
 $pageTitle = 'Driver Rankings';
 $f = evalReportParseFilters(true); // defaults to current month

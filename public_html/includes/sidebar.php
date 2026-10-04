@@ -262,13 +262,15 @@
                     <span>Reports</span>
                 </a>
             </li>
-            <!-- Driver Rankings (anonymous evaluations) -->
+            <!-- Driver Rankings (anonymous evaluations, approver+ only) -->
+            <?php if (canViewDriverRankings()): ?>
             <li class="nav-item">
                 <a class="nav-link <?= (get('page')==='reports' && get('action')==='driver-rankings') ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=reports&action=driver-rankings">
                     <i class="bi bi-trophy"></i>
                     <span>Driver Rankings</span>
                 </a>
             </li>
+            <?php endif; ?>
             <!-- Driver Trip Extract (assigned trips + scores) -->
             <li class="nav-item">
                 <a class="nav-link <?= (get('page')==='reports' && get('action')==='driver-trip-extract') ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=reports&action=driver-trip-extract">

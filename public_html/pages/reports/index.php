@@ -102,7 +102,8 @@ require_once INCLUDES_PATH . '/header.php';
         </div>
         <?php endif; ?>
 
-        <!-- Driver Rankings (anonymous) -->
+        <!-- Driver Rankings (anonymous, approver+ only) -->
+        <?php if (canViewDriverRankings()): ?>
         <div class="col-lg-4 col-md-6">
             <a href="<?= APP_URL ?>/?page=reports&action=driver-rankings" class="text-decoration-none">
                 <div class="card h-100 report-card">
@@ -117,6 +118,7 @@ require_once INCLUDES_PATH . '/header.php';
                 </div>
             </a>
         </div>
+        <?php endif; ?>
 
         <!-- Evaluations -->
         <div class="col-lg-4 col-md-6">

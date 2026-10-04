@@ -100,7 +100,9 @@ require_once INCLUDES_PATH . '/header.php';
                 <?= $flagHidden() ?>
                 <button type="submit" class="btn btn-outline-danger"><i class="bi bi-file-earmark-pdf me-1"></i>Export PDF</button>
             </form>
+            <?php if (canViewDriverRankings()): ?>
             <a href="<?= APP_URL ?>/?page=reports&action=driver-rankings" class="btn btn-outline-primary"><i class="bi bi-trophy me-1"></i>Rankings</a>
+            <?php endif; ?>
         </div>
     </div>
 
