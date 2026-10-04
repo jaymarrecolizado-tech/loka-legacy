@@ -65,7 +65,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
 
 $op = (string) ($body['op'] ?? 'ask');
 
-$tools = aiToolRegistry();
+// Full registry — used to resolve a confirmed call and to read its mutating
+// flag. Execution is gated again inside aiToolExecute().
+$allTools = aiToolRegistry();
+
+// Only the tools THIS user may use are advertised to the provider, so a
+// requester or guard is never told that ops-only actions exist.
+$tools = aiToolsForCurrentUser();
 
 /* ------------------------------------------------------------------ */
 /* confirm — run a previously proposed mutating tool                    */
@@ -93,7 +99,7 @@ if ($op === 'confirm') {
             'tool'     => $verified['tool'],
             'label'    => aiToolLabel($verified['tool']),
             'trace'    => aiToolTraceLine($verified['tool'], $verified['args']),
-            'mutating' => !empty($tools[$verified['tool']]['mutating'] ?? false),
+            'mutating' => !empty($allTools[$verified['tool']]['mutating'] ?? false),
             'summary'  => $result['summary'],
             'data'     => $result['data'],
             'link'     => $result['link'],

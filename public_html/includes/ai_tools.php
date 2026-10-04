@@ -528,6 +528,33 @@ if (!defined('AI_TOOLS_LOADED')) {
         ];
     }
 
+    /**
+     * Only the tools the signed-in user may actually use.
+     *
+     * The endpoint sends THIS list to the provider, so a requester or guard is
+     * never even told that ops-only actions like propose_care exist. Defence in
+     * depth: aiToolExecute() re-checks the same predicate at execute time, so a
+     * role change between the proposal and the confirm cannot escalate either.
+     *
+     * @return array<string, array<string,mixed>>
+     */
+    function aiToolsForCurrentUser(): array
+    {
+        $out = [];
+        foreach (aiToolRegistry() as $id => $tool) {
+            try {
+                $allowed = (bool) ($tool['allowed'])();
+            } catch (Throwable $e) {
+                error_log('aiToolsForCurrentUser: allowed() threw for ' . $id . ': ' . $e->getMessage());
+                $allowed = false;
+            }
+            if ($allowed) {
+                $out[$id] = $tool;
+            }
+        }
+        return $out;
+    }
+
     /** Tool descriptions for the chat UI's "what can you do" hint. */
     function aiToolSummaries(): array
     {
