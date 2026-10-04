@@ -28,21 +28,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $op = postSafe('op', '', 20);
 
     if ($op === 'approve' && $canApprove && $item->status === CARE_STATUS_PENDING) {
-        db()->update('vehicle_care_schedules', [
-            'status' => CARE_STATUS_SCHEDULED,
-            'approved_by' => userId(),
-            'approved_at' => date(DATETIME_FORMAT),
-            'updated_at' => date(DATETIME_FORMAT),
-        ], 'id = ?', [$id]);
-        notifyCareStakeholders(
-            (int) $item->vehicle_id,
-            'care_schedule_scheduled',
-            'Care item approved',
-            "{$item->title} for {$item->plate_number} is scheduled for " . formatDate($item->due_date) . ".",
-            '/?page=maintenance&action=care-edit&id=' . $id
-        );
-        auditLog('care_schedule_approve', 'vehicle_care_schedule', $id);
-        redirectWith('/?page=maintenance&action=care-edit&id=' . $id, 'success', 'Approved and scheduled.');
+        // Plan #40 — the real screen and the AI assistant share ONE implementation
+        // (includes/maintenance_service.php) so the rules cannot drift apart.
+        require_once INCLUDES_PATH . '/maintenance_service.php';
+        $res = maintenanceServiceApproveCare($item, (int) userId());
+        if (!$res['ok']) {
+            $errors[] = $res['error'];
+        } else {
+            redirectWith('/?page=maintenance&action=care-edit&id=' . $id, 'success', 'Approved and scheduled.');
+        }
     }
 
     if ($op === 'save' && $canApprove) {
@@ -69,59 +63,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $mileage = post('completed_mileage') !== '' ? postInt('completed_mileage') : null;
         require_once INCLUDES_PATH . '/repair_history.php';
         $careCostItems = repairHistoryNormalizeItems(repairHistoryItemsFromPost())[0];
-        db()->update('vehicle_care_schedules', [
-            'status' => CARE_STATUS_COMPLETED,
-            'completed_at' => date(DATETIME_FORMAT),
-            'completed_by' => userId(),
-            'completed_mileage' => $mileage,
-            'updated_at' => date(DATETIME_FORMAT),
-        ], 'id = ?', [$id]);
 
-        // Recurring: create next scheduled item
-        $typeInfo = CARE_TYPES[$item->care_type] ?? null;
-        if ($typeInfo && !empty($typeInfo['recurring']) && $item->interval_days) {
-            $nextDue = date('Y-m-d', strtotime($item->due_date . ' +' . (int) $item->interval_days . ' days'));
-            $nextId = db()->insert('vehicle_care_schedules', [
-                'vehicle_id' => $item->vehicle_id,
-                'care_type' => $item->care_type,
-                'title' => $item->title,
-                'notes' => $item->notes,
-                'due_date' => $nextDue,
-                'status' => CARE_STATUS_SCHEDULED,
-                'proposed_by' => userId(),
-                'approved_by' => userId(),
-                'approved_at' => date(DATETIME_FORMAT),
-                'interval_days' => $item->interval_days,
-                'interval_km' => $item->interval_km,
-                'created_at' => date(DATETIME_FORMAT),
-            ]);
-            auditLog('care_schedule_recur', 'vehicle_care_schedule', (int) $nextId, null, ['from' => $id]);
+        // Plan #40 — shared implementation with the AI assistant so there is one
+        // set of rules (see includes/maintenance_service.php).
+        require_once INCLUDES_PATH . '/maintenance_service.php';
+        $res = maintenanceServiceCompleteCare($item, $mileage, $careCostItems, (int) userId());
+        if (!$res['ok']) {
+            $errors[] = $res['error'];
+        } else {
+            redirectWith('/?page=maintenance&action=schedule', 'success', 'Marked completed.');
         }
-
-        notifyCareStakeholders(
-            (int) $item->vehicle_id,
-            'care_schedule_completed',
-            'Care item completed',
-            "{$item->title} for {$item->plate_number} was marked completed.",
-            '/?page=maintenance&action=schedule'
-        );
-
-        // Plan #38 — completed care with costing writes a repair-history entry
-        // (skipped entirely while the experimental flag is off).
-        $completedCare = db()->fetch(
-            "SELECT * FROM vehicle_care_schedules WHERE id = ?",
-            [$id]
-        );
-        $careEntryId = repairHistoryUpsertFromCare($completedCare, $careCostItems);
-        if ($careEntryId) {
-            auditLog('repair_history_auto_written', 'vehicle_repair_entry', $careEntryId, null, [
-                'source' => 'care',
-                'care_schedule_id' => $id,
-            ]);
-        }
-
-        auditLog('care_schedule_complete', 'vehicle_care_schedule', $id);
-        redirectWith('/?page=maintenance&action=schedule', 'success', 'Marked completed.');
     }
 
     if ($op === 'cancel' && $canApprove && $item->status !== CARE_STATUS_COMPLETED) {
