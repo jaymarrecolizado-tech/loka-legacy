@@ -371,6 +371,14 @@ require_once INCLUDES_PATH . '/header.php';
 
             <?php require __DIR__ . '/partials/vehicle_observations.php'; ?>
 
+            <?php // Plan #41 decision 4 — Live positions on the request view, same
+            // panel + same audience gate as the Live Board. The panel renders
+            // itself only when the feature is on, the viewer may see GPS, and
+            // this request has track points. ?>
+            <?php $gpsSingleRequestId = (int) $requestId; $tableRows = [$request]; ?>
+            <?php require __DIR__ . '/../live-board/partials/gps-panel.php'; ?>
+            <?php unset($gpsSingleRequestId, $tableRows); ?>
+
             <!-- Travel Documents -->
             <?php if ($request->has_travel_order || $request->has_official_business_slip): ?>
                 <div class="card mb-4">

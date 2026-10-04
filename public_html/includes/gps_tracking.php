@@ -19,7 +19,7 @@ if (!defined('GPS_TRACKING_LOADED')) {
     define('GPS_TRACKING_LOADED', 1);
 
     /** Plan #41 decision 5: back off when idle or the fix is poor. */
-    define('GPS_MIN_PING_INTERVAL_SECONDS', 30);
+    define('GPS_MIN_PING_INTERVAL_SECONDS', 45);
     define('GPS_POOR_ACCURACY_METERS', 200);
     define('GPS_RETENTION_DAYS', 30);
 
@@ -116,12 +116,16 @@ if (!defined('GPS_TRACKING_LOADED')) {
         $now = date(DATETIME_FORMAT);
 
         // Rate-limit per trip: one point every GPS_MIN_PING_INTERVAL_SECONDS.
+        // Measured on recorded_at (the device clock of the fix) so a queued
+        // backfill flushed after an offline gap is not dropped merely for
+        // arriving back-to-back.
+        $incomingTs = is_numeric($fix['recorded_at'] ?? null) ? (int) $fix['recorded_at'] : strtotime($now);
         $last = db()->fetch(
-            "SELECT received_at FROM trip_gps_points WHERE request_id = ? ORDER BY id DESC LIMIT 1",
+            "SELECT COALESCE(recorded_at, received_at) AS ts FROM trip_gps_points WHERE request_id = ? ORDER BY id DESC LIMIT 1",
             [$requestId]
         );
         if ($last) {
-            $gap = strtotime($now) - strtotime((string) $last->received_at);
+            $gap = $incomingTs - strtotime((string) $last->ts);
             if ($gap < GPS_MIN_PING_INTERVAL_SECONDS) {
                 return ['ok' => false, 'reason' => 'too frequent', 'id' => null];
             }
@@ -158,7 +162,9 @@ if (!defined('GPS_TRACKING_LOADED')) {
      */
     function gpsTrail(int $requestId, int $limit = 500): array
     {
-        return db()->fetchAll(
+        // Take the newest $limit points, then present them OLDEST-first: the
+        // SVG renderer treats the last element as the current (red) marker.
+        $rows = db()->fetchAll(
             "SELECT lat, lng, accuracy_m, recorded_at, received_at
              FROM trip_gps_points
              WHERE request_id = ?
@@ -166,6 +172,7 @@ if (!defined('GPS_TRACKING_LOADED')) {
              LIMIT " . max(1, min(2000, $limit)),
             [$requestId]
         );
+        return array_reverse($rows);
     }
 
     /**

@@ -3,8 +3,9 @@
  * LOKA - GPS breadcrumb retention (Plan #41)
  *
  * Deletes trip_gps_points older than GPS_RETENTION_DAYS (about 30). Runs from
- * the CLI cron, the HTTP cron (?page=cron&action=gps&key=SECRET) and — because it
- * is cheap and idempotent — opportunistically from the ping endpoint.
+ * the CLI cron or the HTTP cron (?page=cron&action=gps&key=SECRET). It is NOT
+ * wired into the ping endpoint — a stalled cron leaves stale points until the
+ * next scheduled run.
  */
 
 if (php_sapi_name() === 'cli') {

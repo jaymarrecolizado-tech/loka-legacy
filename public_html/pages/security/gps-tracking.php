@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($op === 'purge') {
         $r = processGpsRetentionOnce();
-        redirectWith('/?page=security&action=gps-tracking', 'success', 'Purged {$r} point(s) older than ' . GPS_RETENTION_DAYS . ' days.');
+        redirectWith('/?page=security&action=gps-tracking', 'success', 'Purged ' . (int) $r . ' point(s) older than ' . GPS_RETENTION_DAYS . ' days.');
     }
 }
 

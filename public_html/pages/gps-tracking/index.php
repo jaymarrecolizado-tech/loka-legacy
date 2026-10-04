@@ -174,16 +174,17 @@ require_once INCLUDES_PATH . '/header.php';
         bar.style.width = Math.max(0, Math.min(100, pct)) + '%';
     }
 
-    function post(fix) {
-        var body = {
-            csrf_token: CSRF,
-            lat: fix.coords.latitude,
-            lng: fix.coords.longitude,
-            accuracy: fix.coords.accuracy,
-            speed: fix.coords.speed,
-            heading: fix.coords.heading,
-            recorded_at: Math.floor(fix.timestamp / 1000)
-        };
+    var QUEUE_KEY = 'lokaGpsQueue';
+
+    function queueLoad() {
+        try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]') || []; } catch (e) { return []; }
+    }
+    function queueSave(q) {
+        try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q.slice(-50))); } catch (e) { /* storage blocked — drop silently */ }
+    }
+    function queuePush(body) { var q = queueLoad(); q.push(body); queueSave(q); }
+
+    function sendBody(body, onNetFail) {
         return fetch(ENDPOINT, {
             method: 'POST',
             credentials: 'same-origin',
@@ -206,9 +207,39 @@ require_once INCLUDES_PATH . '/header.php';
                 say('Problem', j.error || 'The server refused that position.', 0);
             }
         }).catch(function () {
-            // Offline: the ops map keeps showing the last-seen position.
-            say('Offline', 'Could not reach LOKA. Your last position is still shown to Motorpool.', 0);
+            // Decision 7: keep the last-good fix locally and flush on reconnect.
+            if (onNetFail) {
+                onNetFail();
+                say('Offline', 'Position queued — it will send when you are back online.', 0);
+            }
         });
+    }
+
+    function flushQueue() {
+        var q = queueLoad();
+        if (!q.length) return;
+        queueSave([]);
+        q.forEach(function (body) {
+            sendBody(body, function () { queuePush(body); });
+        });
+    }
+
+    window.addEventListener('online', function () {
+        flushQueue();
+        say('Back online', 'Sending queued positions…', 100);
+    });
+
+    function post(fix) {
+        var body = {
+            csrf_token: CSRF,
+            lat: fix.coords.latitude,
+            lng: fix.coords.longitude,
+            accuracy: fix.coords.accuracy,
+            speed: fix.coords.speed,
+            heading: fix.coords.heading,
+            recorded_at: Math.floor(fix.timestamp / 1000)
+        };
+        sendBody(body, function () { queuePush(body); });
     }
 
     function stop(headline, detailText) {

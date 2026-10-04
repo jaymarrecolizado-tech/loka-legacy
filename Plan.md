@@ -41,10 +41,10 @@
 | #35 | Telegram + Viber notifications (phased) | DONE Phase A+B (2026-09-29; branch `vberandtelegramnotif`, localhost QA — NOT deployed; tokens pending) |
 | #36 | OB Pass Slip workflow revision (button approvals, CoA acknowledgment + QR) | DONE (2026-10-01; branch `ob-slip-revision`, localhost QA + staging deploy — no prod) |
 | #37 | OB approval badge for Immediate Supervisor | DONE (2026-10-01; badge + kiosk checkbox fix, localhost lint + staging deploy — no prod) |
-| #38 | Vehicle Repair History + costing + escalated maintenance alerts (experimental) | CHECKER GAPS (2026-10-04; built on `plans-38-41-experimental` — fix list below — NOT deployed) |
+| #38 | Vehicle Repair History + costing + escalated maintenance alerts (experimental) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
 | #39 | Rollback shows full workflow stages (Trips + OB + Gas) | DONE + minor polish optional (2026-10-04; checker PASS — NOT deployed) |
-| #40 | AI assistant chatbot (experimental, role-scoped actions) | CHECKER GAPS (2026-10-04; built — security fix list below — NOT deployed) |
-| #41 | Driver-phone GPS trip tracking (experimental) | CHECKER GAPS (2026-10-04; built — fix list below — NOT deployed) |
+| #40 | AI assistant chatbot (experimental, role-scoped actions) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
+| #41 | Driver-phone GPS trip tracking (experimental) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -3604,15 +3604,15 @@ Independent re-audit vs locked decisions. Migration is **`060_gps_tracking.php`*
 
 ### Must fix
 
-- [ ] **Cadence (Decision 5):** `GPS_MIN_PING_INTERVAL_SECONDS` is **30**; locked plan is **45–60s**. Raise min interval into that band (e.g. 45 or 60) and align implementation notes / client loop.
-- [ ] **Request-view map (Building blocks / Decision 4 viewers):** Live Trip Board includes `pages/live-board/partials/gps-panel.php`, but `pages/requests/view.php` has **no** GPS panel. Wire the panel for Motorpool/Admin/AF when feature on and the request has (or had) track points — `$gpsSingleRequestId` is already supported by the panel but unused.
-- [ ] **Offline last-good queue (Decision 7):** Denied/offline only shows a message; no brief client-side queue of last good points. Add a small localStorage (or memory) queue that flushes when back online, still session-derived trip only.
+- [x] **Cadence (Decision 5):** `GPS_MIN_PING_INTERVAL_SECONDS` is **30**; locked plan is **45–60s**. Raise min interval into that band (e.g. 45 or 60) and align implementation notes / client loop.
+- [x] **Request-view map (Building blocks / Decision 4 viewers):** Live Trip Board includes `pages/live-board/partials/gps-panel.php`, but `pages/requests/view.php` has **no** GPS panel. Wire the panel for Motorpool/Admin/AF when feature on and the request has (or had) track points — `$gpsSingleRequestId` is already supported by the panel but unused.
+- [x] **Offline last-good queue (Decision 7):** Denied/offline only shows a message; no brief client-side queue of last good points. Add a small localStorage (or memory) queue that flushes when back online, still session-derived trip only.
 - [ ] **Trail “current” marker order bug:** `gpsTrail()` uses `ORDER BY id DESC` while the SVG treats the **last** array element as current → red marker can land on the **oldest** point. Return oldest-first (or reverse before draw) and assert in harness.
 
 ### Should fix
 
-- [ ] **AF hub purge flash:** success message uses single-quoted `'Purged {$r} point(s)...'` → literal `{$r}` shown. Use double quotes or concatenation.
-- [ ] **Retention cron comments:** `process_gps_retention.php` claims opportunistic purge from ping endpoint; `gps-ping.php` never calls it — fix comment or wire opportunistic purge (prefer honest comment unless product wants ping-time purge).
+- [x] **AF hub purge flash:** success message uses single-quoted `'Purged {$r} point(s)...'` → literal `{$r}` shown. Use double quotes or concatenation.
+- [x] **Retention cron comments:** `process_gps_retention.php` claims opportunistic purge from ping endpoint; `gps-ping.php` never calls it — fix comment or wire opportunistic purge (prefer honest comment unless product wants ping-time purge).
 
 ### Re-check when fixed
 
