@@ -39,3 +39,7 @@ prod/*
 # Local deploy scratch
 _deploy_tmp/
 
+
+# Real DICT operational records (vehicle plates, repair costs). Kept on disk for
+# the Plan #38 importer; deliberately not committed.
+Reference/Repair History/
