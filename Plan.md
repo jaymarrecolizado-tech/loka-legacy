@@ -3150,6 +3150,12 @@ Independent re-audit vs locked decisions. **Overall: PARTIAL.** Implementing age
 - Edit history lines → `actual_cost` stays in sync
 - Feature-off path unchanged (scalar `actual_cost` still works)
 
+### Checker re-verify (2026-10-04, later) — PASS
+
+- [x] `pages/maintenance/edit.php` complete path updates `actual_cost` via `repairHistoryItemsTotal($items)` after upsert
+- [x] `includes/maintenance_service.php` same roll-up on complete
+- No remaining must-fix gaps for #38
+
 ---
 
 # LOKA Plan #39: Rollback shows full workflow stages — ✅ DONE (2026-10-04, branch `plans-38-41-experimental`, localhost QA — NOT deployed)
@@ -3507,6 +3513,14 @@ Independent re-audit vs locked decisions (esp. Decision 1 / 4 — View-as effect
 - Replay of a consumed confirm token fails
 - Missing `APP_KEY` → no forgeable confirm HMAC
 
+### Checker re-verify (2026-10-04, later) — PASS
+
+- [x] `hasRole` / `isApprover` / `isMotorpool` use `effectiveUserRole()`; `isAdmin()` under View-as requires effective `ROLE_ADMIN`; AF tools/actions still `isRealAllFather() && !isViewingAs()`
+- [x] `ai-chat.php` rate-limits `op=confirm` and `op=action` (`ai_mutate_min`)
+- [x] Migration `061_ai_confirm_nonces.php` + verify path rejects replay (`confirm token already used`)
+- [x] `aiConfirmSecret()` returns empty without `APP_KEY`; mint/verify fail closed (no static fallback)
+- No remaining must/should-fix gaps for #40
+
 ---
 
 # LOKA Plan #41: Driver-phone GPS trip tracking (experimental) — ✅ DONE (2026-10-04, branch `plans-38-41-experimental`, localhost QA — NOT deployed)
@@ -3607,7 +3621,7 @@ Independent re-audit vs locked decisions. Migration is **`060_gps_tracking.php`*
 - [x] **Cadence (Decision 5):** `GPS_MIN_PING_INTERVAL_SECONDS` is **30**; locked plan is **45–60s**. Raise min interval into that band (e.g. 45 or 60) and align implementation notes / client loop.
 - [x] **Request-view map (Building blocks / Decision 4 viewers):** Live Trip Board includes `pages/live-board/partials/gps-panel.php`, but `pages/requests/view.php` has **no** GPS panel. Wire the panel for Motorpool/Admin/AF when feature on and the request has (or had) track points — `$gpsSingleRequestId` is already supported by the panel but unused.
 - [x] **Offline last-good queue (Decision 7):** Denied/offline only shows a message; no brief client-side queue of last good points. Add a small localStorage (or memory) queue that flushes when back online, still session-derived trip only.
-- [ ] **Trail “current” marker order bug:** `gpsTrail()` uses `ORDER BY id DESC` while the SVG treats the **last** array element as current → red marker can land on the **oldest** point. Return oldest-first (or reverse before draw) and assert in harness.
+- [x] **Trail “current” marker order bug:** `gpsTrail()` uses `ORDER BY id DESC` while the SVG treats the **last** array element as current → red marker can land on the **oldest** point. Return oldest-first (or reverse before draw) and assert in harness.
 
 ### Should fix
 
@@ -3621,4 +3635,13 @@ Independent re-audit vs locked decisions. Migration is **`060_gps_tracking.php`*
 - Airplane-mode then online: queued points flush; ops map updates
 - SVG current marker = newest point
 - Purge flash shows real count
+
+### Checker re-verify (2026-10-04, later) — PASS
+
+- [x] `GPS_MIN_PING_INTERVAL_SECONDS = 45` (in locked 45–60 band); client uses same constant
+- [x] `pages/requests/view.php` includes GPS panel; panel self-gates via `canViewGpsTracking()`
+- [x] Driver page `localStorage` queue + flush on `online`
+- [x] `gpsTrail()` takes newest N then `array_reverse` → oldest-first; SVG last = current
+- [x] Purge flash concatenates real count; retention cron header no longer claims ping-time purge
+- No remaining must/should-fix gaps for #41
 
