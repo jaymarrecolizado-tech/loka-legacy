@@ -22,12 +22,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     try {
         if ($op === 'refresh_models') {
-            $result = aiFetchFreeModels(true);
+            $result = aiFetchModels(true);
             if ($result['ok']) {
                 redirectWith(
                     '/?page=security&action=ai-assistant',
                     'success',
-                    'Loaded ' . count($result['models']) . ' free chat model(s) from the provider.'
+                    'Loaded ' . count($result['models']) . ' model(s) from OpenRouter.'
                 );
             }
             redirectWith(
@@ -89,11 +89,12 @@ $hasKey = aiAssistantApiKey() !== '';
 $keyFingerprint = $hasKey ? substr(aiAssistantApiKey(), -4) : '';
 $tools = aiToolSummaries();
 
-// Free chat models from the provider catalogue (cached; never blocks the page).
-$models = aiCachedFreeModels();
+// OpenRouter's model catalogue, unfiltered (cached; never blocks the page).
+$models = aiCachedModels();
 $modelsAt = (int) tripSetting('ai_free_models_at', '0');
 $modelIsListed = aiModelIsFreeAndUsable(aiAssistantModel());
 $toolCapable = array_values(array_filter($models, static fn($m) => !empty($m['tools'])));
+$freeTagged = array_values(array_filter($models, static fn($m) => !empty($m['free'])));
 
 require_once INCLUDES_PATH . '/header.php';
 ?>
@@ -169,7 +170,7 @@ require_once INCLUDES_PATH . '/header.php';
                                 <button type="submit" name="op" value="refresh_models" formnovalidate
                                         class="btn btn-sm btn-outline-secondary ms-auto">
                                     <i class="bi bi-arrow-clockwise me-1"></i>
-                                    <?= $models === [] ? 'Load free models' : 'Refresh' ?>
+                                    <?= $models === [] ? 'Load models' : 'Refresh' ?>
                                 </button>
                             </div>
 
@@ -178,30 +179,36 @@ require_once INCLUDES_PATH . '/header.php';
                                        value="<?= e(aiAssistantModel()) ?>"
                                        placeholder="<?= e(AI_DEFAULT_MODEL) ?>">
                                 <div class="form-text">
-                                    Free model list not loaded yet. Use
-                                    <em>Load free models</em> to pull OpenRouter's <code>:free</code> models.
+                                    Model list not loaded yet. Use <em>Load models</em> to pull
+                                    OpenRouter's catalogue.
                                 </div>
                             <?php else: ?>
                                 <select name="ai_model" class="form-select" id="ai_model">
                                     <?php if (!$modelIsListed): ?>
                                         <option value="<?= e(aiAssistantModel()) ?>" selected>
-                                            <?= e(aiAssistantModel()) ?> — current<?= aiModelIsFreeTagged(aiAssistantModel()) ? '' : ' (no :free tag)' ?>
+                                            <?= e(aiAssistantModel()) ?> — current (not in the fetched list)
                                         </option>
                                     <?php endif; ?>
                                     <?php foreach ($models as $m): ?>
                                         <option value="<?= e($m['id']) ?>" <?= $m['id'] === aiAssistantModel() ? 'selected' : '' ?>>
                                             <?= e($m['name']) ?>
-                                            <?php if (empty($m['tools'])): ?> — no tool support<?php endif; ?>
+                                            <?php if (!empty($m['free'])): ?> [free]<?php endif; ?>
+                                            <?php if (($m['price'] ?? '') !== '' && empty($m['free'])): ?> · <?= e($m['price']) ?><?php endif; ?>
                                             <?php if (!empty($m['context'])): ?> · <?= number_format((int) $m['context'] / 1000) ?>k ctx<?php endif; ?>
+                                            <?php if (empty($m['tools'])): ?> · no tools<?php endif; ?>
+                                            <?php if (isset($m['chat']) && !$m['chat']): ?> · not text output<?php endif; ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
                                 <div class="form-text">
-                                    <?= count($models) ?> model(s) tagged <code>:free</code> by OpenRouter ·
-                                    <?= count($toolCapable) ?> with tool support<?= count($toolCapable) < count($models) ? ' (the rest cannot use the assistant\'s tools)' : '' ?> ·
+                                    <?= count($models) ?> model(s) from OpenRouter ·
+                                    <?= count($freeTagged) ?> tagged <code>:free</code> ·
+                                    <?= count($toolCapable) ?> support tools ·
                                     <?php if ($modelsAt): ?>
                                         loaded <?= e(formatDateTime(date(DATETIME_FORMAT, $modelsAt))) ?>
                                     <?php else: ?>not loaded yet<?php endif; ?>
+                                    <br>Start typing to filter the list. Models marked <em>no tools</em>
+                                    cannot drive the assistant.
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -264,18 +271,31 @@ require_once INCLUDES_PATH . '/header.php';
                                 <span class="badge bg-secondary">not set</span>
                             <?php endif; ?>
                         </dd>
-                        <dt class="col-6">Free model</dt>
+                        <dt class="col-6">Model cost</dt>
                         <dd class="col-6 text-end">
+                            <?php
+                            $cur = null;
+                            $curPrice = '';
+                            foreach ($models as $m) {
+                                if ($m['id'] === aiAssistantModel()) {
+                                    $cur = $m;
+                                    $curPrice = (string) ($m['price'] ?? '');
+                                    break;
+                                }
+                            }
+                            ?>
                             <?php if (aiModelIsFreeTagged(aiAssistantModel())): ?>
-                                <span class="badge bg-success">:free tagged</span>
+                                <span class="badge bg-success">free (:free)</span>
+                            <?php elseif ($curPrice !== ''): ?>
+                                <span class="badge bg-warning text-dark"><?= e($curPrice) ?></span>
                             <?php else: ?>
-                                <span class="badge bg-warning text-dark">no :free tag</span>
+                                <span class="badge bg-secondary">not in list</span>
                             <?php endif; ?>
-                            <?php if ($modelIsListed && empty($toolCapable) === false): ?>
-                                <?php $cur = null; foreach ($models as $m) { if ($m['id'] === aiAssistantModel()) { $cur = $m; } } ?>
-                                <?php if ($cur !== null && empty($cur['tools'])): ?>
-                                    <span class="badge bg-warning text-dark">no tool support</span>
-                                <?php endif; ?>
+                            <?php if ($cur !== null && empty($cur['tools'])): ?>
+                                <span class="badge bg-warning text-dark">no tools</span>
+                            <?php endif; ?>
+                            <?php if ($cur !== null && isset($cur['chat']) && !$cur['chat']): ?>
+                                <span class="badge bg-warning text-dark">not text output</span>
                             <?php endif; ?>
                         </dd>
                     </dl>

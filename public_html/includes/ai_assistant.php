@@ -32,8 +32,13 @@ if (!defined('AI_ASSISTANT_LOADED')) {
     /** How long a fetched model catalogue is reused before All Father refreshes. */
     define('AI_MODEL_CACHE_TTL_SECONDS', 86400);
 
-    /** Refuse an absurdly large catalogue rather than storing megabytes of JSON. */
-    define('AI_MAX_CATALOGUE_BYTES', 4000000);
+    /**
+     * Refuse an absurdly large catalogue rather than storing megabytes of JSON.
+     * settings.value is MEDIUMTEXT (16 MB) after migration 059; this leaves
+     * plenty of headroom for a growing catalogue while still bailing out on
+     * something that is obviously not a model list.
+     */
+    define('AI_MAX_CATALOGUE_BYTES', 4194304);
 
     /* ----------------------------------------------------------------- */
     /* Feature flag + configuration (server-side only)                    */
@@ -78,6 +83,34 @@ if (!defined('AI_ASSISTANT_LOADED')) {
     function aiModelIsFreeTagged(string $modelId): bool
     {
         return str_ends_with(trim($modelId), ':free');
+    }
+
+    /**
+     * Does this model produce text? Used only to LABEL entries, never to hide
+     * them. NOTE: do not test the "modality" string with str_contains('->text') —
+     * "text+image->text+audio" contains '->text' and would wrongly pass.
+     *
+     * @param array<string,mixed> $model
+     */
+    function aiModelOutputsText(array $model): bool
+    {
+        $outs = array_values(array_filter(array_map('strval', (array) ($model['architecture']['output_modalities'] ?? []))));
+        return $outs === [] || count(array_diff($outs, ['text'])) === 0;
+    }
+
+    /** Human price label: "free", "$0.50/M", or "" when OpenRouter omits it. */
+    function aiFormatModelPrice(array $pricing): string
+    {
+        $p = (string) ($pricing['prompt'] ?? '');
+        if ($p === '' || $p === '0') {
+            return 'free';
+        }
+        // OpenRouter quotes USD per token; show per-million for readability.
+        $perMillion = (float) $p * 1000000;
+        if ($perMillion >= 0.01) {
+            return '$' . rtrim(rtrim(number_format($perMillion, 2, '.', ''), '0'), '0') . '/M';
+        }
+        return '$' . number_format($perMillion, 4) . '/M';
     }
 
     function aiAssistantRateLimit(): int
@@ -259,19 +292,23 @@ if (!defined('AI_ASSISTANT_LOADED')) {
     }
 
     /**
-     * Fetch the free, tool-capable chat models from the provider catalogue.
+     * Fetch OpenRouter's model catalogue, unfiltered.
      *
-     * The catalogue is PUBLIC (no key needed). Results are cached in `settings`
-     * so the settings page does not hit the provider on every load, and so a
-     * transient outage never leaves All Father with an empty dropdown.
+     * The catalogue is PUBLIC (no key needed) and returns every model OpenRouter
+     * serves — free and paid, chat and non-chat. Nothing is hidden: `:free`, the
+     * price, tool support and text output are kept as labels so the operator can
+     * choose, and `:free` models are simply sorted to the top.
+     *
+     * Cached in `settings` (24h TTL) so the page does not hit the provider on
+     * every load and a transient outage never empties the dropdown.
      *
      * @param  bool $refresh bypass the cache
-     * @return array{ok:bool, models:list<array{id:string,name:string,context:int,tools:bool,router:bool}>, error:string, cached_at:?int}
+     * @return array{ok:bool, models:list<array{id:string,name:string,context:int,tools:bool,free:bool,price:string,chat:bool}>, error:string, cached_at:?int}
      */
-    function aiFetchFreeModels(bool $refresh = false): array
+    function aiFetchModels(bool $refresh = false): array
     {
-        $cachedAt = (int) tripSetting('ai_free_models_at', '0');
-        $cached = tripSetting('ai_free_models', '');
+        $cachedAt = (int) tripSetting('ai_models_at', '0');
+        $cached = tripSetting('ai_models', '');
         $fresh = $cachedAt > 0 && (time() - $cachedAt) < AI_MODEL_CACHE_TTL_SECONDS;
 
         if (!$refresh && $fresh && $cached !== '') {
@@ -293,7 +330,7 @@ if (!defined('AI_ASSISTANT_LOADED')) {
         curl_close($ch);
 
         if ($raw === false || $code >= 400) {
-            error_log('aiFetchFreeModels: http=' . $code . ' cURL=' . $err);
+            error_log('aiFetchModels: http=' . $code . ' cURL=' . $err);
             // Fall back to whatever we last cached rather than showing nothing.
             $decoded = $cached !== '' ? json_decode($cached, true) : null;
             return [
@@ -310,68 +347,70 @@ if (!defined('AI_ASSISTANT_LOADED')) {
             return ['ok' => false, 'models' => [], 'error' => 'The provider returned an unexpected model catalogue.', 'cached_at' => null];
         }
 
+        // No filtering: take OpenRouter's catalogue as it is. The `:free` tag,
+        // price, tool support and context are kept as LABELS so the operator can
+        // choose, rather than being used to hide models.
         $models = [];
         foreach ($json['data'] as $m) {
             if (!is_array($m) || empty($m['id'])) {
                 continue;
             }
-            // OpenRouter's own convention for a free model is the ":free" tag on
-            // the id. That tag is the filter — pricing alone is not equivalent
-            // (some zero-priced entries are image/audio models, and
-            // openrouter/free is a zero-cost router rather than a free model).
-            if (!str_ends_with((string) $m['id'], ':free')) {
-                continue;
-            }
-            // Chat-only guard: every declared output modality must be text.
-            // NOTE: do NOT test the "modality" string with str_contains('->text') —
-            // "text+image->text+audio" contains '->text' and would wrongly pass.
-            $outs = array_values(array_filter(array_map('strval', (array) ($m['architecture']['output_modalities'] ?? []))));
-            $outputsTextOnly = $outs === [] || count(array_diff($outs, ['text'])) === 0;
-            if (!$outputsTextOnly) {
-                continue;
-            }
-            // Advisory only — surfaced in the UI. The assistant cannot do
-            // anything useful without tool support, but listing it is still honest.
-            $tools = in_array('tools', (array) ($m['supported_parameters'] ?? []), true);
+            $pricing = $m['pricing'] ?? [];
             $models[] = [
                 'id'      => (string) $m['id'],
                 'name'    => (string) ($m['name'] ?? $m['id']),
                 'context' => (int) ($m['context_length'] ?? 0),
-                'tools'   => $tools,
-                'router'  => false,
+                'tools'   => in_array('tools', (array) ($m['supported_parameters'] ?? []), true),
+                'free'    => str_ends_with((string) $m['id'], ':free'),
+                'price'   => aiFormatModelPrice($pricing),
+                'chat'    => aiModelOutputsText($m),
             ];
         }
 
-        // Tool-capable first (the assistant needs them), then by id.
+        // `:free` first so the free models are easy to reach, then by id.
         usort($models, static function (array $a, array $b): int {
-            return [$b['tools'], $a['id']] <=> [$a['tools'], $b['id']];
+            return [$b['free'], $a['id']] <=> [$a['free'], $b['id']];
         });
 
         $encoded = json_encode($models);
         if ($encoded === false || strlen($encoded) > AI_MAX_CATALOGUE_BYTES) {
-            return ['ok' => false, 'models' => [], 'error' => 'The model catalogue was unexpectedly large; not cached.', 'cached_at' => null];
+            return [
+                'ok' => false, 'models' => $models,
+                'error' => 'The model catalogue was larger than expected; it was fetched but not cached.',
+                'cached_at' => null,
+            ];
         }
 
-        db()->query(
-            "INSERT INTO settings (`key`, value, type, category, created_at, updated_at)
-             VALUES ('ai_free_models', ?, 'string', 'experimental', NOW(), NOW())
-             ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()",
-            [$encoded]
-        );
-        db()->query(
-            "INSERT INTO settings (`key`, value, type, category, created_at, updated_at)
-             VALUES ('ai_free_models_at', ?, 'integer', 'experimental', NOW(), NOW())
-             ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()",
-            [(string) time()]
-        );
+        // Fail soft: a full column must degrade to "not cached", never a fatal.
+        try {
+            db()->query(
+                "INSERT INTO settings (`key`, value, type, category, created_at, updated_at)
+                 VALUES ('ai_models', ?, 'string', 'experimental', NOW(), NOW())
+                 ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()",
+                [$encoded]
+            );
+            db()->query(
+                "INSERT INTO settings (`key`, value, type, category, created_at, updated_at)
+                 VALUES ('ai_models_at', ?, 'integer', 'experimental', NOW(), NOW())
+                 ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()",
+                [(string) time()]
+            );
+        } catch (Throwable $e) {
+            error_log('aiFetchModels cache write failed: ' . $e->getMessage());
+            return [
+                'ok' => true, 'models' => $models,
+                'error' => 'Fetched ' . count($models) . ' model(s), but the list could not be cached.',
+                'cached_at' => null,
+            ];
+        }
 
         return ['ok' => true, 'models' => $models, 'error' => '', 'cached_at' => time()];
     }
 
     /** Cached free models without touching the network. */
-    function aiCachedFreeModels(): array
+    function aiCachedModels(): array
     {
-        $cached = tripSetting('ai_free_models', '');
+        $cached = tripSetting('ai_models', '');
         if ($cached === '') {
             return [];
         }
@@ -382,7 +421,7 @@ if (!defined('AI_ASSISTANT_LOADED')) {
     /** True when the configured model is in the cached free list. */
     function aiModelIsFreeAndUsable(string $modelId): bool
     {
-        foreach (aiCachedFreeModels() as $m) {
+        foreach (aiCachedModels() as $m) {
             if (($m['id'] ?? '') === $modelId) {
                 return true;
             }

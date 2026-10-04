@@ -3274,29 +3274,29 @@ chat-completions call is unchanged apart from the base URL.
   (`ai_free_models`, `ai_free_models_at`, 24h TTL). The catalogue is never
   rendered into the page as raw JSON and the key is never involved.
 
-**Filtering rule — verified against the live catalogue, not assumed.**
-466 models → **17 listed**, and the filter is exactly what was asked for:
+**No filtering.** The catalogue is taken exactly as OpenRouter returns it —
+**466 models**, free and paid, chat and non-chat — and every one is selectable.
+Hiding models was rejected as opinionated: the operator decides, not a hard-coded
+rule. The metadata is kept as **labels** instead of as a filter:
 
-1. the id **ends with `:free`** — OpenRouter's own free tag. This is the filter;
-   pricing is no longer consulted, because a zero price is not equivalent to
-   "free model" (`google/lyria-3-pro-preview` is zero-priced but is an
-   image/audio model, and `openrouter/free` is a zero-cost *router*, not a
-   `:free` model). `aiModelIsFreeTagged()` is the single source of truth and is
-   used for both the filter and the status badge.
-2. every entry of `architecture.output_modalities` is `text` (chat-only guard).
-   Do **not** test the `modality` string with `str_contains($m, '->text')` —
-   `"text+image->text+audio"` contains `->text` and wrongly passes (a real bug,
-   caught by probing the live catalogue).
-3. `tools` in `supported_parameters` is **advisory only** — 16 of the 17 are
-   tool-capable; `nvidia/nemotron-3.5-content-safety:free` is listed but flagged
-   *no tool support*, because it cannot drive the assistant's tool flow.
+- `:free` models are sorted to the **top** (17 of 466), so free is still one keystroke away
+- paid models show their price per million tokens (`$0.80/M`) via `aiFormatModelPrice()`
+- tool support is flagged (*no tools*) — 398 of 466 have it
+- non-text-output models are flagged (*not text output*) — 15 of 466, e.g. image/audio models
 
-Ordering: tool-capable first, then by id. `openrouter/free` is no longer listed,
-so the default model is a real `:free` one: `qwen/qwen3.8-27b:free`.
+`aiModelIsFreeTagged()` is no longer a filter; it is just the status badge that
+answers "is my configured model free?". The default stays a genuinely free one:
+`qwen/qwen3.8-27b:free`.
 
-A model that is configured but not tagged is still selectable (shown as
-`current (no :free tag)`) so an existing configuration is never silently
-invalidated — but the status card badges it honestly.
+`aiModelOutputsText()` deliberately checks `architecture.output_modalities` as a
+list rather than `str_contains($modality, '->text')` — `"text+image->text+audio"`
+contains `->text` and would wrongly pass (a real bug caught while probing).
+
+**Schema change:** the cached catalogue is ~67 KB, which does **not** fit
+`settings.value` TEXT (65,535). Migration 059 widens that column to `MEDIUMTEXT`
+(additive, non-destructive) rather than mangling the payload or silently
+dropping models. The cache write is also wrapped so a too-large catalogue
+degrades to "fetched but not cached" instead of a fatal.
 
 **Tool calling verified live on `:free` models** (not assumed): `qwen/qwen3.8-27b:free`
 and `nvidia/nemotron-3.5-lightning:free` both proposed `explain_request_status
