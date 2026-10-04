@@ -16,6 +16,10 @@ $flash = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
     $op = postSafe('op', '', 20);
+    // Pressing Enter in a text field submits without a submitter button.
+    if ($op === '') {
+        $op = 'save';
+    }
     try {
         if ($op === 'refresh_models') {
             $result = aiFetchFreeModels(true);
@@ -79,6 +83,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $status = aiAssistantStatus();
 $hasKey = aiAssistantApiKey() !== '';
+// Last 4 only: enough to tell WHICH key is active, not enough to use it. The
+// key field itself stays write-only, so a blank field after saving must not
+// look like a failure.
+$keyFingerprint = $hasKey ? substr(aiAssistantApiKey(), -4) : '';
 $tools = aiToolSummaries();
 
 // Free chat models from the provider catalogue (cached; never blocks the page).
@@ -122,7 +130,13 @@ require_once INCLUDES_PATH . '/header.php';
                     <h5 class="mb-3">Settings</h5>
                     <form method="POST">
                         <?= csrfField() ?>
-                        <input type="hidden" name="op" value="save">
+                        <!-- No hidden op=save here. It used to fight a nested
+                             "refresh models" form: the browser merged both into
+                             one form, submitted op twice, and PHP kept the LAST
+                             value — so clicking Save settings ran the refresh
+                             branch and silently never saved the API key.
+                             The clicked submit button now carries op, and an
+                             empty op (Enter in a text field) means save. -->
 
                         <div class="form-check mb-3">
                             <input type="checkbox" name="ai_assistant_enabled" value="1" class="form-check-input"
@@ -153,14 +167,11 @@ require_once INCLUDES_PATH . '/header.php';
                         <div class="mb-3">
                             <div class="d-flex align-items-center gap-2 mb-1">
                                 <label class="form-label mb-0" for="ai_model">Model</label>
-                                <form method="POST" class="ms-auto">
-                                    <?= csrfField() ?>
-                                    <input type="hidden" name="op" value="refresh_models">
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary">
-                                        <i class="bi bi-arrow-clockwise me-1"></i>
-                                        <?= $models === [] ? 'Load free models' : 'Refresh' ?>
-                                    </button>
-                                </form>
+                                <button type="submit" name="op" value="refresh_models" formnovalidate
+                                        class="btn btn-sm btn-outline-secondary ms-auto">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>
+                                    <?= $models === [] ? 'Load free models' : 'Refresh' ?>
+                                </button>
                             </div>
 
                             <?php if ($models === []): ?>
@@ -208,7 +219,9 @@ require_once INCLUDES_PATH . '/header.php';
                             </div>
                         </div>
 
-                        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Save settings</button>
+                        <button type="submit" name="op" value="save" class="btn btn-primary">
+                            <i class="bi bi-save me-1"></i>Save settings
+                        </button>
                     </form>
                 </div>
             </div>
@@ -245,6 +258,15 @@ require_once INCLUDES_PATH . '/header.php';
                         <dd class="col-6 text-end font-monospace"><?= e(aiAssistantBaseUrl()) ?></dd>
                         <dt class="col-6">Model</dt>
                         <dd class="col-6 text-end font-monospace"><?= e(aiAssistantModel()) ?></dd>
+                        <dt class="col-6">API key</dt>
+                        <dd class="col-6 text-end">
+                            <?php if ($hasKey): ?>
+                                <span class="badge bg-success">stored</span>
+                                <span class="font-monospace small text-muted">••••••••<?= e($keyFingerprint) ?></span>
+                            <?php else: ?>
+                                <span class="badge bg-secondary">not set</span>
+                            <?php endif; ?>
+                        </dd>
                         <dt class="col-6">Free &amp; tool-capable</dt>
                         <dd class="col-6 text-end">
                             <?php if ($modelIsListed): ?>
