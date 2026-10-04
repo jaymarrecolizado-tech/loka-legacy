@@ -46,7 +46,7 @@ try {
         ['ai_assistant_enabled', '0', 'boolean', 'AI assistant chatbot (experimental, Plan #40) — OFF by default'],
         ['ai_api_key', '', 'string', 'OpenRouter API key (server-side only; never sent to the browser)'],
         ['ai_base_url', 'https://openrouter.ai/api/v1', 'string', 'OpenAI-compatible API base URL (OpenRouter by default)'],
-        ['ai_model', 'openrouter/free', 'string', 'Model id used for chat + tool proposals'],
+        ['ai_model', 'qwen/qwen3.8-27b:free', 'string', 'Model id used for chat + tool proposals (must carry the OpenRouter :free tag)'],
         ['ai_rate_limit_per_hour', '30', 'integer', 'Maximum AI prompts per user per hour'],
         ['ai_max_prompt_chars', '2000', 'integer', 'Maximum prompt length accepted from the chat box'],
         ['ai_free_models', '', 'string', 'Cached provider catalogue of free chat models (JSON)'],

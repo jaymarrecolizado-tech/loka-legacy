@@ -3274,30 +3274,41 @@ chat-completions call is unchanged apart from the base URL.
   (`ai_free_models`, `ai_free_models_at`, 24h TTL). The catalogue is never
   rendered into the page as raw JSON and the key is never involved.
 
-**Filtering rule — verified against the live catalogue, not assumed.** 466 models,
-22 free. A model is listed only when:
+**Filtering rule — verified against the live catalogue, not assumed.**
+466 models → **17 listed**, and the filter is exactly what was asked for:
 
-1. `pricing.prompt == "0"` **and** `pricing.completion == "0"`, and
-2. every entry of `architecture.output_modalities` is `text`, and
-3. (advisory, shown in the UI) `tools` is in `supported_parameters`.
+1. the id **ends with `:free`** — OpenRouter's own free tag. This is the filter;
+   pricing is no longer consulted, because a zero price is not equivalent to
+   "free model" (`google/lyria-3-pro-preview` is zero-priced but is an
+   image/audio model, and `openrouter/free` is a zero-cost *router*, not a
+   `:free` model). `aiModelIsFreeTagged()` is the single source of truth and is
+   used for both the filter and the status badge.
+2. every entry of `architecture.output_modalities` is `text` (chat-only guard).
+   Do **not** test the `modality` string with `str_contains($m, '->text')` —
+   `"text+image->text+audio"` contains `->text` and wrongly passes (a real bug,
+   caught by probing the live catalogue).
+3. `tools` in `supported_parameters` is **advisory only** — 16 of the 17 are
+   tool-capable; `nvidia/nemotron-3.5-content-safety:free` is listed but flagged
+   *no tool support*, because it cannot drive the assistant's tool flow.
 
-Rules 2 and 3 exist because **price alone is the wrong filter**:
-`google/lyria-3-pro-preview` is zero-priced but is an image/audio model, and
-`nvidia/nemotron-3.5-content-safety:free` is chat but advertises no tool support.
-Do **not** test the `modality` string with `str_contains($m, '->text')` —
-`"text+image->text+audio"` contains `->text` and wrongly passes (this was a real
-bug, caught by the probe).
+Ordering: tool-capable first, then by id. `openrouter/free` is no longer listed,
+so the default model is a real `:free` one: `qwen/qwen3.8-27b:free`.
 
-Ordering: tool-capable first, then routers, then by id — so
-`openrouter/free` (a zero-cost router that auto-picks a free model) is the
-default selection. Models without tool support are still listed but flagged
-*no tool support*; the assistant's tool flow needs them, so they cannot do
-anything useful.
+A model that is configured but not tagged is still selectable (shown as
+`current (no :free tag)`) so an existing configuration is never silently
+invalidated — but the status card badges it honestly.
+
+**Tool calling verified live on `:free` models** (not assumed): `qwen/qwen3.8-27b:free`
+and `nvidia/nemotron-3.5-lightning:free` both proposed `explain_request_status
+{"request_id":679}` correctly.
 
 **Honest caveat on "unlimited":** OpenRouter's `:free` tier has no per-token
-cost but *does* apply its own rate limits, and the free pool rotates. The
-in-app guard (`ai_rate_limit_per_hour`, default 30/user/hour) sits on top of
-that. Treat "unlimited" as "no per-request cost", not "no throttling".
+cost but *does* apply its own rate limits, and the free pool rotates. This was
+confirmed live, not assumed: `google/gemma-4-31b-it:free` returned a provider
+429 mid-test, which `aiProviderError()` surfaced to the user as *"The provider is
+rate-limiting this app right now. Try again shortly."* The in-app guard
+(`ai_rate_limit_per_hour`, default 30/user/hour) sits on top of that. Treat
+"unlimited" as "no per-request cost", not "no throttling".
 
 Provider errors are translated into user-safe sentences (`aiProviderError()`):
 401 → key rejected, 429 → provider rate limit, 402 → no credit,

@@ -23,6 +23,12 @@ if (!defined('AI_ASSISTANT_LOADED')) {
     /** OpenRouter is the provider: OpenAI-compatible, with a public model catalogue. */
     define('AI_DEFAULT_BASE_URL', 'https://openrouter.ai/api/v1');
 
+    /**
+     * Default model. Must carry OpenRouter's `:free` tag — that is what the
+     * catalogue filter lists, and what keeps usage free.
+     */
+    define('AI_DEFAULT_MODEL', 'qwen/qwen3.8-27b:free');
+
     /** How long a fetched model catalogue is reused before All Father refreshes. */
     define('AI_MODEL_CACHE_TTL_SECONDS', 86400);
 
@@ -64,8 +70,14 @@ if (!defined('AI_ASSISTANT_LOADED')) {
 
     function aiAssistantModel(): string
     {
-        $model = trim((string) tripSetting('ai_model', 'openrouter/free'));
-        return $model !== '' ? $model : 'openrouter/free';
+        $model = trim((string) tripSetting('ai_model', AI_DEFAULT_MODEL));
+        return $model !== '' ? $model : AI_DEFAULT_MODEL;
+    }
+
+    /** True when a model id carries OpenRouter's free tag. */
+    function aiModelIsFreeTagged(string $modelId): bool
+    {
+        return str_ends_with(trim($modelId), ':free');
     }
 
     function aiAssistantRateLimit(): int
@@ -303,35 +315,36 @@ if (!defined('AI_ASSISTANT_LOADED')) {
             if (!is_array($m) || empty($m['id'])) {
                 continue;
             }
-            $pricing = $m['pricing'] ?? [];
-            // Free == zero cost on both sides. Verified against the live
-            // catalogue: price alone is NOT enough, because some zero-priced
-            // entries are image/audio models with no chat completion.
-            if ((string) ($pricing['prompt'] ?? 'x') !== '0' || (string) ($pricing['completion'] ?? 'x') !== '0') {
+            // OpenRouter's own convention for a free model is the ":free" tag on
+            // the id. That tag is the filter — pricing alone is not equivalent
+            // (some zero-priced entries are image/audio models, and
+            // openrouter/free is a zero-cost router rather than a free model).
+            if (!str_ends_with((string) $m['id'], ':free')) {
                 continue;
             }
-            // Chat-only: every declared output modality must be text.
+            // Chat-only guard: every declared output modality must be text.
             // NOTE: do NOT test the "modality" string with str_contains('->text') —
-            // google/lyria-3-pro-preview is "text+image->text+audio", which
-            // CONTAINS '->text' and would wrongly pass. Check the list instead.
+            // "text+image->text+audio" contains '->text' and would wrongly pass.
             $outs = array_values(array_filter(array_map('strval', (array) ($m['architecture']['output_modalities'] ?? []))));
             $outputsTextOnly = $outs === [] || count(array_diff($outs, ['text'])) === 0;
             if (!$outputsTextOnly) {
                 continue;
             }
+            // Advisory only — surfaced in the UI. The assistant cannot do
+            // anything useful without tool support, but listing it is still honest.
             $tools = in_array('tools', (array) ($m['supported_parameters'] ?? []), true);
             $models[] = [
                 'id'      => (string) $m['id'],
                 'name'    => (string) ($m['name'] ?? $m['id']),
                 'context' => (int) ($m['context_length'] ?? 0),
                 'tools'   => $tools,
-                'router'  => str_starts_with((string) $m['id'], 'openrouter/'),
+                'router'  => false,
             ];
         }
 
-        // Tool-capable first (the assistant needs them), then routers, then by id.
+        // Tool-capable first (the assistant needs them), then by id.
         usort($models, static function (array $a, array $b): int {
-            return [$b['tools'], $b['router'], $a['id']] <=> [$a['tools'], $a['router'], $b['id']];
+            return [$b['tools'], $a['id']] <=> [$a['tools'], $b['id']];
         });
 
         $encoded = json_encode($models);
@@ -366,7 +379,7 @@ if (!defined('AI_ASSISTANT_LOADED')) {
         return is_array($decoded) ? $decoded : [];
     }
 
-    /** True when the configured model is in the free, tool-capable list. */
+    /** True when the configured model is in the cached free list. */
     function aiModelIsFreeAndUsable(string $modelId): bool
     {
         foreach (aiCachedFreeModels() as $m) {

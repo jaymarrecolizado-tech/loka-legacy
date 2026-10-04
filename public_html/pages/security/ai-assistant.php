@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($op === 'save') {
             $enabled = post('ai_assistant_enabled', '0') === '1' ? '1' : '0';
             $baseUrl = trim(postSafe('ai_base_url', '', 200)) ?: AI_DEFAULT_BASE_URL;
-            $model = trim(postSafe('ai_model', '', 120)) ?: 'openrouter/free';
+            $model = trim(postSafe('ai_model', '', 120)) ?: AI_DEFAULT_MODEL;
             $limit = max(1, min(600, (int) post('ai_rate_limit_per_hour', 30)));
 
             // Only allow an http(s) endpoint so the key cannot be exfiltrated.
@@ -94,7 +94,6 @@ $models = aiCachedFreeModels();
 $modelsAt = (int) tripSetting('ai_free_models_at', '0');
 $modelIsListed = aiModelIsFreeAndUsable(aiAssistantModel());
 $toolCapable = array_values(array_filter($models, static fn($m) => !empty($m['tools'])));
-$routerModels = array_values(array_filter($models, static fn($m) => !empty($m['router'])));
 
 require_once INCLUDES_PATH . '/header.php';
 ?>
@@ -176,34 +175,32 @@ require_once INCLUDES_PATH . '/header.php';
 
                             <?php if ($models === []): ?>
                                 <input type="text" name="ai_model" class="form-control" id="ai_model"
-                                       value="<?= e(aiAssistantModel()) ?>" list="aiModelList"
-                                       placeholder="openrouter/free">
+                                       value="<?= e(aiAssistantModel()) ?>"
+                                       placeholder="<?= e(AI_DEFAULT_MODEL) ?>">
                                 <div class="form-text">
                                     Free model list not loaded yet. Use
-                                    <em>Load free models</em> to pull the catalogue from OpenRouter.
+                                    <em>Load free models</em> to pull OpenRouter's <code>:free</code> models.
                                 </div>
                             <?php else: ?>
                                 <select name="ai_model" class="form-select" id="ai_model">
                                     <?php if (!$modelIsListed): ?>
                                         <option value="<?= e(aiAssistantModel()) ?>" selected>
-                                            <?= e(aiAssistantModel()) ?> — current (not in the free list)
+                                            <?= e(aiAssistantModel()) ?> — current<?= aiModelIsFreeTagged(aiAssistantModel()) ? '' : ' (no :free tag)' ?>
                                         </option>
                                     <?php endif; ?>
                                     <?php foreach ($models as $m): ?>
                                         <option value="<?= e($m['id']) ?>" <?= $m['id'] === aiAssistantModel() ? 'selected' : '' ?>>
                                             <?= e($m['name']) ?>
-                                            <?php if (!empty($m['router'])): ?> — auto-picks a free model<?php endif; ?>
                                             <?php if (empty($m['tools'])): ?> — no tool support<?php endif; ?>
                                             <?php if (!empty($m['context'])): ?> · <?= number_format((int) $m['context'] / 1000) ?>k ctx<?php endif; ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
                                 <div class="form-text">
-                                    <?= count($models) ?> free chat model(s) ·
-                                    <?= count($toolCapable) ?> with tool support ·
-                                    <?= count($routerModels) ?> router<?= count($routerModels) === 1 ? '' : 's' ?> ·
+                                    <?= count($models) ?> model(s) tagged <code>:free</code> by OpenRouter ·
+                                    <?= count($toolCapable) ?> with tool support<?= count($toolCapable) < count($models) ? ' (the rest cannot use the assistant\'s tools)' : '' ?> ·
                                     <?php if ($modelsAt): ?>
-                                        catalogue loaded <?= e(formatDateTime(date(DATETIME_FORMAT, $modelsAt))) ?>
+                                        loaded <?= e(formatDateTime(date(DATETIME_FORMAT, $modelsAt))) ?>
                                     <?php else: ?>not loaded yet<?php endif; ?>
                                 </div>
                             <?php endif; ?>
@@ -267,14 +264,18 @@ require_once INCLUDES_PATH . '/header.php';
                                 <span class="badge bg-secondary">not set</span>
                             <?php endif; ?>
                         </dd>
-                        <dt class="col-6">Free &amp; tool-capable</dt>
+                        <dt class="col-6">Free model</dt>
                         <dd class="col-6 text-end">
-                            <?php if ($modelIsListed): ?>
-                                <span class="badge bg-success">yes</span>
-                            <?php elseif ($models === []): ?>
-                                <span class="badge bg-secondary">catalogue not loaded</span>
+                            <?php if (aiModelIsFreeTagged(aiAssistantModel())): ?>
+                                <span class="badge bg-success">:free tagged</span>
                             <?php else: ?>
-                                <span class="badge bg-warning text-dark">not in the free list</span>
+                                <span class="badge bg-warning text-dark">no :free tag</span>
+                            <?php endif; ?>
+                            <?php if ($modelIsListed && empty($toolCapable) === false): ?>
+                                <?php $cur = null; foreach ($models as $m) { if ($m['id'] === aiAssistantModel()) { $cur = $m; } } ?>
+                                <?php if ($cur !== null && empty($cur['tools'])): ?>
+                                    <span class="badge bg-warning text-dark">no tool support</span>
+                                <?php endif; ?>
                             <?php endif; ?>
                         </dd>
                     </dl>
