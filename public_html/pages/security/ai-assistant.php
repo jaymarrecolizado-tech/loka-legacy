@@ -17,10 +17,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
     $op = postSafe('op', '', 20);
     try {
+        if ($op === 'refresh_models') {
+            $result = aiFetchFreeModels(true);
+            if ($result['ok']) {
+                redirectWith(
+                    '/?page=security&action=ai-assistant',
+                    'success',
+                    'Loaded ' . count($result['models']) . ' free chat model(s) from the provider.'
+                );
+            }
+            redirectWith(
+                '/?page=security&action=ai-assistant',
+                'warning',
+                $result['error'] ?: 'Could not load the model catalogue.'
+            );
+        }
+
         if ($op === 'save') {
             $enabled = post('ai_assistant_enabled', '0') === '1' ? '1' : '0';
-            $baseUrl = trim(postSafe('ai_base_url', '', 200)) ?: 'https://api.openai.com/v1';
-            $model = trim(postSafe('ai_model', '', 80)) ?: 'gpt-4o-mini';
+            $baseUrl = trim(postSafe('ai_base_url', '', 200)) ?: AI_DEFAULT_BASE_URL;
+            $model = trim(postSafe('ai_model', '', 120)) ?: 'openrouter/free';
             $limit = max(1, min(600, (int) post('ai_rate_limit_per_hour', 30)));
 
             // Only allow an http(s) endpoint so the key cannot be exfiltrated.
@@ -39,6 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             aiAssistantSaveKey(postSafe('ai_api_key', '', 300));
             $upsert('ai_base_url', $baseUrl);
+            // Never persist a model the provider's free list does not contain
+            // without saying so — but DO allow it, since a paid or self-hosted
+            // model is a legitimate choice for an All Father.
             $upsert('ai_model', $model);
             $upsert('ai_rate_limit_per_hour', (string) $limit, 'integer');
             if (aiAssistantApiKey() === '') {
@@ -61,6 +80,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $status = aiAssistantStatus();
 $hasKey = aiAssistantApiKey() !== '';
 $tools = aiToolSummaries();
+
+// Free chat models from the provider catalogue (cached; never blocks the page).
+$models = aiCachedFreeModels();
+$modelsAt = (int) tripSetting('ai_free_models_at', '0');
+$modelIsListed = aiModelIsFreeAndUsable(aiAssistantModel());
+$toolCapable = array_values(array_filter($models, static fn($m) => !empty($m['tools'])));
+$routerModels = array_values(array_filter($models, static fn($m) => !empty($m['router'])));
 
 require_once INCLUDES_PATH . '/header.php';
 ?>
@@ -107,10 +133,10 @@ require_once INCLUDES_PATH . '/header.php';
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label" for="ai_api_key">Provider API key</label>
+                            <label class="form-label" for="ai_api_key">OpenRouter API key</label>
                             <input type="password" name="ai_api_key" class="form-control" id="ai_api_key"
                                    autocomplete="new-password"
-                                   placeholder="<?= $hasKey ? '•••••••• (leave blank to keep the current key)' : 'sk-...' ?>">
+                                   placeholder="<?= $hasKey ? '•••••••• (leave blank to keep the current key)' : 'sk-or-v1-...' ?>">
                             <div class="form-text">Stored server-side only and never sent to the browser.</div>
                         </div>
 
@@ -118,20 +144,67 @@ require_once INCLUDES_PATH . '/header.php';
                             <label class="form-label" for="ai_base_url">API base URL</label>
                             <input type="text" name="ai_base_url" class="form-control" id="ai_base_url"
                                    value="<?= e(aiAssistantBaseUrl()) ?>">
-                            <div class="form-text">Any OpenAI-compatible endpoint (<code>/v1</code>).</div>
+                            <div class="form-text">
+                                OpenRouter by default (<code><?= e(AI_DEFAULT_BASE_URL) ?></code>). Any
+                                OpenAI-compatible endpoint works.
+                            </div>
                         </div>
 
-                        <div class="row g-3 mb-3">
-                            <div class="col-8">
-                                <label class="form-label" for="ai_model">Model</label>
-                                <input type="text" name="ai_model" class="form-control" id="ai_model"
-                                       value="<?= e(aiAssistantModel()) ?>">
+                        <div class="mb-3">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <label class="form-label mb-0" for="ai_model">Model</label>
+                                <form method="POST" class="ms-auto">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="op" value="refresh_models">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-arrow-clockwise me-1"></i>
+                                        <?= $models === [] ? 'Load free models' : 'Refresh' ?>
+                                    </button>
+                                </form>
                             </div>
-                            <div class="col-4">
-                                <label class="form-label" for="ai_rate_limit_per_hour">Prompts / hour</label>
-                                <input type="number" name="ai_rate_limit_per_hour" class="form-control"
-                                       id="ai_rate_limit_per_hour" min="1" max="600"
-                                       value="<?= aiAssistantRateLimit() ?>">
+
+                            <?php if ($models === []): ?>
+                                <input type="text" name="ai_model" class="form-control" id="ai_model"
+                                       value="<?= e(aiAssistantModel()) ?>" list="aiModelList"
+                                       placeholder="openrouter/free">
+                                <div class="form-text">
+                                    Free model list not loaded yet. Use
+                                    <em>Load free models</em> to pull the catalogue from OpenRouter.
+                                </div>
+                            <?php else: ?>
+                                <select name="ai_model" class="form-select" id="ai_model">
+                                    <?php if (!$modelIsListed): ?>
+                                        <option value="<?= e(aiAssistantModel()) ?>" selected>
+                                            <?= e(aiAssistantModel()) ?> — current (not in the free list)
+                                        </option>
+                                    <?php endif; ?>
+                                    <?php foreach ($models as $m): ?>
+                                        <option value="<?= e($m['id']) ?>" <?= $m['id'] === aiAssistantModel() ? 'selected' : '' ?>>
+                                            <?= e($m['name']) ?>
+                                            <?php if (!empty($m['router'])): ?> — auto-picks a free model<?php endif; ?>
+                                            <?php if (empty($m['tools'])): ?> — no tool support<?php endif; ?>
+                                            <?php if (!empty($m['context'])): ?> · <?= number_format((int) $m['context'] / 1000) ?>k ctx<?php endif; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="form-text">
+                                    <?= count($models) ?> free chat model(s) ·
+                                    <?= count($toolCapable) ?> with tool support ·
+                                    <?= count($routerModels) ?> router<?= count($routerModels) === 1 ? '' : 's' ?> ·
+                                    <?php if ($modelsAt): ?>
+                                        catalogue loaded <?= e(formatDateTime(date(DATETIME_FORMAT, $modelsAt))) ?>
+                                    <?php else: ?>not loaded yet<?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="ai_rate_limit_per_hour">Prompts per user per hour</label>
+                            <input type="number" name="ai_rate_limit_per_hour" class="form-control"
+                                   id="ai_rate_limit_per_hour" min="1" max="600"
+                                   value="<?= aiAssistantRateLimit() ?>">
+                            <div class="form-text">
+                                This app-side limit is separate from OpenRouter's own free-tier limits.
                             </div>
                         </div>
 
@@ -157,13 +230,32 @@ require_once INCLUDES_PATH . '/header.php';
                     </div>
                     <div class="alert alert-<?= $status['ready'] ? 'success' : 'secondary' ?> mb-3">
                         <?php if ($status['ready']): ?>
-                            The assistant is ready. The chat bubble appears on authenticated pages.
+                            Ready. The chat bubble appears on authenticated pages.
                         <?php elseif ($status['reason'] === 'no_api_key'): ?>
-                            Blocked: no provider API key.
+                            Blocked: no OpenRouter API key.
                         <?php else: ?>
                             Blocked: the feature switch is off.
                         <?php endif; ?>
                     </div>
+
+                    <dl class="row small mb-3">
+                        <dt class="col-6">Provider</dt>
+                        <dd class="col-6 text-end">OpenRouter</dd>
+                        <dt class="col-6">Endpoint</dt>
+                        <dd class="col-6 text-end font-monospace"><?= e(aiAssistantBaseUrl()) ?></dd>
+                        <dt class="col-6">Model</dt>
+                        <dd class="col-6 text-end font-monospace"><?= e(aiAssistantModel()) ?></dd>
+                        <dt class="col-6">Free &amp; tool-capable</dt>
+                        <dd class="col-6 text-end">
+                            <?php if ($modelIsListed): ?>
+                                <span class="badge bg-success">yes</span>
+                            <?php elseif ($models === []): ?>
+                                <span class="badge bg-secondary">catalogue not loaded</span>
+                            <?php else: ?>
+                                <span class="badge bg-warning text-dark">not in the free list</span>
+                            <?php endif; ?>
+                        </dd>
+                    </dl>
                     <h6>Hardening in force</h6>
                     <ul class="small text-muted mb-0">
                         <li>Model output is a tool <em>proposal</em> only — no SQL, shell, file write or eval path exists.</li>
@@ -173,6 +265,7 @@ require_once INCLUDES_PATH . '/header.php';
                         <li>View-as is honoured; All Father-only tools are refused while impersonating.</li>
                         <li>Every prompt, proposal, denial and execution is written to <code>audit_logs</code>.</li>
                         <li>Rate limit: <?= aiAssistantRateLimit() ?> prompt(s) per user per hour.</li>
+                        <li>The API key stays server-side; the model catalogue is fetched without it.</li>
                     </ul>
                 </div>
             </div>
@@ -183,7 +276,7 @@ require_once INCLUDES_PATH . '/header.php';
         <div class="card-header"><h5 class="mb-0">Tool registry <span class="badge bg-secondary"><?= count($tools) ?></span></h5></div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0">
+                <table class="table table-hover mb-0 no-datatable">
                     <thead><tr><th>Tool</th><th>What it does</th><th style="width:10%">Mutating</th></tr></thead>
                     <tbody>
                     <?php foreach ($tools as $t): ?>

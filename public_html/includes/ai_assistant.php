@@ -20,6 +20,15 @@ if (!defined('AI_ASSISTANT_LOADED')) {
 
     define('AI_MAX_TOOL_ARGS_BYTES', 2000);
 
+    /** OpenRouter is the provider: OpenAI-compatible, with a public model catalogue. */
+    define('AI_DEFAULT_BASE_URL', 'https://openrouter.ai/api/v1');
+
+    /** How long a fetched model catalogue is reused before All Father refreshes. */
+    define('AI_MODEL_CACHE_TTL_SECONDS', 86400);
+
+    /** Refuse an absurdly large catalogue rather than storing megabytes of JSON. */
+    define('AI_MAX_CATALOGUE_BYTES', 4000000);
+
     /* ----------------------------------------------------------------- */
     /* Feature flag + configuration (server-side only)                    */
     /* ----------------------------------------------------------------- */
@@ -46,12 +55,17 @@ if (!defined('AI_ASSISTANT_LOADED')) {
 
     function aiAssistantBaseUrl(): string
     {
-        return rtrim((string) tripSetting('ai_base_url', 'https://api.openai.com/v1'), '/');
+        $url = trim((string) tripSetting('ai_base_url', AI_DEFAULT_BASE_URL));
+        if ($url === '' || !preg_match('#^https?://#i', $url)) {
+            return AI_DEFAULT_BASE_URL;
+        }
+        return rtrim($url, '/');
     }
 
     function aiAssistantModel(): string
     {
-        return (string) tripSetting('ai_model', 'gpt-4o-mini');
+        $model = trim((string) tripSetting('ai_model', 'openrouter/free'));
+        return $model !== '' ? $model : 'openrouter/free';
     }
 
     function aiAssistantRateLimit(): int
@@ -189,9 +203,185 @@ if (!defined('AI_ASSISTANT_LOADED')) {
     /* ----------------------------------------------------------------- */
 
     /**
-     * Call the provider. Never throws — returns an error string on failure so
-     * the UI can show something user-safe (no stack traces).
+     * OpenRouter asks apps to identify themselves on every call. The key stays
+     * server-side; these headers carry no secret.
      *
+     * @return list<string>
+     */
+    function aiAssistantHeaders(bool $auth = true): array
+    {
+        $headers = [
+            'Content-Type: application/json',
+            'Accept: application/json',
+            'HTTP-Referer: ' . (string) (defined('SITE_URL') ? SITE_URL : ''),
+            'X-Title: ' . (defined('APP_NAME') ? APP_NAME : 'LOKA Fleet'),
+        ];
+        if ($auth && aiAssistantApiKey() !== '') {
+            $headers[] = 'Authorization: Bearer ' . aiAssistantApiKey();
+        }
+        return $headers;
+    }
+
+    /**
+     * Turn a provider error payload into something a user can act on.
+     * Never echoes the key, the URL or a raw stack.
+     */
+    function aiProviderError(?array $json): string
+    {
+        $msg = trim((string) ($json['error']['message'] ?? ''));
+        $code = (int) ($json['error']['code'] ?? 0);
+
+        if ($code === 401 || stripos($msg, 'auth') !== false) {
+            return 'The provider rejected the API key. Check it in System Control → AI Assistant.';
+        }
+        if ($code === 429 || stripos($msg, 'rate limit') !== false || stripos($msg, 'quota') !== false) {
+            return 'The provider is rate-limiting this app right now. Try again shortly.';
+        }
+        if ($code === 402 || stripos($msg, 'credit') !== false) {
+            return 'The provider reports no credit available for this key.';
+        }
+        if (stripos($msg, 'model') !== false && stripos($msg, 'not found') !== false) {
+            return 'The selected model is no longer available. Pick another one in System Control → AI Assistant.';
+        }
+        return 'The assistant returned an unexpected response.';
+    }
+
+    /**
+     * Fetch the free, tool-capable chat models from the provider catalogue.
+     *
+     * The catalogue is PUBLIC (no key needed). Results are cached in `settings`
+     * so the settings page does not hit the provider on every load, and so a
+     * transient outage never leaves All Father with an empty dropdown.
+     *
+     * @param  bool $refresh bypass the cache
+     * @return array{ok:bool, models:list<array{id:string,name:string,context:int,tools:bool,router:bool}>, error:string, cached_at:?int}
+     */
+    function aiFetchFreeModels(bool $refresh = false): array
+    {
+        $cachedAt = (int) tripSetting('ai_free_models_at', '0');
+        $cached = tripSetting('ai_free_models', '');
+        $fresh = $cachedAt > 0 && (time() - $cachedAt) < AI_MODEL_CACHE_TTL_SECONDS;
+
+        if (!$refresh && $fresh && $cached !== '') {
+            $decoded = json_decode($cached, true);
+            if (is_array($decoded)) {
+                return ['ok' => true, 'models' => $decoded, 'error' => '', 'cached_at' => $cachedAt];
+            }
+        }
+
+        $ch = curl_init(aiAssistantBaseUrl() . '/models');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_HTTPHEADER => aiAssistantHeaders(false),
+        ]);
+        $raw = curl_exec($ch);
+        $err = curl_error($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($raw === false || $code >= 400) {
+            error_log('aiFetchFreeModels: http=' . $code . ' cURL=' . $err);
+            // Fall back to whatever we last cached rather than showing nothing.
+            $decoded = $cached !== '' ? json_decode($cached, true) : null;
+            return [
+                'ok' => is_array($decoded),
+                'models' => is_array($decoded) ? $decoded : [],
+                'error' => 'Could not reach the provider model catalogue (HTTP ' . $code . ').'
+                    . (is_array($decoded) ? ' Showing the last cached list.' : ''),
+                'cached_at' => $cachedAt ?: null,
+            ];
+        }
+
+        $json = json_decode((string) $raw, true);
+        if (!is_array($json) || !isset($json['data']) || !is_array($json['data'])) {
+            return ['ok' => false, 'models' => [], 'error' => 'The provider returned an unexpected model catalogue.', 'cached_at' => null];
+        }
+
+        $models = [];
+        foreach ($json['data'] as $m) {
+            if (!is_array($m) || empty($m['id'])) {
+                continue;
+            }
+            $pricing = $m['pricing'] ?? [];
+            // Free == zero cost on both sides. Verified against the live
+            // catalogue: price alone is NOT enough, because some zero-priced
+            // entries are image/audio models with no chat completion.
+            if ((string) ($pricing['prompt'] ?? 'x') !== '0' || (string) ($pricing['completion'] ?? 'x') !== '0') {
+                continue;
+            }
+            // Chat-only: every declared output modality must be text.
+            // NOTE: do NOT test the "modality" string with str_contains('->text') —
+            // google/lyria-3-pro-preview is "text+image->text+audio", which
+            // CONTAINS '->text' and would wrongly pass. Check the list instead.
+            $outs = array_values(array_filter(array_map('strval', (array) ($m['architecture']['output_modalities'] ?? []))));
+            $outputsTextOnly = $outs === [] || count(array_diff($outs, ['text'])) === 0;
+            if (!$outputsTextOnly) {
+                continue;
+            }
+            $tools = in_array('tools', (array) ($m['supported_parameters'] ?? []), true);
+            $models[] = [
+                'id'      => (string) $m['id'],
+                'name'    => (string) ($m['name'] ?? $m['id']),
+                'context' => (int) ($m['context_length'] ?? 0),
+                'tools'   => $tools,
+                'router'  => str_starts_with((string) $m['id'], 'openrouter/'),
+            ];
+        }
+
+        // Tool-capable first (the assistant needs them), then routers, then by id.
+        usort($models, static function (array $a, array $b): int {
+            return [$b['tools'], $b['router'], $a['id']] <=> [$a['tools'], $a['router'], $b['id']];
+        });
+
+        $encoded = json_encode($models);
+        if ($encoded === false || strlen($encoded) > AI_MAX_CATALOGUE_BYTES) {
+            return ['ok' => false, 'models' => [], 'error' => 'The model catalogue was unexpectedly large; not cached.', 'cached_at' => null];
+        }
+
+        db()->query(
+            "INSERT INTO settings (`key`, value, type, category, created_at, updated_at)
+             VALUES ('ai_free_models', ?, 'string', 'experimental', NOW(), NOW())
+             ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()",
+            [$encoded]
+        );
+        db()->query(
+            "INSERT INTO settings (`key`, value, type, category, created_at, updated_at)
+             VALUES ('ai_free_models_at', ?, 'integer', 'experimental', NOW(), NOW())
+             ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()",
+            [(string) time()]
+        );
+
+        return ['ok' => true, 'models' => $models, 'error' => '', 'cached_at' => time()];
+    }
+
+    /** Cached free models without touching the network. */
+    function aiCachedFreeModels(): array
+    {
+        $cached = tripSetting('ai_free_models', '');
+        if ($cached === '') {
+            return [];
+        }
+        $decoded = json_decode($cached, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /** True when the configured model is in the free, tool-capable list. */
+    function aiModelIsFreeAndUsable(string $modelId): bool
+    {
+        foreach (aiCachedFreeModels() as $m) {
+            if (($m['id'] ?? '') === $modelId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Call the provider (OpenRouter, OpenAI-compatible). Never throws — returns
+     * a user-safe error string on failure so the UI shows no stack traces.
+     *
+     * @param  array<string,array<string,mixed>> $tools
      * @return array{ok:bool, reply:string, tool:?array, error:string}
      */
     function aiAssistantAsk(string $prompt, array $tools): array
@@ -238,11 +428,8 @@ if (!defined('AI_ASSISTANT_LOADED')) {
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Authorization: Bearer ' . aiAssistantApiKey(),
-            ],
+            CURLOPT_TIMEOUT => 60,
+            CURLOPT_HTTPHEADER => aiAssistantHeaders(true),
             CURLOPT_POSTFIELDS => $body,
         ]);
         $raw = curl_exec($ch);
@@ -256,8 +443,11 @@ if (!defined('AI_ASSISTANT_LOADED')) {
 
         $json = json_decode((string) $raw, true);
         if (!is_array($json) || !isset($json['choices'][0]['message'])) {
+            // OpenRouter reports quota/rate-limit problems in `error`; surface a
+            // useful, user-safe sentence rather than "unexpected response".
+            $detail = aiProviderError($json);
             error_log('aiAssistantAsk bad response: ' . substr((string) $raw, 0, 400));
-            return ['ok' => false, 'reply' => '', 'tool' => null, 'error' => 'The assistant returned an unexpected response.'];
+            return ['ok' => false, 'reply' => '', 'tool' => null, 'error' => $detail];
         }
 
         $message = $json['choices'][0]['message'];

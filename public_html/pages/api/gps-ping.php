@@ -16,8 +16,6 @@
  */
 
 require_once INCLUDES_PATH . '/gps_tracking.php';
-requireAuth();
-requireCsrf();
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Robots-Tag: noindex, nofollow');
@@ -30,22 +28,30 @@ $respond = static function (array $payload, int $code = 200): void {
 };
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    requireAuth();
     $respond(['ok' => false, 'error' => 'POST required.'], 405);
 }
 
+// The page posts JSON, but verifyCsrf() reads $_POST — merge the body in
+// BEFORE the auth/CSRF gate, or every JSON ping is rejected as a CSRF failure.
+// (This is the same trap as pages/api/ai-chat.php.)
 $raw = file_get_contents('php://input') ?: '';
 if (strlen($raw) > 4096) {
+    requireAuth();
     $respond(['ok' => false, 'error' => 'Payload too large.'], 413);
 }
-$body = json_decode($raw, true);
-if (!is_array($body)) {
-    $body = $_POST;
-}
-foreach ($body as $k => $v) {
-    if (is_scalar($v) && !isset($_POST[$k])) {
-        $_POST[$k] = $v;
+$decoded = json_decode($raw, true);
+$body = is_array($decoded) ? $decoded : $_POST;
+if (is_array($decoded)) {
+    foreach ($decoded as $k => $v) {
+        if (is_scalar($v) && !isset($_POST[$k])) {
+            $_POST[$k] = $v;
+        }
     }
 }
+
+requireAuth();
+requireCsrf();
 
 if (!gpsTrackingEnabled()) {
     $respond(['ok' => false, 'error' => 'GPS tracking is switched off.', 'disabled' => true], 403);

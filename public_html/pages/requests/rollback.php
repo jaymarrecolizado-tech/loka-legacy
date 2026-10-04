@@ -78,8 +78,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('confirm_rollback') === '1') {
         $currentIdx = (int) array_search($currentStage, $order, true);
         $hadDispatch = !empty($request->actual_dispatch_datetime);
         $hadArrival = !empty($request->actual_arrival_datetime);
-        $leavingAssigned = $targetIdx <= (int) array_search('approved', $order, true);
         $now = date(DATETIME_FORMAT);
+
+        // Release the vehicle/driver only when this request stops holding them:
+        // going back to an approval stage, or undoing a COMPLETED trip.
+        //
+        // A same-stage undo (dispatched/arrived -> approved) deliberately KEEPS
+        // the assignment: the request stays approved and still needs that
+        // vehicle, so freeing it would let another trip double-book it. The
+        // guard transaction is still cleared, so the guard can re-dispatch.
+        $leavingAssigned = ($targetIdx <= (int) array_search('pending_motorpool', $order, true))
+            || ((string) $request->status === STATUS_COMPLETED);
 
         // Release the vehicle/driver when leaving an assigned/active state —
         // only if this request still owns them.

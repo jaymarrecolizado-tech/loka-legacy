@@ -80,7 +80,7 @@ require_once INCLUDES_PATH . '/header.php';
             <?= e($agency) ?> — <?= e($province) ?>
         </p>
 
-        <table class="table table-bordered table-sm mb-3">
+        <table class="table table-bordered table-sm mb-3 no-datatable">
             <tbody>
                 <tr>
                     <th class="w-auto" style="width:12%">Agency</th>
@@ -103,7 +103,7 @@ require_once INCLUDES_PATH . '/header.php';
             </tbody>
         </table>
 
-        <table class="table table-bordered table-sm rh-sheet mb-0">
+        <table class="table table-bordered table-sm rh-sheet mb-0 no-datatable">
             <thead>
                 <tr>
                     <th rowspan="2" style="width:9%">Date</th>

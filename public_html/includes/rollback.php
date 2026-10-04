@@ -133,23 +133,47 @@ if (!defined('ROLLBACK_STAGES_LOADED')) {
      *
      * @return list<string>
      */
+    /**
+     * Side effects reversed when rolling a request back to $targetStatus.
+     *
+     * Every line here must match what pages/requests/rollback.php actually
+     * does — this text is shown in the confirmation box as a promise, and a
+     * promise the code does not keep is worse than no promise.
+     *
+     * @return list<string>
+     */
     function rollbackTripEffects(object $request, string $targetStatus): array
     {
+        $order = array_keys(ROLLBACK_TRIP_STAGES);
         $current = rollbackTripCurrentStage($request);
-        $currentIdx = (int) array_search($current, array_keys(ROLLBACK_TRIP_STAGES), true);
-        $targetIdx = (int) array_search($targetStatus, array_keys(ROLLBACK_TRIP_STAGES), true);
+        $currentIdx = (int) array_search($current, $order, true);
+        $targetIdx = (int) array_search($targetStatus, $order, true);
+        $dispatchedIdx = (int) array_search('dispatched', $order, true);
         $currentStatus = (string) $request->status;
+        $hadDispatch = !empty($request->actual_dispatch_datetime);
 
         $effects = [];
 
-        if ($targetIdx <= 1) {                       // back to an approval stage
-            $effects[] = 'Release the assigned vehicle and driver (if not in use by another trip)';
-            $effects[] = 'Reset the workflow step so the request is re-approved from scratch';
-        } elseif ($targetIdx < $currentIdx && $targetIdx <= 2) {
-            $effects[] = 'Reset the motorpool approval step to pending';
+        $pendingIdx = (int) array_search('pending_motorpool', $order, true);
+        $sameStageUndo = ($currentStatus === STATUS_APPROVED && $targetStatus === STATUS_APPROVED);
+        // Must mirror $leavingAssigned in pages/requests/rollback.php exactly.
+        $releases = ($targetIdx <= $pendingIdx) || ($currentStatus === STATUS_COMPLETED);
+
+        if ($releases) {
+            $effects[] = 'Release the assigned vehicle and driver (if no other approved trip holds them)';
         }
 
-        if (!empty($request->actual_dispatch_datetime) && $targetIdx < (int) array_search('dispatched', array_keys(ROLLBACK_TRIP_STAGES), true)) {
+        if ($targetIdx <= $pendingIdx) {
+            $effects[] = $targetStatus === STATUS_PENDING
+                ? 'Put the workflow back with the department approver (step reset to pending)'
+                : 'Reset the motorpool approval step to pending';
+        } elseif ($sameStageUndo) {
+            $effects[] = 'Keep the approval and the vehicle assignment — only the guard transaction is cleared';
+        } else {
+            $effects[] = 'Restore the request to approved so the guard can dispatch it again';
+        }
+
+        if ($hadDispatch && $targetIdx < $dispatchedIdx) {
             $effects[] = 'Undo the guard transaction: dispatch/arrival times and guard records are cleared';
         }
 
@@ -229,25 +253,34 @@ if (!defined('ROLLBACK_STAGES_LOADED')) {
         return $targets;
     }
 
-    /** @return list<string> */
+    /**
+     * Side effects reversed when rolling a pass slip back to $targetStage.
+     * Must match pages/ob-requests/rollback.php.
+     *
+     * @return list<string>
+     */
     function rollbackObEffects(object $ob, string $targetStage): array
     {
-        $effects = [];
-        $currentIdx = (int) array_search(rollbackObCurrentStage($ob), array_keys(ROLLBACK_OB_STAGES), true);
-        $targetIdx = (int) array_search($targetStage, array_keys(ROLLBACK_OB_STAGES), true);
+        $order = array_keys(ROLLBACK_OB_STAGES);
+        $approvedIdx = (int) array_search('approved', $order, true);
+        $currentIdx = (int) array_search(rollbackObCurrentStage($ob), $order, true);
+        $targetIdx = (int) array_search($targetStage, $order, true);
 
-        if ($targetIdx <= (int) array_search('approved', array_keys(ROLLBACK_OB_STAGES), true)
-            && $currentIdx > (int) array_search('approved', array_keys(ROLLBACK_OB_STAGES), true)) {
+        $effects = [];
+
+        // Leaving the approved stage and everything after it: the gate stamps and
+        // the client acknowledgment are no longer valid.
+        if ($targetIdx <= $approvedIdx && $currentIdx > $approvedIdx) {
             $effects[] = 'Clear the guard departure/arrival stamps';
             $effects[] = 'Clear the client Certificate of Appearance acknowledgment and contacts';
         }
-        if ($targetIdx < $currentIdx && $targetStage === 'approved') {
-            $effects[] = 'Clear the guard departure/arrival stamps';
-            $effects[] = 'Clear the client Certificate of Appearance acknowledgment and contacts';
-        }
-        if ($targetIdx < $currentIdx && $targetStage === 'completed') {
+
+        // Un-finalize when going back from Completed. The handler clears
+        // finalized_at for ANY target other than 'completed', so say so here.
+        if ((string) $ob->status === 'completed') {
             $effects[] = 'Clear the finalization timestamp';
         }
+
         $effects[] = 'Record a rollback entry in the slip timeline';
         $effects[] = 'Notify the requester and the approver holding the target stage';
         return $effects;

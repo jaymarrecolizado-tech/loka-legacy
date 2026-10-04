@@ -16,7 +16,7 @@ $disabled = $disabled ?? false;
     <div class="card-body">
         <?php if ($disabled): ?>
             <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
+                <table class="table table-sm align-middle mb-0 no-datatable">
                     <thead><tr><th>Description</th><th>Unit</th><th class="text-end">Qty</th><th class="text-end">Price</th></tr></thead>
                     <tbody>
                     <?php if ($items === []): ?>

@@ -41,10 +41,10 @@
 | #35 | Telegram + Viber notifications (phased) | DONE Phase A+B (2026-09-29; branch `vberandtelegramnotif`, localhost QA — NOT deployed; tokens pending) |
 | #36 | OB Pass Slip workflow revision (button approvals, CoA acknowledgment + QR) | DONE (2026-10-01; branch `ob-slip-revision`, localhost QA + staging deploy — no prod) |
 | #37 | OB approval badge for Immediate Supervisor | DONE (2026-10-01; badge + kiosk checkbox fix, localhost lint + staging deploy — no prod) |
-| #38 | Vehicle Repair History + costing + escalated maintenance alerts (experimental) | DONE (2026-10-04; branch `plans-38-41-experimental`; localhost QA — NOT deployed) |
-| #39 | Rollback shows full workflow stages (Trips + OB + Gas) | DONE (2026-10-04; same branch; localhost QA — NOT deployed) |
-| #40 | AI assistant chatbot (experimental, role-scoped actions) | DONE (2026-10-04; same branch; localhost QA — NOT deployed) |
-| #41 | Driver-phone GPS trip tracking (experimental) | DONE (2026-10-04; same branch; localhost QA — NOT deployed) |
+| #38 | Vehicle Repair History + costing + escalated maintenance alerts (experimental) | DONE (2026-10-04; branch `plans-38-41-experimental`; localhost + browser QA — NOT deployed) |
+| #39 | Rollback shows full workflow stages (Trips + OB + Gas) | DONE (2026-10-04; same branch; localhost + browser QA — NOT deployed) |
+| #40 | AI assistant chatbot (experimental, role-scoped actions) | DONE (2026-10-04; same branch; OpenRouter provider; needs a real key to exercise) |
+| #41 | Driver-phone GPS trip tracking (experimental) | DONE (2026-10-04; same branch; localhost + browser QA — NOT deployed) |
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -3256,7 +3256,52 @@ Logged-in users get an in-app AI chatbot that can **propose and (after confirm) 
 - [x] Tool registry + chat API endpoint + rate limits + audit
 - [x] Chat UI with confirm gate for mutating tools
 - [x] Role matrix QA (requester cannot approve; approver cannot AF settings; AF can only listed tools)
+- [x] OpenRouter as the provider + free-model catalogue picker
 - [x] Staging only when asked
+
+## Provider: OpenRouter (decided 2026-10-04)
+
+The app talks to **OpenRouter**, which is OpenAI-compatible — so the existing
+chat-completions call is unchanged apart from the base URL.
+
+- `ai_base_url` defaults to `https://openrouter.ai/api/v1`; any OpenAI-compatible
+  endpoint still works.
+- Every call sends OpenRouter's attribution headers (`HTTP-Referer`, `X-Title`).
+  The API key stays server-side.
+- **Free model catalogue.** `GET {base}/models` is **public** (no key needed).
+  System Control → AI Assistant has a *Load free models / Refresh* button that
+  fetches it server-side and caches the filtered list in `settings`
+  (`ai_free_models`, `ai_free_models_at`, 24h TTL). The catalogue is never
+  rendered into the page as raw JSON and the key is never involved.
+
+**Filtering rule — verified against the live catalogue, not assumed.** 466 models,
+22 free. A model is listed only when:
+
+1. `pricing.prompt == "0"` **and** `pricing.completion == "0"`, and
+2. every entry of `architecture.output_modalities` is `text`, and
+3. (advisory, shown in the UI) `tools` is in `supported_parameters`.
+
+Rules 2 and 3 exist because **price alone is the wrong filter**:
+`google/lyria-3-pro-preview` is zero-priced but is an image/audio model, and
+`nvidia/nemotron-3.5-content-safety:free` is chat but advertises no tool support.
+Do **not** test the `modality` string with `str_contains($m, '->text')` —
+`"text+image->text+audio"` contains `->text` and wrongly passes (this was a real
+bug, caught by the probe).
+
+Ordering: tool-capable first, then routers, then by id — so
+`openrouter/free` (a zero-cost router that auto-picks a free model) is the
+default selection. Models without tool support are still listed but flagged
+*no tool support*; the assistant's tool flow needs them, so they cannot do
+anything useful.
+
+**Honest caveat on "unlimited":** OpenRouter's `:free` tier has no per-token
+cost but *does* apply its own rate limits, and the free pool rotates. The
+in-app guard (`ai_rate_limit_per_hour`, default 30/user/hour) sits on top of
+that. Treat "unlimited" as "no per-request cost", not "no throttling".
+
+Provider errors are translated into user-safe sentences (`aiProviderError()`):
+401 → key rejected, 429 → provider rate limit, 402 → no credit,
+unknown model → pick another. Never echoes the key, URL or a stack.
 
 ## Implementation notes (2026-10-04)
 
@@ -3288,11 +3333,55 @@ Logged-in users get an in-app AI chatbot that can **propose and (after confirm) 
 
 **QA — 2026-10-04 (`_deploy_tmp/verify_plan40.php`, 100 checks green over 8 steps, repeatable):** gate
 (off / no-key), registry shape + unknown-tool rejection + schema arg sanitising, confirm-token
-tamper/cross-user/expiry, the full per-role tool matrix (34 checks) including View-as refusal
-of AF-only tools, real draft + care writes with their audit rows, the confirm gate (forged and
-cross-user tokens create nothing), and the endpoint refusing when off / keyless / CSRF-less.
-The provider was never contacted. DB left pristine, `ai_assistant_enabled` back to `0` and
-`ai_api_key` empty. `php -l` clean on every touched file.
+tamper/cross-user/expiry, the full per-role tool matrix including View-as refusal of AF-only
+tools, the real care write with its audit row, the confirm gate (forged and cross-user tokens
+create nothing), and the endpoint refusing when off / keyless / CSRF-less.
+DB left pristine, `ai_assistant_enabled` back to `0` and `ai_api_key` empty.
+`php -l` clean on every touched file.
+
+## Browser click-through (2026-10-04) — what only a browser could find
+
+Run against `localhost` with a real session per persona. **Six real defects** came
+out of this; none were reachable from the PHP harnesses.
+
+1. **`gps_ping` rejected every JSON ping.** `pages/api/gps-ping.php` called
+   `requireCsrf()` *before* merging `php://input` into `$_POST`, so a JSON chat
+   post never had `$_POST['csrf_token']` and always 403'd. I had already fixed
+   this ordering in `ai-chat.php` and then wrote the GPS endpoint from the
+   pre-fix version. My harness missed it because it called `gpsRecordPing()`
+   directly and never went through HTTP. Fixed, and `verify_plan41.php endpoint`
+   now drives the endpoint the way the page does.
+2. **The chat panel never appeared.** `footer.php` guarded on
+   `function_exists('aiAssistantStatus')` *before* requiring the file that
+   defines it, so the bubble only rendered on pages that happened to load it
+   already (the settings page). Fixed by hoisting the require.
+3. **The chat JS threw on load.** `ai-chat.js` listened on `lokaAiOpen` while
+   the markup renders `lokaAiBubble` → `TypeError` → no greeting, no handlers.
+4. **DataTables was auto-wrapping read-only tables** — including the **print
+   sheet** — adding a "Show 15 entries" control, a search box and a pager to
+   what should be a plain list. Added `no-datatable` to the new read-only
+   tables (the codebase's existing opt-out).
+5. **`$flash` collision, pre-existing.** `includes/header.php` assigned
+   `$flash` in the *including* page's scope (`if ($flash = getFlash())`), so any
+   page that sets its own `$flash` list and renders the header gets it clobbered
+   by the assoc session flash → `Undefined array key 0/1`. Five legacy pages
+   (`rate-limits`, `channel_page`, `email`, `sms`, `odometer`) had the same shape
+   and were saved only because they always redirect. Fixed at the source in
+   `header.php` (uses `$sessionFlash`).
+6. **Two effect strings were promises the code did not keep.** A dispatched trip
+   rolled back to *Approved* released the vehicle even though the request stays
+   `approved` and still holds it (double-booking risk), and the OB picker listed
+   the same effect line twice. Both fixed; the release now mirrors the copy
+   exactly, and the harness asserts the copy.
+
+Harness hygiene issue found the same way: `verify_plan39.php`'s residue
+self-heal matched `destination LIKE 'QA %'`, which **silently deleted the
+browser-QA fixtures** in the same database. Narrowed to the harness's exact
+marker.
+
+Still needing a real provider key: the confirm-card *pixels* (CSP forbids
+`eval`, so the script cannot be re-driven in-page to fake a proposal). The
+confirm **endpoint** is covered server-side and over HTTP.
 
 ---
 
@@ -3369,10 +3458,19 @@ Track active DICT fleet trips using the **driver’s phone** GPS so Motorpool / 
   Geolocation does not need a SW for, and a caching service worker on a session/PHP app is a
   large footgun for no benefit here.
 
-**QA — 2026-10-04 (`_deploy_tmp/verify_plan41.php`, 74 checks green over 9 steps, repeatable):**
+**QA — 2026-10-04 (`_deploy_tmp/verify_plan41.php`, 85 checks green over 10 steps, repeatable):**
 gate (off blocks everything, retention inert while off), the dispatch→arrival window matrix,
 driver authz, intake (validation, cadence, poor-fix drop, trail + last-seen + SVG incl. the
-single-point no-divide-by-zero case), scope exclusions, per-role panel visibility, retention
-purge + idempotency, and renders for the driver page (no-trip, consent, live) + the AF hub.
+single-point no-divide-by-zero case), scope exclusions, per-role panel visibility, the HTTP
+endpoint driven exactly as the page drives it (JSON body accepted, bad CSRF rejected, cadence
+and poor-accuracy reported as skippable, off-switch), retention purge + idempotency, the PWA
+manifest and its icons, and renders for the driver page (no-trip, consent, live) + the AF hub.
 DB left pristine and `gps_tracking_enabled` back to `0`. `php -l` clean on every touched file.
+
+**Browser-verified end to end:** with the driver's own session and a live dispatched trip,
+the page posts a real JSON ping and the panel reports *"Last sent just now · trip #1011"*;
+the point is stored, and the All Father Live Board then shows it with exact coordinates,
+accuracy, a staleness badge and an SVG trail. The denied-permission path shows
+*"Permission denied — allow location access for this site"*, and the SVG contains no `http`,
+confirming no tile provider ever sees the coordinates.
 

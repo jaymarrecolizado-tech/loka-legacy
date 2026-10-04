@@ -166,7 +166,7 @@
         statusEl = el('lokaAiStatus');
         bubble = el('lokaAiBubble');
 
-        el('lokaAiOpen').addEventListener('click', open);
+        el('lokaAiBubble').addEventListener('click', open);
         el('lokaAiClose').addEventListener('click', close);
         sendBtn.addEventListener('click', send);
         input.addEventListener('keydown', function (e) {

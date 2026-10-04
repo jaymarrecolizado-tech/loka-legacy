@@ -40,10 +40,12 @@
 
     <!-- AI assistant chat panel (Plan #40, experimental) — only when ready -->
     <?php
-    if (isLoggedIn() && function_exists('aiAssistantStatus')
-        && !isViewingAs()
-        && (function_exists('aiAssistantStatus') ? aiAssistantStatus()['ready'] : false)) {
-        require_once INCLUDES_PATH . '/ai_assistant.php';
+    // The require must come BEFORE the status check: guarding on
+    // function_exists('aiAssistantStatus') without loading the file first meant
+    // the bubble only appeared on pages that happened to load it already.
+    require_once INCLUDES_PATH . '/ai_assistant.php';
+    $lokaAiReady = isLoggedIn() && !isViewingAs() && aiAssistantStatus()['ready'];
+    if ($lokaAiReady) {
         ?>
         <button id="lokaAiBubble" type="button" aria-label="Open the AI assistant"
                 class="btn btn-primary rounded-circle shadow d-flex align-items-center justify-content-center p-0"

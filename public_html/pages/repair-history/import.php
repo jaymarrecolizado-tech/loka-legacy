@@ -105,7 +105,7 @@ require_once INCLUDES_PATH . '/header.php';
                                 <?= count($pv['entries']) ?> event(s)
                             </div>
                             <div class="table-responsive mt-2" style="max-height:22rem;overflow:auto;">
-                                <table class="table table-sm small mb-0">
+                                <table class="table table-sm small mb-0 no-datatable">
                                     <thead class="table-light" style="position:sticky;top:0;">
                                         <tr><th>Date</th><th>Nature of Repair</th><th>Description</th><th>Unit</th><th class="text-end">Qty</th><th class="text-end">Amount</th></tr>
                                     </thead>
@@ -173,7 +173,7 @@ require_once INCLUDES_PATH . '/header.php';
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover mb-0 no-datatable">
                         <thead><tr><th>Workbook</th><th class="text-end">Size</th><th class="text-end">Actions</th></tr></thead>
                         <tbody>
                         <?php foreach ($files as $f): ?>

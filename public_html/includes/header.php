@@ -186,9 +186,16 @@
                 </div>
             <?php endif; endif; ?>
             <!-- Flash Messages -->
-            <?php if ($flash = getFlash()): ?>
-            <div class="alert alert-<?= e($flash['type']) ?> alert-dismissible fade show m-3" role="alert">
-                <?= e($flash['message']) ?>
+            <?php
+            // NOTE: deliberately NOT assigned to $flash. This include runs in the
+            // including page's scope, so writing $flash here used to clobber a
+            // page's own $flash list (['success', 'msg']) with the session flash
+            // array, producing "Undefined array key 0/1" on every page that sets
+            // its own flash without redirecting first.
+            if ($sessionFlash = getFlash()):
+            ?>
+            <div class="alert alert-<?= e($sessionFlash['type']) ?> alert-dismissible fade show m-3" role="alert">
+                <?= e($sessionFlash['message']) ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             <?php endif; ?>
