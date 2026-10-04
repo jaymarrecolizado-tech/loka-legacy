@@ -26,6 +26,19 @@
                     <span>My Trips</span>
                 </a>
             </li>
+
+            <?php
+            // Plan #41 — Trip Tracking is offered to a tagged driver who has a
+            // live dispatched trip, only while the feature is on.
+            $gpsFlag = db()->fetch("SELECT value FROM settings WHERE `key` = 'gps_tracking_enabled'");
+            if ($gpsFlag && (string) $gpsFlag->value === '1' && gpsTrackingCurrentTripForDriver()): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= activeMenu('gps-tracking') ?>" href="<?= APP_URL ?>/?page=gps-tracking">
+                        <i class="bi bi-geo-alt-fill"></i>
+                        <span>Trip Tracking</span>
+                    </a>
+                </li>
+            <?php endif; ?>
             <?php endif; ?>
 
             <!-- Completed Trips -->
@@ -237,26 +250,6 @@
             </li>
             <?php endif; ?>
 
-            <?php
-            // Plan #41 — Trip Tracking is offered only to a driver who actually has
-            // a live dispatched trip, and only while the feature is on.
-            if (currentDriverId()) {
-                $gpsFlag = db()->fetch("SELECT value FROM settings WHERE `key` = 'gps_tracking_enabled'");
-                if ($gpsFlag && (string) $gpsFlag->value === '1') {
-                    $gpsTrip = gpsTrackingCurrentTripForDriver();
-                    if ($gpsTrip) {
-                        ?>
-                        <li class="nav-item">
-                            <a class="nav-link <?= activeMenu('gps-tracking') ?>" href="<?= APP_URL ?>/?page=gps-tracking">
-                                <i class="bi bi-geo-alt-fill"></i>
-                                <span>Trip Tracking</span>
-                            </a>
-                        </li>
-                        <?php
-                    }
-                }
-            }
-            ?>
             <?php endif; ?>
             
             <?php if (canAccessReports()): ?>
