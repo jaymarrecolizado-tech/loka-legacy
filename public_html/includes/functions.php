@@ -690,6 +690,38 @@ function notificationThreadSubject(string $family, int $id): string
 }
 
 /**
+ * Soft-fail side-channel fan-out for one user: SMS + messenger channels
+ * (Telegram etc.). Shared by notify() and notifyPassengersBatch() so every
+ * participant gets the same delivery regardless of role: a channel message
+ * goes out only when that user has a linked binding (chat id) and the event
+ * is allowed on that channel; unlinked users are silently skipped.
+ */
+function notifyChannelsForUser(int $userId, string $type, string $title, string $message, ?string $link = null, ?int $requestId = null): void
+{
+    // Soft-fail SMS enqueue (does not affect in-app/email)
+    try {
+        if (function_exists('smsNotifyUser')) {
+            smsNotifyUser($userId, $type, $title, $message, $link, $requestId);
+        }
+    } catch (Throwable $e) {
+        error_log("NOTIFY ERROR: SMS queue failed for user #{$userId}: " . $e->getMessage());
+    }
+
+    // Soft-fail messenger channels (Plan #35): Telegram extra beside SMS.
+    // Skips silently when the channel is disabled or the user has
+    // no binding — never blast unlinked users.
+    if (function_exists('channelNotifyUser') && defined('LOKA_CHANNELS')) {
+        foreach (LOKA_CHANNELS as $__channel) {
+            try {
+                channelNotifyUser($userId, $__channel, $type, $title, $message, $link, $requestId);
+            } catch (Throwable $e) {
+                error_log("NOTIFY ERROR: " . ucfirst($__channel) . " queue failed for user #{$userId}: " . $e->getMessage());
+            }
+        }
+    }
+}
+
+/**
  * Create notification and send email
  *
  * @param int $userId User ID to notify
@@ -783,27 +815,7 @@ function notify(int $userId, string $type, string $title, string $message, ?stri
         error_log("NOTIFY ERROR: Email queue failed for user #{$userId}: " . $e->getMessage());
     }
 
-    // Soft-fail SMS enqueue (does not affect in-app/email)
-    try {
-        if (function_exists('smsNotifyUser')) {
-            smsNotifyUser($userId, $type, $title, $message, $link, $requestId);
-        }
-    } catch (Throwable $e) {
-        error_log("NOTIFY ERROR: SMS queue failed for user #{$userId}: " . $e->getMessage());
-    }
-
-    // Soft-fail messenger channel (Plan #35): Telegram extra beside
-    // SMS. Skips silently when the channel is disabled or the user has
-    // no binding — never blast unlinked users.
-    if (function_exists('channelNotifyUser') && defined('LOKA_CHANNELS')) {
-        foreach (LOKA_CHANNELS as $__channel) {
-            try {
-                channelNotifyUser($userId, $__channel, $type, $title, $message, $link, $requestId);
-            } catch (Throwable $e) {
-                error_log("NOTIFY ERROR: " . ucfirst($__channel) . " queue failed for user #{$userId}: " . $e->getMessage());
-            }
-        }
-    }
+    notifyChannelsForUser($userId, $type, $title, $message, $link, $requestId);
 }
 
 /**
@@ -937,12 +949,17 @@ function notifyPassengersBatch(int $requestId, string $type, string $title, stri
                     'link' => $link,
                     'link_text' => 'View Details'
                 ], $passenger->name, 5, $requestId, $family);
-                
+
                 $emailsQueued++;
             } catch (Exception $e) {
                 error_log("NOTIFY PASSENGERS BATCH ERROR: Failed to queue email for {$passenger->email}: " . $e->getMessage());
             }
         }
+
+        // Channel parity (Telegram/SMS): passengers ride the same fan-out as
+        // notify() recipients — delivered only when this passenger has a
+        // linked binding (chat id), silently skipped otherwise.
+        notifyChannelsForUser((int) $passenger->user_id, $type, $title, $message, $link, $requestId);
     }
     
     error_log("NOTIFY PASSENGERS BATCH: Request #{$requestId} - Notified {$notified} passengers, queued {$emailsQueued} emails (type: {$type})");
