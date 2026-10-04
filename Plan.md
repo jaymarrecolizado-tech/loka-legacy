@@ -3392,12 +3392,16 @@ unknown model → pick another. Never echoes the key, URL or a stack.
 - The chat panel mounts in `footer.php` only when `aiAssistantStatus()['ready']` is true, so
   nothing is shipped to the browser while the feature is off.
 
-**QA — 2026-10-04 (`_deploy_tmp/verify_plan40.php`, 100 checks green over 8 steps, repeatable):** gate
-(off / no-key), registry shape + unknown-tool rejection + schema arg sanitising, confirm-token
+**QA — 2026-10-04 (`_deploy_tmp/verify_plan40.php`, 255 checks green over 10 steps, repeatable):**
+gate (off / no-key), registry shape + unknown-tool rejection + schema arg sanitising, confirm-token
 tamper/cross-user/expiry, the full per-role tool matrix including View-as refusal of AF-only
 tools, the real care write with its audit row, the confirm gate (forged and cross-user tokens
-create nothing), and the endpoint refusing when off / keyless / CSRF-less.
-DB left pristine, `ai_assistant_enabled` back to `0` and `ai_api_key` empty.
+create nothing), the `actions` step (All Father gate, View-as refusal, preview purity, phrase
+mismatch audit, full create->approve->complete care chain, ticket completion with odometer +
+vehicle release, rollback through the assistant), the endpoint, and render.
+Plus a live browser test: action tool through `op=action` with wrong phrase refused (403),
+right phrase executed, care row + `ai_action_executed` audit verified in DB, then cleaned up.
+DB left pristine, passwords restored, `ai_assistant_enabled` back to operator state (`1`).
 `php -l` clean on every touched file.
 
 ## Browser click-through (2026-10-04) — what only a browser could find
