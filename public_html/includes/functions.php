@@ -217,6 +217,32 @@ function canAccessReports(): bool
 }
 
 /**
+ * Driver Rankings are for approver+ only — the people being ranked must not
+ * see anonymous peer scores. hasRole() is effective-role-based, so View-as a
+ * driver correctly loses access here too.
+ *
+ * Lives in functions.php (not eval_report.php): sidebar.php and nav_search.php
+ * call it on every page.
+ */
+function canViewDriverRankings(): bool
+{
+    return isApprover();
+}
+
+/**
+ * Gate for the Driver Rankings screen and its CSV export (fleet-wide rows).
+ * The shared evaluations PDF keeps requireEvalReportAccess(): self-scoped
+ * drivers legitimately export their own rows through it.
+ */
+function requireDriverRankingsAccess(): void
+{
+    requireReportsAccess();
+    if (!canViewDriverRankings()) {
+        redirectWith('/?page=reports', 'danger', 'Driver Rankings are only visible to approvers and above.');
+    }
+}
+
+/**
  * Guard, or All Father (not while View-as another role).
  * Do not fold this into isGuard() — that would lock All Father out of admin pages.
  */

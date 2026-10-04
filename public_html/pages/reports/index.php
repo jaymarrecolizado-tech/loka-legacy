@@ -102,8 +102,8 @@ require_once INCLUDES_PATH . '/header.php';
         </div>
         <?php endif; ?>
 
-        <!-- Driver Rankings (anonymous, approver+ only) -->
         <?php if (canViewDriverRankings()): ?>
+        <!-- Driver Rankings (anonymous, approver+ only) -->
         <div class="col-lg-4 col-md-6">
             <a href="<?= APP_URL ?>/?page=reports&action=driver-rankings" class="text-decoration-none">
                 <div class="card h-100 report-card">
