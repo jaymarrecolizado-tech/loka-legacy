@@ -20,6 +20,14 @@ if (!defined('ROLLBACK_SERVICE_LOADED')) {
 
     define('ROLLBACK_SERVICE_LOADED', 1);
 
+    // The stage matrix lives in includes/rollback.php. Require it HERE rather
+    // than relying on the caller: the admin screen loads it first, but the AI
+    // assistant reaches this file directly and would otherwise fatal on the
+    // undefined ROLLBACK_TRIP_STAGES constant.
+    if (!defined('ROLLBACK_STAGES_LOADED')) {
+        require_once INCLUDES_PATH . '/rollback.php';
+    }
+
     /** Load a request plus the fields the rollback rules read. */
     function rollbackServiceLoadRequest(int $id, bool $forUpdate = false): ?object
     {

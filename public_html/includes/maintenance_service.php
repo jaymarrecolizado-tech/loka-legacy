@@ -297,16 +297,16 @@ if (!defined('MAINTENANCE_SERVICE_LOADED')) {
             return ['ok' => false, 'error' => 'An odometer reading is required to complete a repair ticket.', 'summary' => '', 'before' => [], 'after' => []];
         }
         $vehicle = db()->fetch("SELECT mileage FROM vehicles WHERE id = ?", [(int) $mr->vehicle_id]);
-        $newMileage = max((int) ($vehicle['mileage'] ?? 0), $odometer);
+        $newMileage = max((int) ($vehicle->mileage ?? 0), $odometer);
         return [
             'ok' => true,
             'error' => '',
             'summary' => sprintf(
                 'Complete repair #%d "%s" for %s — status %s -> %s, odometer %s, vehicle mileage %s -> %s, vehicle released to available.',
                 (int) $mr->id, $mr->title, $mr->plate_number, $mr->status, MAINTENANCE_STATUS_COMPLETED,
-                number_format($odometer), number_format((int) ($vehicle['mileage'] ?? 0)), number_format($newMileage)
+                number_format($odometer), number_format((int) ($vehicle->mileage ?? 0)), number_format($newMileage)
             ),
-            'before' => ['status' => $mr->status, 'vehicle_mileage' => (int) ($vehicle['mileage'] ?? 0)],
+            'before' => ['status' => $mr->status, 'vehicle_mileage' => (int) ($vehicle->mileage ?? 0)],
             'after' => ['status' => MAINTENANCE_STATUS_COMPLETED, 'vehicle_mileage' => $newMileage],
         ];
     }
@@ -327,7 +327,6 @@ if (!defined('MAINTENANCE_SERVICE_LOADED')) {
             'status' => MAINTENANCE_STATUS_COMPLETED,
             'completed_date' => $now,
             'completed_at' => $now,
-            'completed_by' => $actorId,
             'mileage_at_completion' => $odometer,
             'odometer_reading' => $odometer,
             'updated_at' => $now,
@@ -338,7 +337,7 @@ if (!defined('MAINTENANCE_SERVICE_LOADED')) {
         db()->update('maintenance_requests', $update, 'id = ?', [(int) $mr->id]);
 
         $vehicle = db()->fetch("SELECT mileage FROM vehicles WHERE id = ?", [(int) $mr->vehicle_id]);
-        $newMileage = max((int) ($vehicle['mileage'] ?? 0), (int) $odometer);
+        $newMileage = max((int) ($vehicle->mileage ?? 0), (int) $odometer);
         db()->update('vehicles', [
             'status' => VEHICLE_AVAILABLE,
             'mileage' => $newMileage,

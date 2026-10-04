@@ -53,184 +53,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('confirm_rollback') === '1') {
     $reason = trim(postSafe('reason', '', 2000));
     $expectedUpdatedAt = post('expected_updated_at');
 
-    try {
-        db()->beginTransaction();
-
-        $request = $loadRequest($requestId, true);
-        if (!$request) {
-            throw new Exception('Request not found.');
-        }
-
-        $target = rollbackTripTargetByKey($request, $targetKey);
-        if ($target === null) {
-            throw new Exception('That workflow stage is not a valid rollback target right now.');
-        }
-        if (strlen($reason) < 10) {
-            throw new Exception('Please provide a reason (at least 10 characters).');
-        }
-        if ($expectedUpdatedAt && $request->updated_at !== $expectedUpdatedAt) {
-            throw new Exception('Request was modified by someone else. Please review the current state and try again.');
-        }
-
-        $order = array_keys(ROLLBACK_TRIP_STAGES);
-        $currentStage = rollbackTripCurrentStage($request);
-        $targetIdx = (int) array_search($target['status'], $order, true);
-        $currentIdx = (int) array_search($currentStage, $order, true);
-        $hadDispatch = !empty($request->actual_dispatch_datetime);
-        $hadArrival = !empty($request->actual_arrival_datetime);
-        $now = date(DATETIME_FORMAT);
-
-        // Release the vehicle/driver only when this request stops holding them:
-        // going back to an approval stage, or undoing a COMPLETED trip.
-        //
-        // A same-stage undo (dispatched/arrived -> approved) deliberately KEEPS
-        // the assignment: the request stays approved and still needs that
-        // vehicle, so freeing it would let another trip double-book it. The
-        // guard transaction is still cleared, so the guard can re-dispatch.
-        $leavingAssigned = ($targetIdx <= (int) array_search('pending_motorpool', $order, true))
-            || ((string) $request->status === STATUS_COMPLETED);
-
-        // Release the vehicle/driver when leaving an assigned/active state —
-        // only if this request still owns them.
-        if ($leavingAssigned && $currentIdx >= (int) array_search('approved', $order, true)) {
-            if ($request->vehicle_id) {
-                $otherActive = db()->fetchColumn(
-                    "SELECT COUNT(*) FROM requests
-                     WHERE vehicle_id = ? AND id != ? AND status = 'approved' AND deleted_at IS NULL",
-                    [$request->vehicle_id, $requestId]
-                );
-                if (!$otherActive) {
-                    db()->update('vehicles', ['status' => VEHICLE_AVAILABLE, 'updated_at' => $now], 'id = ?', [$request->vehicle_id]);
-                }
-            }
-            if ($request->driver_id) {
-                $otherActiveDrv = db()->fetchColumn(
-                    "SELECT COUNT(*) FROM requests
-                     WHERE driver_id = ? AND id != ? AND status = 'approved' AND deleted_at IS NULL",
-                    [$request->driver_id, $requestId]
-                );
-                if (!$otherActiveDrv) {
-                    db()->update('drivers', ['status' => DRIVER_AVAILABLE, 'updated_at' => $now], 'id = ?', [$request->driver_id]);
-                }
-            }
-        }
-
-        // Undo the guard transaction whenever the target sits before Dispatched.
-        $clearedGuard = false;
-        if ($hadDispatch && $targetIdx < (int) array_search('dispatched', $order, true)) {
-            db()->query(
-                "UPDATE requests
-                 SET actual_dispatch_datetime = NULL, actual_arrival_datetime = NULL,
-                     dispatch_guard_id = NULL, arrival_guard_id = NULL
-                 WHERE id = ?",
-                [$requestId]
-            );
-            $clearedGuard = true;
-        }
-
-        // Trip tickets leave the active queue.
-        $ticketEffect = null;
-        if (in_array($request->status, [STATUS_APPROVED, STATUS_COMPLETED], true)) {
-            if ($target['status'] === STATUS_APPROVED) {
-                db()->query(
-                    "UPDATE trip_tickets SET status = 'cancelled', updated_at = ? WHERE request_id = ? AND deleted_at IS NULL",
-                    [$now, $requestId]
-                );
-                $ticketEffect = 'cancelled';
-            } else {
-                db()->query(
-                    "UPDATE trip_tickets SET deleted_at = ? WHERE request_id = ? AND deleted_at IS NULL",
-                    [$now, $requestId]
-                );
-                $ticketEffect = 'voided';
-            }
-        }
-
-        db()->query(
-            "UPDATE requests SET status = ?, rollback_count = rollback_count + 1, updated_at = ? WHERE id = ?",
-            [$target['status'], $now, $requestId]
+    // Optimistic lock stays HERE, not in the service: it is a form-concurrency
+    // concern (someone else touched the row while the admin read the form), not
+    // a business rule. The service re-validates target + reason itself.
+    if ($expectedUpdatedAt && $request->updated_at !== $expectedUpdatedAt) {
+        redirectWith(
+            '/?page=rollback&action=process&id=' . $requestId,
+            'danger',
+            'Rollback failed: Request was modified by someone else. Please review the current state and try again.'
         );
-
-        // Reset the workflow step (non-destructive: history stays in approvals).
-        try {
-            if (db()->fetch("SELECT id FROM approval_workflow WHERE request_id = ?", [$requestId])) {
-                db()->update('approval_workflow', [
-                    'step'       => $target['step'],
-                    'status'     => $target['status'] === STATUS_APPROVED ? 'approved' : 'pending',
-                    'action_at'  => null,
-                    'comments'   => 'Rolled back by admin: ' . $reason,
-                    'updated_at' => $now,
-                ], 'request_id = ?', [$requestId]);
-            }
-        } catch (Throwable $e) {
-            error_log('Rollback workflow reset failed (non-critical): ' . $e->getMessage());
-        }
-
-        // Timeline entry. approval_type holds the target step's owner.
-        db()->insert('approvals', [
-            'request_id'    => $requestId,
-            'approver_id'   => userId(),
-            'approval_type' => $target['step'],
-            'status'        => 'rollback',
-            'comments'      => $reason,
-            'created_at'    => $now,
-        ]);
-
-        auditLog('request_rollback', 'request', $requestId, [
-            'status'                   => $request->status,
-            'stage'                    => $currentStage,
-            'actual_dispatch_datetime' => $request->actual_dispatch_datetime,
-            'actual_arrival_datetime'  => $request->actual_arrival_datetime,
-        ], [
-            'status'                   => $target['status'],
-            'target_stage'             => $targetKey,
-            'reason'                   => $reason,
-            'rolled_back_by'           => userId(),
-            'rollback_count'           => (int) $request->rollback_count + 1,
-            'dispatch_records_cleared' => $clearedGuard,
-            'trip_tickets'             => $ticketEffect,
-        ]);
-
-        db()->commit();
-
-        // Notifications after commit (non-blocking).
-        try {
-            $label = $target['label'];
-            if ((int) $request->user_id !== (int) userId()) {
-                @notify(
-                    (int) $request->user_id,
-                    'request_rolled_back',
-                    'Request Rolled Back',
-                    "Request #{$requestId} ({$request->destination}) has been rolled back to: {$label}.\n\nReason: {$reason}",
-                    '/?page=requests&action=view&id=' . $requestId,
-                    $requestId
-                );
-            }
-            $targetApprover = $target['status'] === STATUS_PENDING_MOTORPOOL
-                ? ($request->motorpool_head_id ?? null)
-                : ($target['status'] === STATUS_PENDING ? ($request->approver_id ?? null) : null);
-            if ($targetApprover) {
-                @notify(
-                    (int) $targetApprover,
-                    'request_rolled_back',
-                    'Request Rolled Back to You',
-                    "Request #{$requestId} ({$request->destination}) has been rolled back to your approval level ({$label}).\n\nReason: {$reason}",
-                    '/?page=approvals&action=view&id=' . $requestId,
-                    $requestId
-                );
-            }
-        } catch (Throwable $e) {
-            error_log('Rollback notifications failed: ' . $e->getMessage());
-        }
-
-        redirectWith('/?page=rollback&tab=trips', 'success', "Request #{$requestId} rolled back to: {$target['label']}.");
-    } catch (Exception $e) {
-        if (db()->inTransaction()) {
-            db()->rollback();
-        }
-        error_log('Rollback error: ' . $e->getMessage());
-        redirectWith('/?page=rollback&action=process&id=' . $requestId, 'danger', 'Rollback failed: ' . $e->getMessage());
     }
+
+    // Plan #40 — one implementation shared with the AI assistant
+    // (includes/rollback_service.php). What ran inline here before now runs
+    // there, so the two cannot drift apart.
+    require_once INCLUDES_PATH . '/rollback_service.php';
+    $res = rollbackServiceRun($requestId, $targetKey, $reason, (int) userId());
+
+    if (!$res['ok']) {
+        error_log('Rollback error: ' . $res['error']);
+        redirectWith('/?page=rollback&action=process&id=' . $requestId, 'danger', 'Rollback failed: ' . $res['error']);
+    }
+
+    $label = $res['after']['stage'] ?? 'the selected stage';
+    redirectWith('/?page=rollback&tab=trips', 'success', "Request #{$requestId} rolled back to: {$label}.");
     exit;
 }
 

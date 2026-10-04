@@ -74,6 +74,41 @@ $allTools = aiToolRegistry();
 $tools = aiToolsForCurrentUser();
 
 /* ------------------------------------------------------------------ */
+/* action — execute an All Father action after its typed confirmation   */
+/* ------------------------------------------------------------------ */
+if ($op === 'action') {
+    require_once INCLUDES_PATH . '/ai_actions.php';
+
+    $toolId = (string) ($body['tool'] ?? '');
+    $args = (array) ($body['args'] ?? []);
+    $phrase = (string) ($body['phrase'] ?? '');
+    $promptRef = (int) ($body['prompt_ref'] ?? 0);
+
+    if (!isset($allTools[$toolId]) || empty($allTools[$toolId]['is_action'])) {
+        $respond(['ok' => false, 'error' => 'That is not an executable action.'], 400);
+    }
+
+    // Re-sanitise server-side: never trust the args the browser echoes back.
+    $args = aiSanitizeToolArgs($toolId, $args, $allTools);
+
+    $result = aiActionRun($toolId, $args, $phrase, $promptRef);
+    if (!$result['ok']) {
+        $respond(['ok' => false, 'error' => $result['error']], 403);
+    }
+    $respond([
+        'ok' => true,
+        'executed' => [
+            'tool' => $toolId,
+            'label' => $allTools[$toolId]['label'],
+            'trace' => $result['summary'],
+            'mutating' => true,
+            'summary' => $result['summary'],
+            'link' => $result['link'],
+        ],
+    ]);
+}
+
+/* ------------------------------------------------------------------ */
 /* confirm — run a previously proposed mutating tool                    */
 /* ------------------------------------------------------------------ */
 if ($op === 'confirm') {
@@ -149,6 +184,9 @@ auditLog('ai_prompt', 'ai_assistant', null, null, [
     'chars' => mb_strlen($prompt),
     'proposed_tool' => $answer['tool']['tool'] ?? null,
 ]);
+// auditLog() is void by design, so read back the id we just wrote — it is the
+// reference an executed action is audited against.
+$promptAuditId = (int) db()->getConnection()->lastInsertId();
 
 // The endpoint PROPOSES only — it never executes here. That is what lets the UI
 // show "Searching your trips — query: SBY 225" on screen *while* the call runs,
@@ -160,15 +198,40 @@ if ($answer['tool'] !== null) {
     $toolId = $answer['tool']['tool'];
     $tool = $tools[$toolId];
     $args = $answer['tool']['args'];
-    $proposal = [
-        'tool'          => $toolId,
-        'mutating'      => !empty($tool['mutating']),
-        'label'         => aiToolLabel($toolId),
-        'trace'         => aiToolTraceLine($toolId, $args),
-        'description'   => $tool['description'],
-        'args'          => $args,
-        'confirm_token' => aiConfirmToken((int) userId(), $toolId, $args),
-    ];
+
+    if (!empty($tool['is_action'])) {
+        // Plan #40 executing action: return a before/after diff and the phrase
+        // All Father must type. Nothing is executed on this round trip.
+        require_once INCLUDES_PATH . '/ai_actions.php';
+        $preview = aiActionPreview($toolId, $args);
+        $proposal = [
+            'kind'          => 'action',
+            'tool'          => $toolId,
+            'mutating'      => true,
+            'label'         => aiToolLabel($toolId),
+            'trace'         => aiToolTraceLine($toolId, $args),
+            'description'   => $tool['description'],
+            'args'          => $args,
+            'ok'            => $preview['ok'],
+            'error'         => $preview['error'],
+            'summary'       => $preview['summary'],
+            'before'        => $preview['before'],
+            'after'         => $preview['after'],
+            'phrase'        => $preview['phrase'],
+            'link'          => $preview['link'],
+            'prompt_ref'    => (int) $promptAuditId,
+        ];
+    } else {
+        $proposal = [
+            'tool'          => $toolId,
+            'mutating'      => !empty($tool['mutating']),
+            'label'         => aiToolLabel($toolId),
+            'trace'         => aiToolTraceLine($toolId, $args),
+            'description'   => $tool['description'],
+            'args'          => $args,
+            'confirm_token' => aiConfirmToken((int) userId(), $toolId, $args),
+        ];
+    }
 }
 
 $respond([

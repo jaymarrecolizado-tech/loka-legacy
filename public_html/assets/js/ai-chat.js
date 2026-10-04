@@ -100,10 +100,92 @@
         };
     }
 
+    /* ---------- action cards: before/after diff + type-to-confirm ---------- */
+
+    function renderActionCard(p) {
+        if (!p.ok) {
+            addError(p.error || 'That action is not possible right now.');
+            return Promise.resolve();
+        }
+
+        var rows = '';
+        var before = p.before || {};
+        var after = p.after || {};
+        Object.keys(after).forEach(function (k) {
+            var b = before[k] === undefined ? '—' : String(before[k]);
+            var a = after[k] === undefined ? '—' : String(after[k]);
+            var changed = b !== a;
+            rows += '<tr>'
+                + '<td class="small text-muted pe-2">' + esc(k.replace(/_/g, ' ')) + '</td>'
+                + '<td class="small pe-2 text-muted"><s>' + esc(b) + '</s></td>'
+                + '<td class="small"><strong>' + esc(a) + '</strong>'
+                + (changed ? ' <span class="badge bg-warning text-dark">changes</span>' : '') + '</td>'
+                + '</tr>';
+        });
+
+        var card = document.createElement('div');
+        card.className = 'card border-warning mb-2';
+        card.innerHTML =
+            '<div class="card-body p-2">'
+            + '<div class="small fw-semibold mb-1"><i class="bi bi-shield-exclamation me-1"></i>This changes data</div>'
+            + '<div class="small mb-2">' + esc(p.summary || '') + '</div>'
+            + '<table class="table table-sm mb-2" style="font-size:.78rem">' + rows + '</table>'
+            + '<div class="small text-muted mb-2">Nothing has run yet. To apply it, type '
+            + '<code class="user-select-all">' + esc(p.phrase) + '</code> below.</div>'
+            + '<div class="input-group input-group-sm mb-2">'
+            + '<input type="text" class="form-control" data-ai-phrase placeholder="' + esc(p.phrase) + '"'
+            + ' aria-label="Confirmation phrase">'
+            + '<button class="btn btn-success" data-ai-run>Apply</button>'
+            + '</div>'
+            + '<button type="button" class="btn btn-sm btn-outline-secondary" data-ai-cancel>Cancel</button>'
+            + '</div>';
+        log.appendChild(card);
+        log.scrollTop = log.scrollHeight;
+
+        card.querySelector('[data-ai-cancel]').addEventListener('click', function () {
+            card.remove();
+            addRow('bot', 'Cancelled — nothing was changed.');
+        });
+
+        var run = function () {
+            var typed = card.querySelector('[data-ai-phrase]').value;
+            var trace = addTrace('Applying: ' + (p.trace || p.label || ''));
+            setBusy(true);
+            post({
+                op: 'action', tool: p.tool, args: p.args,
+                phrase: typed, prompt_ref: p.prompt_ref || 0
+            }).then(function (r) {
+                setBusy(false);
+                if (!r.ok) {
+                    trace.fail(r.error || 'The action was refused.');
+                    return;
+                }
+                trace.finish('Done: ' + (r.executed.trace || p.trace));
+                card.remove();
+                if (r.executed.summary) addRow('bot', esc(r.executed.summary));
+                if (r.executed.link) addLink(r.executed.link);
+            }).catch(function () {
+                setBusy(false);
+                trace.fail('Could not reach the server.');
+            });
+        };
+        card.querySelector('[data-ai-run]').addEventListener('click', run);
+        card.querySelector('[data-ai-phrase]').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); run(); }
+        });
+
+        return Promise.resolve();
+    }
+
     /* ---------- proposal cards (mutating only) ---------- */
 
     function renderProposal(p) {
         if (!p) return Promise.resolve();
+
+        // Plan #40 executing action: diff + typed confirmation.
+        if (p.kind === 'action') {
+            return renderActionCard(p);
+        }
 
         if (!p.mutating) {
             // Read tool: show the action, then run it immediately. The trace row

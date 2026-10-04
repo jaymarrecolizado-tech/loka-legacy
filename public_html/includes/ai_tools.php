@@ -21,6 +21,11 @@ if (!defined('AI_TOOLS_LOADED')) {
 
     define('AI_TOOLS_LOADED', 1);
 
+    // The executing-action layer. Required HERE rather than lazily behind a
+    // function_exists() check: nothing else loads it, so a lazy check would
+    // always be false and the actions would silently never register.
+    require_once INCLUDES_PATH . '/ai_actions.php';
+
     /**
      * All Father tools are refused while the admin is impersonating another
      * role (Plan #40 decision 4).
@@ -732,6 +737,51 @@ if (!defined('AI_TOOLS_LOADED')) {
         // requests nobody can finish. Add the tool only together with a real
         // draft -> pending transition.
 
+        // ---------------------------------------------------------------
+        // Executing actions (Plan #40, All Father only).
+        //
+        // These are NOT handlers in the usual sense: they share the screens'
+        // implementation (includes/maintenance_service.php,
+        // includes/rollback_service.php) and run only after All Father has seen
+        // a before/after diff and typed a confirmation phrase bound to this
+        // exact tool+args. See includes/ai_actions.php.
+        //
+        // rollback_request is exposed because pages/requests/rollback.php now
+        // calls rollbackServiceRun() — screen and assistant share one
+        // implementation, so they cannot drift apart.
+        // ---------------------------------------------------------------
+        if (function_exists('aiActionsAllowed')) {
+            foreach (aiActionDefinitions() as $id => $def) {
+                $tools[$id] = [
+                    'label' => $def['label'],
+                    'description' => $def['description'] . ' Requires All Father to confirm a before/after diff.',
+                    'schema' => [
+                        'type' => 'object',
+                        'properties' => $def['args'],
+                        'required' => array_keys($def['args']),
+                    ],
+                    'mutating' => true,
+                    'is_action' => true,
+                    'allowed' => static fn(): bool => aiActionsAllowed(),
+                    // Never executed through aiToolExecute() — the endpoint
+                    // routes action tools to aiActionPreview()/aiActionRun() so
+                    // the typed confirmation cannot be bypassed. This handler
+                    // exists only so the registry stays uniform, and it returns
+                    // the preview rather than performing anything.
+                    'handler' => static function (array $args) use ($id): array {
+                        $preview = aiActionPreview($id, $args);
+                        return [
+                            'summary' => $preview['ok']
+                                ? $preview['summary'] . ' NOT APPLIED — awaiting typed confirmation.'
+                                : $preview['error'],
+                            'data' => ['before' => $preview['before'], 'after' => $preview['after'], 'phrase' => $preview['phrase']],
+                            'link' => $preview['link'],
+                        ];
+                    },
+                ];
+            }
+        }
+
         $tools['propose_care'] = [
             'label' => 'Proposing a vehicle care item',
             'description' => 'Propose a vehicle care item for Motorpool to schedule. Creates a PENDING care item that an approver must still approve.',
@@ -822,6 +872,19 @@ if (!defined('AI_TOOLS_LOADED')) {
         }
         $tool = $tools[$toolId];
         $clean = aiSanitizeToolArgs($toolId, $args, $tools);
+
+        // Action tools (Plan #40) must go through aiActionRun(), which demands a
+        // typed confirmation phrase. Reaching them here would bypass that, so
+        // this path refuses rather than executes.
+        if (!empty($tool['is_action'])) {
+            auditLog('ai_tool_blocked', 'ai_tool', null, null, [
+                'tool' => $toolId, 'reason' => 'action tools require a typed confirmation',
+            ]);
+            return [
+                'ok' => false, 'summary' => '', 'data' => [], 'link' => null,
+                'error' => 'This action must be confirmed with its before/after diff.',
+            ];
+        }
 
         // Re-check authorisation at execute time (never trust the model).
         $allowed = false;
