@@ -48,6 +48,30 @@ body {
     overflow-y: auto;
 }
 
+/* Phones: turn the notifications dropdown into a near-full-width sheet
+   pinned under the navbar — 320px absolute is cramped on small screens.
+   !important is required to beat the inline position/transform that
+   Bootstrap's Popper writes onto .show elements. */
+@media (max-width: 575.98px) {
+    .notification-dropdown {
+        position: fixed !important;
+        top: calc(var(--navbar-height) + 0.25rem) !important;
+        left: 0.5rem !important;
+        right: 0.5rem !important;
+        width: auto !important;
+        max-width: none !important;
+        max-height: 70vh;
+        max-height: 70dvh;
+        transform: none !important;
+        margin: 0;
+    }
+
+    .notification-dropdown .dropdown-item {
+        padding: 0.6rem 0.9rem;
+        white-space: normal;
+    }
+}
+
 @media (max-width: 575.98px) {
     .notification-dropdown {
         width: calc(100vw - 1.5rem);
