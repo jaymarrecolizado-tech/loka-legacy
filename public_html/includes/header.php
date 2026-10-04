@@ -24,6 +24,13 @@
     <!-- Chart.js for Analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
+    <!-- PWA (Plan #41 — installable, e.g. a driver's phone keeping Trip Tracking open) -->
+    <link rel="manifest" href="<?= APP_URL ?>/manifest.json">
+    <meta name="theme-color" content="#0d6efd">
+    <link rel="apple-touch-icon" href="<?= ASSETS_PATH ?>/icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="LOKA Fleet">
+
     <!-- Custom CSS -->
     <link href="<?= ASSETS_PATH ?>/css/style.css?v=<?= e(APP_VERSION) ?>" rel="stylesheet">
     <style>

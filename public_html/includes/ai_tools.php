@@ -379,75 +379,12 @@ if (!defined('AI_TOOLS_LOADED')) {
         // Mutating tools — confirmed by a signed, 2-minute, single-user token
         // ---------------------------------------------------------------
 
-        $tools['create_trip_draft'] = [
-            'description' => 'Create a DRAFT vehicle trip request for the signed-in user. A draft triggers no approvals and no notifications.',
-            'schema' => [
-                'type' => 'object',
-                'properties' => [
-                    'destination' => ['type' => 'string', 'maxLength' => 100],
-                    'purpose' => ['type' => 'string', 'maxLength' => 200],
-                    'start_datetime' => ['type' => 'string', 'maxLength' => 20],
-                    'end_datetime' => ['type' => 'string', 'maxLength' => 20],
-                ],
-                'required' => ['destination', 'purpose', 'start_datetime', 'end_datetime'],
-            ],
-            'mutating' => true,
-            'allowed' => static fn(): bool => userId() !== null && !isGuard(),
-            'handler' => static function (array $args): array {
-                $destination = trim((string) ($args['destination'] ?? ''));
-                $purpose = trim((string) ($args['purpose'] ?? ''));
-                $start = trim((string) ($args['start_datetime'] ?? ''));
-                $end = trim((string) ($args['end_datetime'] ?? ''));
-
-                $errors = [];
-                if ($destination === '' || mb_strlen($destination) > 100) {
-                    $errors[] = 'destination is required (max 100 characters)';
-                }
-                if ($purpose === '' || mb_strlen($purpose) > 200) {
-                    $errors[] = 'purpose is required (max 200 characters)';
-                }
-                $startTs = strtotime($start);
-                $endTs = strtotime($end);
-                if ($startTs === false || $endTs === false) {
-                    $errors[] = 'start and end must be real date-times';
-                } elseif ($endTs <= $startTs) {
-                    $errors[] = 'the end must be after the start';
-                }
-                if ($errors) {
-                    return ['summary' => 'Could not create the draft: ' . implode('; ', $errors), 'data' => ['errors' => $errors], 'link' => null];
-                }
-
-                $deptId = (int) (currentUser()->department_id ?? 0);
-                if ($deptId <= 0) {
-                    $deptId = (int) db()->fetchColumn("SELECT id FROM departments WHERE deleted_at IS NULL ORDER BY id LIMIT 1");
-                }
-
-                $id = db()->insert('requests', [
-                    'user_id' => userId(),
-                    'department_id' => $deptId,
-                    'start_datetime' => date(DATETIME_FORMAT, $startTs),
-                    'end_datetime' => date(DATETIME_FORMAT, $endTs),
-                    'purpose' => $purpose,
-                    'destination' => $destination,
-                    'status' => STATUS_DRAFT,
-                    'created_at' => date(DATETIME_FORMAT),
-                ]);
-
-                auditLog('ai_trip_draft_created', 'request', $id, null, [
-                    'destination' => $destination,
-                    'start' => date(DATETIME_FORMAT, $startTs),
-                    'end' => date(DATETIME_FORMAT, $endTs),
-                    'by_tool' => 'create_trip_draft',
-                ]);
-
-                return [
-                    'summary' => 'Draft trip request #' . $id . ' created for "' . $destination . '" ('
-                        . formatDateTime(date(DATETIME_FORMAT, $startTs)) . '). It is a draft — open it to review and submit for approval.',
-                    'data' => ['id' => $id, 'status' => STATUS_DRAFT],
-                    'link' => '/?page=requests&action=view&id=' . $id,
-                ];
-            },
-        ];
+        // NOTE: there is deliberately NO "create a trip draft" tool. This app has
+        // no draft lifecycle — requests/create.php always submits straight to
+        // `pending`, and pages/requests/edit.php will edit a draft but nothing
+        // ever promotes it. A tool that manufactures such rows would create
+        // requests nobody can finish. Add the tool only together with a real
+        // draft -> pending transition.
 
         $tools['propose_care'] = [
             'description' => 'Propose a vehicle care item for Motorpool to schedule. Creates a PENDING care item that an approver must still approve.',
@@ -472,7 +409,11 @@ if (!defined('AI_TOOLS_LOADED')) {
                 $due = trim((string) ($args['due_date'] ?? ''));
 
                 $errors = [];
-                if (!canViewCareVehicle($vehicleId)) {
+                // Existence first: ops roles pass canViewCareVehicle() for any id,
+                // so a bogus id would otherwise fall through to a foreign-key error.
+                if (!db()->fetch("SELECT id FROM vehicles WHERE id = ? AND deleted_at IS NULL", [$vehicleId])) {
+                    $errors[] = 'that vehicle does not exist';
+                } elseif (!canViewCareVehicle($vehicleId)) {
                     $errors[] = 'you cannot see that vehicle';
                 }
                 if ($title === '' || mb_strlen($title) > 255) {

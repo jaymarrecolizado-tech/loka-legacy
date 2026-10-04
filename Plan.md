@@ -3216,6 +3216,11 @@ forward-only target, stale optimistic lock), the three hub tabs and all three pi
 Handlers end in `redirectWith()` → `exit`, so each is driven in a child process that reports
 its post-state as JSON. DB left pristine. `php -l` clean on every touched file.
 
+**Plus `_deploy_tmp/smoke_shared.php`** (cross-plan): every `require` target named in
+`index.php` resolves (161 of them), and `includes/header.php` + `footer.php` + `sidebar.php`
+render clean for all six roles. This is the guard against collateral damage from the shared
+files all four plans touched.
+
 ---
 
 # LOKA Plan #40: AI assistant chatbot (experimental, role-scoped) — ✅ DONE (2026-10-04, branch `plans-38-41-experimental`, localhost QA — NOT deployed)
@@ -3263,9 +3268,12 @@ Logged-in users get an in-app AI chatbot that can **propose and (after confirm) 
   `pages/approvals/process.php` state machine (and the OB equivalent) into a tool would create
   a second, silently-divergent copy of the most safety-critical code in the app. Say the word
   if you want the write path anyway.
-- What the assistant *does* write: `create_trip_draft` (a real `draft` — no workflow row, no
-  notifications, so nothing can be triggered by accident) and `propose_care` (a real `pending`
-  care item that an approver must still approve).
+- What the assistant *does* write: `propose_care` only — a real `pending` care item that an
+  approver must still approve. There is deliberately **no "create a trip draft" tool**:
+  this app has no draft lifecycle (`requests/create.php` always submits straight to
+  `pending`, and `requests/edit.php` will edit a draft but nothing ever promotes it), so
+  such a tool would only manufacture requests nobody can finish. Add it together with a real
+  draft → pending transition, not before.
 - Tool args are sanitised **from the declared JSON schema** — unknown keys are dropped, types
   coerced, strings capped. That is the injection boundary; the model's free text never
   reaches a query.
@@ -3278,7 +3286,7 @@ Logged-in users get an in-app AI chatbot that can **propose and (after confirm) 
 - The chat panel mounts in `footer.php` only when `aiAssistantStatus()['ready']` is true, so
   nothing is shipped to the browser while the feature is off.
 
-**QA — 2026-10-04 (`_deploy_plan40.php`, 106 checks green over 8 steps, repeatable):** gate
+**QA — 2026-10-04 (`_deploy_tmp/verify_plan40.php`, 100 checks green over 8 steps, repeatable):** gate
 (off / no-key), registry shape + unknown-tool rejection + schema arg sanitising, confirm-token
 tamper/cross-user/expiry, the full per-role tool matrix (34 checks) including View-as refusal
 of AF-only tools, real draft + care writes with their audit rows, the confirm gate (forged and
@@ -3353,8 +3361,15 @@ Track active DICT fleet trips using the **driver’s phone** GPS so Motorpool / 
   trip and only while the feature is on — a dead menu entry is worse than no entry.
 - Scope v1 enforced and tested: no fleet vehicle attached → not trackable; private-vehicle OB
   slips are never in scope.
+- **Installable PWA (decision 3).** `public_html/manifest.json` + generated icons
+  (`assets/icons/icon-192|512.png`, `apple-touch-icon.png`, produced by
+  `_deploy_tmp/make_icons.php` so no binary is hand-committed), wired into the head with
+  `<link rel="manifest">`, `theme-color` and the apple-touch icon.
+  **No service worker was added** — decision 3 is foreground-only tracking, which
+  Geolocation does not need a SW for, and a caching service worker on a session/PHP app is a
+  large footgun for no benefit here.
 
-**QA — 2026-10-04 (`_deploy_tmp/verify_plan41.php`, 67 checks green over 9 steps, repeatable):**
+**QA — 2026-10-04 (`_deploy_tmp/verify_plan41.php`, 74 checks green over 9 steps, repeatable):**
 gate (off blocks everything, retention inert while off), the dispatch→arrival window matrix,
 driver authz, intake (validation, cadence, poor-fix drop, trail + last-seen + SVG incl. the
 single-point no-divide-by-zero case), scope exclusions, per-role panel visibility, retention
