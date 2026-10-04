@@ -89,7 +89,7 @@
                         <i class="bi bi-bell fs-5"></i>
                         <?php $unreadCount = unreadNotificationCount(); ?>
                         <?php if ($unreadCount > 0): ?>
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge">
                             <?= $unreadCount > 9 ? '9+' : $unreadCount ?>
                         </span>
                         <?php endif; ?>

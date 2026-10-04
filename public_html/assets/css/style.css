@@ -310,6 +310,21 @@ a.stat-card-link:focus .stat-hint {
     padding: 0.4em 0.65em;
 }
 
+/* Navbar notification count badge — compact pill that hugs the bell's
+   corner and stays inside the 56px navbar instead of poking above it. */
+.navbar .notification-badge {
+    font-size: 0.6rem;
+    font-weight: 600;
+    line-height: 1;
+    padding: 0.22em 0.34em;
+    min-width: 1.4em;
+    text-align: center;
+    top: 0.25rem;
+    left: auto;
+    right: 0.15rem;
+    transform: none;
+}
+
 /* ===== ACTIVITY FEED ===== */
 .activity-feed {
     list-style: none;
