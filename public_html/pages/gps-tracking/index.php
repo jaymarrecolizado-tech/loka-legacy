@@ -167,6 +167,8 @@ require_once INCLUDES_PATH . '/header.php';
     var count = 0;
     var lastSentAt = 0;
     var watching = false;
+    var watchId = null;
+    var blockedOnce = false;
 
     function say(headline, detailText, pct) {
         state.textContent = headline;
@@ -269,12 +271,44 @@ require_once INCLUDES_PATH . '/header.php';
     function onError(err) {
         if (!watching) return;
         if (err && err.code === 1) {
-            stop('Permission denied', 'Allow location access for this site in your browser settings, then reload.');
+            // Android can flip location off behind the driver's back (battery
+            // saver, per-app permission, screen lock). Do NOT dead-end: keep
+            // the watch alive and self-heal when the Permissions API says it
+            // returned to granted (see the permission watcher below).
+            blockedOnce = true;
+            say('Location blocked', 'Tap the padlock in the address bar > Permissions > Location > Allow. If it still fails: Android Settings > Apps > your browser > Permissions > Location.', 0);
         } else if (err && err.code === 3) {
             say('No fix yet', 'Waiting for a GPS signal…', 10);
         } else {
             say('Location unavailable', 'Motorpool sees your last recorded position.', 0);
         }
+    }
+
+    function beginWatch() {
+        watchId = navigator.geolocation.watchPosition(onPosition, onError, {
+            enableHighAccuracy: true,
+            maximumAge: 15000,
+            timeout: 30000
+        });
+    }
+
+    // When the block is lifted mid-trip (driver re-allows, battery saver
+    // releases location), restart the watch without a page reload.
+    if (navigator.permissions && navigator.permissions.query) {
+        try {
+            navigator.permissions.query({ name: 'geolocation' }).then(function (p) {
+                p.onchange = function () {
+                    if (p.state === 'granted' && watching && blockedOnce) {
+                        blockedOnce = false;
+                        say('Sharing your location', 'Location allowed again — waiting for a fresh fix.', 30);
+                        if (watchId !== null) {
+                            navigator.geolocation.clearWatch(watchId);
+                        }
+                        beginWatch();
+                    }
+                };
+            }).catch(function () { /* Permissions API unavailable — rely on onError */ });
+        } catch (e) { /* older browser — rely on onError */ }
     }
 
     function start() {
@@ -285,11 +319,7 @@ require_once INCLUDES_PATH . '/header.php';
         }
         watching = true;
         say('Starting…', 'Waiting for the first GPS fix.', 10);
-        navigator.geolocation.watchPosition(onPosition, onError, {
-            enableHighAccuracy: true,
-            maximumAge: 15000,
-            timeout: 30000
-        });
+        beginWatch();
     }
 
     start();
