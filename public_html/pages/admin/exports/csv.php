@@ -172,7 +172,7 @@ switch ($type) {
 
     case 'department_usage':
         $filename = 'department_usage_' . $startDate . '_to_' . $endDate;
-        $headers = ['Department', 'Total Requests', 'Approved', 'Completed', 'Rejected', 'Pending', 'Total Hours', 'Total Distance Km'];
+        $headers = ['Department', 'Total Requests', 'Approved', 'Completed', 'Rejected', 'Pending', 'Total Hours', 'Total Distance Km', 'Top Vehicle'];
         $data = db()->fetchAll(
             "SELECT dept.name as department,
                     COUNT(*) as total_requests,
@@ -184,15 +184,25 @@ switch ($type) {
                         TIMESTAMPDIFF(MINUTE, r.actual_dispatch_datetime, r.actual_arrival_datetime),
                         TIMESTAMPDIFF(MINUTE, r.start_datetime, r.end_datetime)
                     )) / 60, 1) as total_hours,
-                    COALESCE(SUM(r.mileage_actual), 0) as total_distance_km
+                    COALESCE(SUM(r.mileage_actual), 0) as total_distance_km,
+                    COALESCE(CONCAT(tv.plate_number, ' (', tv.vc, ' trips)'), '-') as top_vehicle
              FROM requests r
              JOIN departments dept ON r.department_id = dept.id
+             LEFT JOIN (
+                 SELECT r2.department_id, v2.plate_number, COUNT(*) AS vc,
+                        ROW_NUMBER() OVER (PARTITION BY r2.department_id ORDER BY COUNT(*) DESC, v2.plate_number ASC) AS rn
+                 FROM requests r2
+                 JOIN vehicles v2 ON v2.id = r2.vehicle_id
+                 WHERE r2.deleted_at IS NULL AND r2.vehicle_id IS NOT NULL
+                   AND DATE(r2.created_at) BETWEEN ? AND ?
+                 GROUP BY r2.department_id, v2.id, v2.plate_number
+             ) tv ON tv.department_id = dept.id AND tv.rn = 1
              WHERE r.deleted_at IS NULL
              AND DATE(r.created_at) BETWEEN ? AND ?
              GROUP BY dept.id, dept.name
              ORDER BY total_requests DESC
              LIMIT ?",
-            [$startDate, $endDate, $maxRows]
+            [$startDate, $endDate, $startDate, $endDate, $maxRows]
         );
         break;
 }

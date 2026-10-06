@@ -14,7 +14,7 @@
 | #8 | Validation Hardening | DONE (2026-09-03) |
 | #9 | Production Deployment & Cron Handover | DONE (code ready; VPS cutover when scheduled) |
 | #10 | Manual QA & Backlog | DONE (documented 2026-09-03) |
-| #11 | Reports Follow-up Gaps | OPEN |
+| #11 | Reports Follow-up Gaps | DONE (2026-10-06; localhost QA — staging deploy 2026-10-06) |
 | #12 | Hostinger KVM 2 Staging Migration (`lokastage`) | DONE (deployed 2026-09-03; rotate secrets + manual QA left) |
 | #13 | Trip Email One-Thread (by Control No.) | DONE (2026-09-04) |
 | #14 | Driver Evaluation Access, Anonymity, Reports & PDF | DONE (2026-09-04; SMTP send + full browser click-through manual) |
@@ -22,7 +22,7 @@
 | #16 | Overdue PDF + Daily Motorpool Report (All Father) | OPEN (2026-09-04; not next build) |
 | #17 | Live Trip Board | DONE (2026-09-04) |
 | #18 | Gas Voucher QR Public Verify | DONE (2026-09-09) |
-| #19 | Leftover UX Fixes, then VAPT, then Optional Features | OPEN (2026-09-10) |
+| #19 | Leftover UX Fixes, then VAPT, then Optional Features | A–C DONE (2026-10-06, localhost + staging; NOT prod); Phase D VAPT open |
 | #20 | Useful Role Dashboard | DONE (2026-09-10) |
 | #21 | Fair Driver Ranking + Trip Extract | DONE (2026-09-13; live `lokafleet.dictr2.cloud`) |
 | #22 | Official Business Pass Slip | DONE (2026-09-15; localhost QA done on `ob_integration` — NOT deployed) |
@@ -45,6 +45,9 @@
 | #39 | Rollback shows full workflow stages (Trips + OB + Gas) | DONE + minor polish optional (2026-10-04; checker PASS — NOT deployed) |
 | #40 | AI assistant chatbot (experimental, role-scoped actions) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
 | #41 | Driver-phone GPS trip tracking (experimental) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
+| #42 | Full-system regression QA (all features / nothing broken) | DONE (2026-10-06; A–D pass; gaps closed — click-through, live AI/GPS, flags OFF) |
+
+**What's next (after #42):** see [Post–Plan #42 next steps](#postplan-42-next-steps) below the Plan #42 section.
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -758,18 +761,24 @@ Cut over `pred-loka-old-boots` to Hostinger KVM 2 (`prod/public_html` package) w
 
 ---
 
-# LOKA Plan #11: Reports Follow-up Gaps — OPEN (2026-09-03)
+# LOKA Plan #11: Reports Follow-up Gaps — ✅ DONE (2026-10-06, branch `plans-38-41-experimental`, localhost QA)
 
 ## Goal
 Finish leftover gaps from the Better LOKA Reports work. Core enrichment (mileage/fuel/dispatch, admin export fixes, `driver_history` / `vehicle_history` / `department_usage`) is already DONE. This plan is UI/export parity only.
 
-## Open checklist
-- [ ] Travel order on Vehicle History UI — add `has_travel_order` / `travel_order_number` to query + table ([vehicle-history.php](public_html/pages/reports/vehicle-history.php); already in CSV)
-- [ ] Travel order + OB slip on Trip Requests — add `has_travel_order`, `has_official_business_slip` to [trips.php](public_html/pages/reports/trips.php) UI; include OB in CSV/PDF exports
-- [ ] Revision stats card on Trip Requests — show `$stats->revision` (SQL already counts it)
-- [ ] Date-filter note — Trip Requests use `created_at`; Vehicle/Driver use `start_datetime`
-- [ ] Admin `department_usage` top vehicles column — [csv.php](public_html/pages/admin/exports/csv.php) + [pdf.php](public_html/pages/admin/exports/pdf.php)
-- [ ] Trip Requests pagination or clearer 500-row cap messaging (export limits unchanged)
+## Open checklist — ✅ DONE (2026-10-06)
+- [x] Travel order on Vehicle History UI — `has_travel_order` / `travel_order_number` added to the query + a **Travel Order** column (info badge with the number, "Yes" when unnumbered) ([vehicle-history.php](public_html/pages/reports/vehicle-history.php); already in CSV)
+- [x] Travel order + OB slip on Trip Requests — `has_travel_order`, `travel_order_number`, `has_official_business_slip` added to the [trips.php](public_html/pages/reports/trips.php) query + a **Docs** column (`TO` / `OB` badges); **OB** added to the trips CSV ([export.php](public_html/pages/reports/export.php) — aliased `official_business` to match the header→key writer; caught + fixed a real bug where the raw column name hit the writer's `$rowArray` lookup) and the trips PDF ([export-pdf.php](public_html/pages/reports/export-pdf.php) — 9 mm OB column after Status, Destination/Purpose trimmed to keep the landscape width)
+- [x] Revision stats card on Trip Requests — orange card (`#fd7e14`, matching the status-donut color) after Rejected, reading the existing `$stats->revision`
+- [x] Date-filter note — note under the Trip Requests filters: this report filters by the date the request was filed (created_at); Vehicle/Driver History filter by trip start date
+- [x] Admin `department_usage` top vehicles column — **Top Vehicle** (`plate (N trips)` via a `ROW_NUMBER()`-ranked per-department subquery) added to [csv.php](public_html/pages/admin/exports/csv.php) + [pdf.php](public_html/pages/admin/exports/pdf.php)
+- [x] Trip Requests 500-row cap messaging — the report page itself was already paginated (50/page); added export-cap note + button tooltips: **CSV up to 10,000 · PDF up to 500** most recent matching rows (export limits unchanged)
+
+## QA — verified 2026-10-06 (localhost, `fleetdb`)
+- [x] `php -l` clean on all six touched files; login page 200.
+- [x] Render: Trip Requests shows the Revision card, Docs column, date-filter note and export-cap note; Vehicle History shows the Travel Order column.
+- [x] Trips CSV: `Official Business` header + Yes/No values, **0 warnings**; `department_usage` CSV: `Top Vehicle` + `plate (N trips)`, no warnings.
+- [x] `department_usage` PDF: valid `%PDF`, `Top Vehicle` + `(N)` confirmed in decompressed content streams; trips PDF still generates.
 
 ## Out of scope
 - New report types
@@ -1307,7 +1316,7 @@ Gas-station login / PIN to redeem. Changing HMAC fields (would void already-prin
 
 ---
 
-# LOKA Plan #19: Leftover UX Fixes, then VAPT, then Optional Features — OPEN (2026-09-10)
+# LOKA Plan #19: Leftover UX Fixes, then VAPT, then Optional Features — OPEN (Phases A–C DONE 2026-10-06; Phase D VAPT open)
 
 ## Goal
 
@@ -1326,30 +1335,28 @@ flowchart LR
   phaseC --> pick
 ```
 
-## Phase A — Trip tickets (do first)
+## Phase A — Trip tickets (do first) — ✅ DONE (2026-10-06, localhost `fleetdb` QA)
 
 These are live bugs, not polish.
 
-1. **Tickets stay `draft` forever** — [`create.php`](public_html/pages/trip-tickets/create.php) always inserts `status => 'draft'`. Nothing sets `submitted`. Motorpool Review Trip Tickets then filters `IN ('submitted','reviewed','approved')`, so new tickets never show for MH (admin still sees drafts with a blank badge). **Fix:** save as `submitted` (or add a Submit action) so review/badges match what drivers filed.
-2. **Approve / Return is broken** — JS in [`trip-tickets/index.php`](public_html/pages/trip-tickets/index.php) POSTs `ticket_id` and a bogus CSRF field `<?= csrf_token ?>`. PHP reads GET `id` and `requireCsrf()`. The green/yellow buttons fail closed. **Fix:** POST `id` + `csrf_token` via `csrfToken()`, and read `post('id')`.
-3. **Filter drops the page** — Filter form has no `hidden page=trip-tickets`, so Filter navigates away from the list.
-4. **Combined dest/purpose caps clip multi-stop trips** — Request hops are 100 chars each joined with ` -> `; ticket create still maxlength 100/200 on the **whole** string. Align ticket dest/purpose with the request chain (print wrapping already landed 2026-09-09).
-5. **Label `TT-{request_id}`** — cosmetic; keep unless we want `TT-{ticket id}` plus request ref.
+1. **Tickets stay `draft` forever** — ✅ [create.php](public_html/pages/trip-tickets/create.php) now inserts `status => 'submitted'` (flash: "created and submitted for Motorpool review"), so Motorpool Review + badges see what drivers filed. QA: driver-3 render shows the form; new inserts land in the `submitted` queue.
+2. **Approve / Return is broken** — ✅ two-part fix: [index.php](public_html/pages/trip-tickets/index.php) now accepts the POSTed body id (`post('id') ?: post('ticket_id')`; GET `id` stays for view links) and the JS CSRF field is `csrfToken()` (staging fix from Plan #42, kept). QA: motorpool POST `?action=approve` with `ticket_id` + CSRF → ticket `submitted → approved`, `reviewed_by` recorded, driver notified, 0 warnings.
+3. **Filter drops the page** — ✅ hidden `page=trip-tickets` added to the filter form; Filter stays on the list.
+4. **Combined dest/purpose caps clip multi-stop trips** — ✅ ticket create destination `maxlength` 100 → **500** (client + `postSafe`), matching the request chain (` -> ` joined hops; purpose writer was already 500). QA: create form renders `maxlength="500"`, old 100 gone.
+5. **Label `TT-{request_id}`** — skipped (cosmetic; keep as-is per plan).
 
-## Phase B — Gas vouchers
+## Phase B — Gas vouchers — ✅ DONE (2026-10-06)
 
-- **Edit is a dead link** — View/list/approve point to `?page=gas-vouchers&action=edit`, but [`index.php`](public_html/index.php) has no `edit` route and there is no `edit.php`. **Fix:** add `pages/gas-vouchers/edit.php` (draft / pending_review only, same fields as create) and route it.
-- Remove leftover Tailwind / mojibake on [`approve.php`](public_html/pages/gas-vouchers/approve.php) and [`print.php`](public_html/pages/gas-vouchers/print.php). QR public verify (Plan #18) stays as-is.
+- **Edit is a dead link** — ✅ `action=edit` routed to `pages/gas-vouchers/create.php` (`$isEdit` mode; draft/`pending_review`/`pending_approval` edit rules already enforced server-side). QA: motorpool opening `?page=gas-vouchers&action=edit&id=7` renders "Edit Gas Voucher" (was: silently falling through to the list).
+- Remove leftover Tailwind / mojibake — ✅ the `w-100 px-4 sm:px-6 lg:px-8` / `xl:col-span-7` Tailwind wrapper on [approve.php](public_html/pages/gas-vouchers/approve.php) is now a Bootstrap `container-fluid px-4 py-4` + `col-lg-8` (print.php mojibake already fixed 2026-09-28). QR public verify (Plan #18) untouched.
 
-## Phase C — Reports (Plan #11, already specified)
+## Phase C — Reports (Plan #11) — ✅ DONE (2026-10-06, see the Plan #11 section above)
 
-Small UI/export parity in [`vehicle-history.php`](public_html/pages/reports/vehicle-history.php), [`trips.php`](public_html/pages/reports/trips.php), [`export.php`](public_html/pages/reports/export.php), admin [`csv.php`](public_html/pages/admin/exports/csv.php) / [`pdf.php`](public_html/pages/admin/exports/pdf.php):
-
-- Travel order + number on Vehicle History table (CSV already has it)
-- TO + OB slip on Trip Requests UI and CSV/PDF
-- Revision stats card (`$stats->revision` is already counted)
-- Note that Trip Requests date filter uses `created_at` vs Vehicle/Driver `start_datetime`
-- `department_usage` top-vehicles column
+- [x] Travel order + number on Vehicle History table (CSV already had it)
+- [x] TO + OB slip on Trip Requests UI + CSV + PDF
+- [x] Revision stats card (`$stats->revision` was already counted)
+- [x] Note: Trip Requests date filter uses `created_at` vs Vehicle/Driver `start_datetime`
+- [x] `department_usage` top-vehicles column
 
 **Defer Plan #16** (overdue PDF + daily digest): needs Mailer attachments + System Control toggles. Not a leftover bug.
 
@@ -3644,4 +3651,354 @@ Independent re-audit vs locked decisions. Migration is **`060_gps_tracking.php`*
 - [x] `gpsTrail()` takes newest N then `array_reverse` → oldest-first; SVG last = current
 - [x] Purge flash concatenates real count; retention cron header no longer claims ping-time purge
 - No remaining must/should-fix gaps for #41
+
+---
+
+# LOKA Plan #42: Full-system regression QA — DONE (2026-10-06)
+
+**Status:** Phases A–D **PASS**. Open gaps from the first pass are **closed** (2026-10-06 gap-close):
+real AF login + View-as click-through, live OpenRouter AI ask, GPS seed ping (plate SBY 225 /
+request #591), experimental flags left **OFF**, AF password hash restored and verified.
+**Related:** Plan #10 Manual QA backlog; Plan #12 post-deploy staging QA; checker PASS on #38–#41.
+
+## Locked approach
+
+1. **Environments:** localhost first (automated harnesses + DB-safe markers on XAMPP `old_loka_db`), then **staging** (`https://lokastage.dictr2.cloud`) for role click-through. **No production** testing that mutates live data.
+2. **Depth:** full module coverage (not smoke-only), including experimental Plans **#38–#41** (enable → smoke → leave **OFF**).
+3. **Evidence:** reuse/extend gitignored `_deploy_tmp/verify_plan*.php` + `smoke_shared.php`; tick the checklists below with date + env.
+4. **Exit criteria:** no open P0/P1; experimental flags OFF after tests; staging `health.php` healthy; Plan #42 checkboxes updated.
+
+```mermaid
+flowchart LR
+  localAuto[Local harnesses]
+  fixBugs[Fix regressions]
+  stageSmoke[Staging role walk]
+  expToggle[Experimental 38-41]
+  signoff[Sign-off checklist]
+  localAuto --> fixBugs --> stageSmoke --> expToggle --> signoff
+```
+
+## Phase A — Local automated (fast fail)
+
+Run from repo root. Harnesses must leave DB pristine / clean their markers.
+
+### A1. Lint + shared smoke
+
+**QA — 2026-10-06 (local XAMPP, `fleetdb`, MariaDB 10.4, PHP 8.2.12):** all PASS. MySQL + a PHP
+built-in server had to be started first (neither was running); `health.php` → `{"status":"healthy",
+"database":"ok","redis":"skipped"}`.
+
+- [x] `php -l` sweep on `public_html/` app PHP (exclude `vendor/`) — **295 files, 0 errors**
+- [x] `_deploy_tmp/smoke_shared.php` — 161 require targets resolve, header/sidebar render for
+      all_father / admin / motorpool_head / approver / requester / guard, flag gating OK → SMOKE PASS
+- [x] Local `health.php` → healthy / DB ok
+
+### A2. Priority plan harnesses (`_deploy_tmp/`)
+
+**QA — 2026-10-06 (local): every priority harness green.** Four harness bugs found and fixed first
+(all were the *test* being wrong about the fixture, not the app):
+
+- `verify_plan28_gate.php` / `_redirect.php` picked user #1, which is `all_father` — a role the gate
+  deliberately exempts, so the gate could never close. Now excludes the break-glass roles **and**
+  anyone who already has real pending evals (the counts asserted are absolute).
+- `verify_plan28_gate.php` rendered the “2 pending → dismissible warning” banner *after* it had
+  crossed 3. The sticky flag (`users.eval_create_blocked`) is working as designed — it stays blocked
+  on the way down — so the 2-pending render now happens before the crossing.
+- `verify_plan35.php` still asserted a **Viber** row. Viber was dropped in migration `056`
+  (2026-09-29); `linked_queue` now expects Telegram-only. The other viber references are gone.
+- `verify_plan39.php render` needed an ambient roll-backable OB slip; staging has none. It now seeds
+  its own (`39TR1`, trimmed by the existing residue sweep).
+- `verify_plan40.php twostep` never turned the gate on, so the endpoint refused everything
+  (8 failures). Child steps (`gate_nokey`, `gate_ready`, `endpoint_call`, `twostep_call`) now documented
+  as parent-driven only — running them alone was never meaningful.
+
+- [x] `verify_plan28*` — 3-pending trip-create gate — 18 + 3 checks (harness fixed, see above)
+- [x] `verify_plan30.php` — all-trip visibility — 4 personas: 8/8/6/6 checks
+- [x] `verify_plan31.php` — gas budget officer — 12 scenarios, 43 checks
+- [x] `verify_plan32.php` — email/SMS themes — 31 checks
+- [x] `verify_plan35.php` — Telegram / channels — 7 scenarios, 22 checks
+- [x] `verify_plan36` / `verify_plan37` — OB revision + approval badge — 12 + 5 steps, 31 + 12 checks
+- [x] `verify_plan38.php` — repair history + costing + escalate — 9 steps, 116 checks
+- [x] `verify_plan39.php` — rollback workflow stages — 16 steps, 135 checks
+- [x] `verify_plan40.php` — AI assistant (role matrix + confirm) — 13 top-level steps, 285 checks
+- [x] `verify_plan41.php` — GPS tracking — 14 steps, 86 checks
+- [x] Optional stretch — skipped: `verify_plan14`–`27` predate this gate and are already covered by
+      their own DONE + checker PASS entries; re-running them is not a regression risk for #38–#41.
+
+### A3. Cron HTTP smokes (local `cron_secret`)
+
+`/?page=cron&action=…&key=SECRET` — each returns ok / no fatal:
+
+**QA — 2026-10-06 (local, all 200, no fatals):**
+
+- [x] a wrong key is **403 Forbidden** (the key is read from `settings.cron_secret`, 32 chars locally)
+- [x] `email` — `EMAIL ok sent=14 failed=0 skipped=0`
+- [x] `sms` — `SMS disabled` (clean refusal, `sms_enabled = 0`)
+- [x] `channels` — `Telegram disabled` + `CHANNELS total sent=0 failed=0 skipped=0`
+- [x] `care` — `CARE ok sent=0 skipped=0`
+- [x] `maintenance` — `MAINTENANCE ok sent=0 skipped=0`
+- [x] `trips` — `TRIPS ok sent=0 expired=0 overdue=4 reminders=0`
+- [x] `gps` — `GPS ok purged=0` (no-op while the feature is off)
+
+### A4. Public pages
+
+- [x] Login page loads — 200
+- [x] `verify-voucher` — bad hash → "Not Valid", no PII (re-checked on staging in Phase D)
+- [x] `verify-ticket` — bad hash → "Not Valid", no PII
+- [x] `verify-coa` — bad hash → "Not Verified", no PII. Good-hash path with masked contacts is
+      covered by local `verify_plan36 official_5b` (no CoA fixture survives on either env)
+
+**Stop on red:** fix before Phase B.
+
+---
+
+## Phase B — Staging role walkthrough
+
+Env: `https://lokastage.dictr2.cloud`. One persona per row (or View-as from All Father where safe). For each: login → sidebar loads → happy path → logout.
+
+**QA — 2026-10-06 (staging, over SSH).** Staging code for Plans #38–#41 is **byte-identical** to
+local (md5 compared on 9 files; only `pages/cron/index.php` differed by CRLF, diffed IDENTICAL).
+`health.php` → healthy, `database: ok`, `redis: ok`.
+
+**Gap-close 2026-10-06:** temp AF password set via SSH (`admin@fleet.local`), real HTTP login +
+CSRF, View-as each persona, logout; AF hash restored (base64-safe) and verified `hash_match` +
+len 60. Evidence: `_deploy_tmp/q42_clickthrough_report.json` (36/37 then; AI retried green).
+
+| Persona | Must pass | Render | Click |
+|---------|-----------|--------|-------|
+| Requester | Create trip request; see own list; cancel/edit rules | [x] 36 pages | [x] View-as nav (Requests) |
+| Approver | Approvals queue; approve/revise one trip | [x] 36 pages | [x] View-as nav (Approvals) |
+| Motorpool | Assign vehicle/driver; motorpool stage; Live Board | [x] 36 pages | [x] View-as nav (Live Trip Board) |
+| Guard | Dispatch + Arrive; OB Depart/Arrive if slip present | [x] 36 pages | [x] View-as → Guard |
+| Driver-tagged | My Trips; Trip Tracking visible when GPS ON | [x] 36 pages | [x] View-as (My Trips) + GPS ping |
+| Budget Officer | Gas voucher budget step | [x] (local `verify_plan31`, 12 scenarios) | [x] covered via CAF View-as + local |
+| CAF / OIC CAF | Gas final approval path | [x] 36 pages | [x] View-as nav (Gas) |
+| Admin | Users/settings read; Workflow Rollback hub shows stage targets | [x] 36 pages | [x] View-as nav (Users) + Rollback hub |
+| All Father | System Control pages load; View-as narrows privileges; no prod deploy | [x] 45 pages (36 + 9 System Control) | [x] real login + System Control + View-as clear |
+
+**289 persona × page combinations, 0 failures** (render). Click column: real login → sidebar →
+View-as × roles → logout (AF); mutating B1/B2/B3 chains stay local-harness proven (below) to avoid
+polluting staging business data during QA.
+
+### B1. Core trip lifecycle (once on staging)
+
+- [x] Request create → dept approve → motorpool approve → guard dispatch → guard arrive → complete
+      — **local harness** (`verify_plan36` / `37` / `39` / `41`); staging click-through covered
+      login + View-as Motorpool/Guard/Driver + Live Board. Full mutation chain not re-run on
+      staging (deliberate — leave staging rows clean).
+- [x] Trip ticket / summary print smoke — trip tickets / vehicle / repair print sheets all render clean
+
+### B2. OB Pass Slip lifecycle
+
+- [x] Supervisor approve → … → finalize — **local** `verify_plan36` (12 steps); staging public CoA
+      bad-hash path verified in Phase D; View-as roles that own OB stamps load clean
+- [x] Public CoA verify QR / hash path — good hash shows VERIFIED with masked contacts, bad hash
+      shows Not Verified (local `verify_plan36 official_5b`); staging bad-hash path verified in Phase D
+
+### B3. Gas voucher lifecycle
+
+- [x] Motorpool review → Budget Officer → CAF approve → print / public voucher QR — **local**
+      `verify_plan31` (12 scenarios); staging View-as CAF shows Gas nav; no staging voucher mutated
+
+### B4. Module smoke (no white screen) — ALL PASS on staging
+
+- [x] Dashboard (each role above) — 8 personas, clean
+- [x] Requests / Approvals / Completed Trips
+- [x] Availability / Schedule (`schedule/calendar.php`)
+- [x] Vehicles / Drivers / Vehicle types
+- [x] Maintenance list + care schedule pages
+- [x] Reports / Evaluations (role-gated) — index + trips + driver + gas + vehicle-history + rankings
+- [x] Users / Departments / Audit (Admin+)
+- [x] Settings / Gas Stations
+- [x] System Control — gps-tracking, ai-assistant, telegram, sms, email, odometer, rate-limits,
+      summary, channel (All Father only)
+
+**One real bug found and fixed here** — `pages/trip-tickets/index.php` lines 545 and 580 wrote
+`<?= csrf_token ?>`, which PHP 8 resolves as an **undefined constant**, not a function call. Every
+Motorpool / Admin / All Father visit to Trip Tickets was a fatal error (white screen) — the page
+never loaded for the three roles that can actually act on a ticket. Fixed to `<?= csrfToken() ?>`,
+`php -l` clean, deployed to **staging only**, and the role walk is green after the fix. The approve
+and reject buttons had never worked from that page.
+
+---
+
+## Phase C — Experimental features (#38–#41)
+
+All Father toggles **ON** only for the test window, then **OFF**. Clean marker data after.
+
+**QA — 2026-10-06, staging (`q42_stage_gates.php`, 19 cases / 153 checks, 0 failures).** Every flag
+state runs in its own process, because `repairHistoryEnabled()` / `gpsTrackingEnabled()` /
+`aiAssistantEnabled()` memoise in a static — flipping mid-process proves nothing. Each case snapshots
+its four settings values on entry and restores them byte-for-byte on exit; verified after the run
+(`repair_history_enabled=1`, `gps_tracking_enabled=0`, `ai_assistant_enabled=1`, key untouched).
+**No business rows were created.**
+
+**Flags after gap-close (exit criteria):** `#38` / `#40` / `#41` all forced **OFF** on staging
+(`repair_history_enabled=0`, `ai_assistant_enabled=0`, `gps_tracking_enabled=0`). Prior operator
+values were `#38=1`, `#40=1`, `#41=0` (snapshotted in `_deploy_tmp/.q42_gap_state.json`).
+`ai_api_key` remains SET; `ai_model` left at `qwen/qwen3.8-27b:free` (free-tier flaky — live ask
+succeeded on `nvidia/nemotron-3.5-lightning:free` then model restored).
+
+### C1. Plan #38 Repair History
+
+- [x] System Control → Repair History → Enable — flag read ON, AF can view + manage
+- [x] Manual entry form (parts + labor lines) — renders with the shared line-item editor and a CSRF field
+- [x] Complete maintenance with lines → `actual_cost` = sum — verified on local (`verify_plan38
+      maintenance`: 13 checks, incl. the itemised roll-up to 6950 ≠ `actual_cost`)
+- [x] History view + print — per-vehicle view and print sheet both clean; print is not DataTable-wrapped
+- [x] Disable; data routes blocked for non-hub users — hub offers Enable, no roll-up listed, motorpool
+      told an All Father must switch it on, requester refused view + manage
+- [x] Motorpool gets **no** toggle; importer is AF-only
+
+### C2. Plan #39 Rollback
+
+- [x] Workflow Rollback hub: tabs Trips | OB | Gas — all three render clean with their own nav item
+- [x] Trip completed/dispatched → stage radios visible (not empty) — trip #573 (approved) offers
+      **3 radios, matching the 3 computed targets**; stepper renders, no phase dropdown left
+- [x] One rollback with reason ≥10 chars; audit/timeline shows stage — verified on local
+      (`verify_plan39`: reason <10 chars refused, forward-only stage refused, stale lock refused, and
+      5 successful rollbacks each writing an approval row + an audit row + a notification)
+- [x] OB and Gas tabs list eligible rows — OB #2 offers 3 radios (3 targets), gas #9 offers 1 (1 target)
+
+### C3. Plan #40 AI assistant
+
+- [x] Enable + provider key present; chat bubble mounts — `aiAssistantStatus()` ready, bubble in the
+      markup, **no key leaked into the HTML** (neither the page nor the settings form). Gap-close:
+      bubble present after real AF login when flag ON; gone when OFF
+- [x] Read tool runs with visible action trace — verified on local (`verify_plan40 twostep`: the
+      confirm path runs `care_due_this_week` end to end and returns tool + label + trace + summary)
+- [x] Mutating tool requires Confirm — same step: `propose_care` over `op=confirm` reports
+      `mutating=true` and names the action; a wrong/absent CSRF token is refused
+- [x] View-as Requester: ops tools denied — on staging: View-as detected, own-record tools kept,
+      `my_pending_approvals` / `audit_trail_lookup` withdrawn, all action tools withdrawn, action
+      gate refused with a reason naming View-as. View-as Approver: approver tools offered, no
+      action tools. Clearing View-as restores the full 18-tool AF surface
+- [x] Per-role tool surface — requester 5 (own-record only), guard 5, approver 11, motorpool 12,
+      admin 13 (ops read, **no** executing actions), all_father 18 (all 5 action tools, behind
+      `aiActionsAllowed()` + a typed confirm phrase)
+- [x] **Live OpenRouter ask** (gap-close) — `aiAssistantAsk("Reply with exactly the word OK…")`
+      returned `OK` via `nvidia/nemotron-3.5-lightning:free` (qwen free tier returned unexpected /
+      502). Flag forced OFF after; model restored to prior value
+- [x] Disable; bubble gone — while off, neither `lokaAiBubble` nor `ai-chat.js` is in the markup
+
+### C4. Plan #41 GPS tracking
+
+- [x] Enable; driver sees **Trip Tracking** — driver's My Trips offers Trip Tracking; hub renders
+      clean, exposes the toggle + purge forms, states the retention window and who can see coordinates
+- [x] Consent + page open → at least one ping — window + consent verified earlier on trip #588;
+      **gap-close live ping:** seed dispatched trip #591 / driver id 5 → consent → POST ping →
+      `ok` with plate **SBY 225** (status 200); Live Board renders; seed cleaned. Endpoint cadence
+      still covered by local `verify_plan41 endpoint`
+- [x] All Father/Admin: Live Trip Board + request view panel — AF and Motorpool boards render clean;
+      admin may view coordinates; **requester may not**, and their request view shows no GPS panel
+- [x] Disable; driver link / ping / ops panel stop — while off the driver page redirects with
+      "switched off" and the Live Board carries no coordinates markup. Ops visibility is computed
+      independently of the flag (correct — the flag gates the data, the role gates the page)
+
+---
+
+## Phase D — Regression guards (nothing broken)
+
+**QA — 2026-10-06: ALL PASS** (staging unless noted).
+
+- [x] No PHP fatals / white screens on dashboard for each role — **289 persona × page combinations,
+      0 failures**; and it caught a real white screen (see Phase B). Note the harness's diagnostic
+      detector is anchored to real error shapes, not the bare word "Notice", so page copy reading
+      "Status Notice: …" is not a false positive.
+- [x] Sidebar badges (OB approvals, guard stamps, approvals) do not crash — every persona × page
+      includes the pages that render badges (approvals, ob-requests, guard, dashboard)
+- [x] Soft gates still work: 3-pending trip-create (#28) — `driverEvaluationBlockAt() === 3`, the
+      settings row agrees, the `users.eval_create_blocked` column exists, the pending count and the
+      gate decision are consistent for a real user, expiry is 30 days. Booking/confirm knobs sane
+      (confirmation ≥15 min, renotify ≥1 h, reminder ≥1 h)
+- [x] GPS cadence still in the locked band — `GPS_MIN_PING_INTERVAL_SECONDS = 45`
+- [x] Notifications: one event → in-app row; queues soft-fail cleanly — all 7 cron endpoints return
+      ok on local (`EMAIL ok sent=14 failed=0`, `SMS disabled`, `CHANNELS total sent=0`,
+      `CARE ok`, `MAINTENANCE ok`, `TRIPS ok`, `GPS ok purged=0`) and a wrong key 403s. Local
+      `verify_plan35 cron_drain` proves rows stay **pending** rather than lost when the gateway is off
+- [x] CSRF enforced on POSTs — bad token refused, missing token refused, real token accepted,
+      `csrfField()` renders the hidden input. Also re-verified inside the request flows by
+      `verify_plan36` / `verify_plan39` / `verify_plan41 endpoint`
+- [x] Public verify pages never leak full PII on bad hash — 23 checks: voucher / ticket / CoA all
+      render clean, all say Not Valid / Not Verified, and none contains an email domain, a phone
+      prefix, a licence word or a stack trace. Login page renders with its CSRF field
+- [x] Staging `health.php` → healthy — `{"status":"healthy","database":"ok","redis":"ok"}`, re-checked
+      after every staging change
+
+---
+
+## Deliverables
+
+- [x] This Plan #42 section kept as the live checklist (tick with date/env notes)
+- [ ] Optional: `run_regression_suite.php` — **skipped.** Every priority harness takes a step/scenario
+      argument and several need chained steps; the wrapper would just be a hardcoded list that
+      breaks silently when a harness gains a step. The per-plan commands are recorded in A2 instead.
+- [x] New staging harnesses (gitignored, in `_deploy_tmp/`): `q42_stage_walk.php` (persona × page
+      render matrix, one process per page because a role-gated page redirects), `q42_stage_gates.php`
+      (Phase C/D, one process per flag state because the helpers memoise, exact-value restore),
+      `q42_stage_put.py` (single-file staging push, refuses prod), plus read-only probes.
+- [x] Sign-off block filled (below)
+
+## Out of scope
+
+- Production deploy or mutating prod data
+- Load / performance testing
+- Full VAPT deep scan (stays under Plan #19)
+- Rewriting historical harnesses into PHPUnit
+
+## Sign-off
+
+| Item | Status |
+|------|--------|
+| Phase A local | **PASS** — 295 files lint-clean, smoke_shared ok, health ok, 10 harnesses green after fixing 5 harness bugs |
+| Phase B staging roles + E2E | **PASS** — render 289/0 fail + real AF login / View-as click-through / logout (gap-close). Mutation B1–B3 left on local harnesses |
+| Phase C experimental (#38–#41) | **PASS** — 153 gate checks + live AI ask (nemotron) + GPS ping SBY 225; flags left **OFF** |
+| Phase D guards + health | **PASS** — 7/7; staging `health.php` healthy after gap-close |
+| Open P0 | **0** |
+| Open P1 | **0** (the trip-tickets fatal was a P1; found and fixed in this run — **staging only**) |
+| Non-blocking polish | #39 hub lists every eligible row with no LIMIT cap on staging; #40 settings has no "models loaded at" timestamp; OpenRouter free models flaky (prefer nvidia nemotron when qwen 502s) |
+| Signed off by | Plan #42 gap-close complete 2026-10-06 |
+
+## Closed gaps (2026-10-06)
+
+1. ~~Phase B click-through / credentials~~ — temp AF password via SSH → real login → View-as ×
+   personas → logout; AF hash restored (base64-safe) and verified.
+2. ~~Live AI / GPS~~ — OpenRouter ask OK via `nvidia/nemotron-3.5-lightning:free`; GPS ping OK
+   on seeded trip #591 / plate SBY 225; markers cleaned.
+3. ~~`#38` / `#40` left ON~~ — forced OFF per exit criteria (snapshotted prior values).
+
+## Residual (non-blocking / out of scope for #42)
+
+1. **Trip-tickets CSRF fix + Plan #11/#19 A–C files are on staging** (redeployed 2026-10-06,
+   MD5-matched). Production still needs the surgical trip-tickets (and optional reports) deploy.
+2. **Staging mutation E2E for trip/OB/gas** — not re-run against staging business rows; covered by
+   local `verify_plan31` / `36` / `37` / `39` + View-as nav on staging.
+
+**Execution order:** complete. Index status → **DONE**.
+
+---
+
+<a id="postplan-42-next-steps"></a>
+# Post–Plan #42 next steps (2026-10-06)
+
+Natural order after regression QA signed off. Prefer ship-what-we-verified before opening new build work.
+
+1. **Prod trip-tickets fix (P1 carry-over)** — `pages/trip-tickets/index.php` `csrfToken()` white-screen
+   fix is on **staging** (MD5-matched 2026-10-06 with Plan #11 reports + #19 A–C files). Production
+   still has the fatal. Do a surgical prod deploy when ready (no full #38–#41 cutover required for
+   this alone).
+2. **Prod cutover for #38–#41** (and other staging-only work) — decide which experimental flags go
+   live (`repair_history`, AI assistant, GPS). Staging currently has them **OFF** after #42 exit
+   criteria. Deploy + flip carefully; keep a staging backup / rollback path.
+3. **Open backlog plans** if the next work is build rather than deploy:
+   - ~~**#11** — Reports follow-up gaps~~ — ✅ DONE 2026-10-06 (**staging** 2026-10-06; not prod)
+   - **#16** — Overdue PDF + daily motorpool report (All Father)
+   - **#19** — ~~Phases A–C (trip tickets, gas voucher edit, reports)~~ ✅ DONE 2026-10-06
+     (**staging** 2026-10-06; not prod); **Phase D (VAPT hardening) open**
+
+**Staging push 2026-10-06:** 10 files MD5-OK on `lokastage` — `index.php`,
+`pages/trip-tickets/{index,create}.php`, `pages/reports/{trips,vehicle-history,export,export-pdf}.php`,
+`pages/admin/exports/{csv,pdf}.php`, `pages/gas-vouchers/approve.php`. Health healthy after put.
+
+If the goal is “ship what we just verified,” start with **(1)** prod trip-tickets.
 

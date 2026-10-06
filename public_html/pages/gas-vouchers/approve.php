@@ -357,9 +357,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 require_once INCLUDES_PATH . '/header.php';
 ?>
 
-<div class="w-100 px-4 sm:px-6 lg:px-8">
+<div class="container-fluid px-4 py-4">
     <div class="row g-4 justify-content-center">
-        <div class="col-12 col-lg-8 xl:col-span-7">
+        <div class="col-12 col-lg-8">
 
             <!-- Page Header -->
             <div class="d-flex justify-content-between align-items-center mb-4">

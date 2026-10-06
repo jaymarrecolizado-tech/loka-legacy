@@ -536,6 +536,10 @@ switch ($page) {
             require_once PAGES_PATH . '/gas-vouchers/rollback.php';
         } elseif ($action === 'create') {
             require_once PAGES_PATH . '/gas-vouchers/create.php';
+        } elseif ($action === 'edit') {
+            // Plan #19 B1 — create.php handles edit mode ($isEdit); the old
+            // dead link now reaches the real editor instead of the list
+            require_once PAGES_PATH . '/gas-vouchers/create.php';
         } elseif ($action === 'view') {
             require_once PAGES_PATH . '/gas-vouchers/view.php';
         } elseif ($action === 'approve') {

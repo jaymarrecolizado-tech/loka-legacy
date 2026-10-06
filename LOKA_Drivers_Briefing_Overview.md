@@ -188,6 +188,21 @@ Hands-on blocks placed after each topic in the deck. Format: **Scenario → Your
 
 *Facilitator: this is the take-home action of the whole briefing — leave real time for it. Links expire after 30 minutes; stuck participants can be linked by an admin instead.*
 
+## 6) Experimental features (what's next)
+
+Four new tools are built and QA'd (Plans #38–41, branch `plans-38-41-experimental`). Each ships **switched OFF** behind a System Control flag until the region signs off — production only after that. Today's briefing is awareness only.
+
+| Feature | Who it's for | What it does |
+|---|---|---|
+| **GPS Trip Tracking** (#41) | drivers + motorpool | Tracks active fleet trips from the **driver's phone** — auto-starts at guard dispatch, auto-stops at arrival. One-time consent box; pings ~every 45 s; page must stay open (installable PWA, no app store). Only **Motorpool / Admin / All Father** ever see the live position and trail; points auto-delete after 30 days. No third-party map tiles (coordinates never leave the server). |
+| **AI Assistant** (#40) | everyone (role-scoped) | In-app chat bubble: ask *“What is the status of my current trip?”* — it runs a **visible trace line** for every lookup, answers, and links to the record (“Open in LOKA”). 9 tools, 8 read-only; the only write creates a care item an approver must still approve. It **cannot click buttons** — approvals stay human. Writes require Confirm; per-user rate limits; every call audited. |
+| **Vehicle Repair History** (#38) | motorpool | Per-plate repair records with dated events, parts and labor line items and cost roll-up — matching the old Excel workbooks, imported one-time from `Reference/Repair History/`. Completed repair tickets and care jobs write history automatically; maintenance reminders now escalate (due-day + overdue daily, no cap) to a wider audience. |
+| **Deeper Rollback View** (#39) | admins | Rolling a request back now shows/uses the **full workflow stage map**, with side effects (guard stamps, vehicle/driver holds) reversed explicitly and the trail kept. |
+
+**Driver takeaways:** GPS tracking and the AI assistant are the two you will actually touch — both opt-in/flag-gated, and you'll get a live walkthrough when the region switches them on.
+
+> Workflow note: the three workflow diagrams in the deck now show the **exact status tokens** the app displays (`pending`, `pending_motorpool`, `approved`, `dispatched`, `completed`, `pending_supervisor` → `coa_received`, `draft` → `pending_budget` → `pending_approval`, etc.) so drivers can match the slides to what they see on screen.
+
 ## House rules (closing slide)
 1. **File early** — booking windows and lead times are enforced automatically.
 2. **Mind the gate** — departure/arrival stamps make the official record; no stamp, no completed trip. Report a missed stamp to motorpool immediately.

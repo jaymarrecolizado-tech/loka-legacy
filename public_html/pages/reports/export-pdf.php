@@ -42,6 +42,7 @@ $requests = db()->fetchAll(
     "SELECT r.id, r.created_at, r.start_datetime, r.end_datetime, r.purpose, r.destination,
             r.passenger_count, r.status, r.notes,
             r.mileage_start, r.mileage_end, r.mileage_actual,
+            r.has_official_business_slip,
             u.name as requester, dept.name as department,
             v.plate_number, v.make as vehicle_make, v.model as vehicle_model,
             dr_u.name as driver,
@@ -110,8 +111,8 @@ $tripKm = function ($row) {
     return null;
 };
 
-$columns = ['ID', 'Created', 'Scheduled', 'Requester', 'Dept', 'Destination', 'Purpose', 'Vehicle', 'Driver', 'Status', 'Pax', 'Duration', 'Km', 'Fuel (L)', 'Dispatch', 'Arrival'];
-$colWidths = [9, 15, 24, 20, 19, 28, 28, 14, 17, 13, 8, 14, 12, 11, 16, 17];
+$columns = ['ID', 'Created', 'Scheduled', 'Requester', 'Dept', 'Destination', 'Purpose', 'Vehicle', 'Driver', 'Status', 'OB', 'Pax', 'Duration', 'Km', 'Fuel (L)', 'Dispatch', 'Arrival'];
+$colWidths = [9, 15, 24, 20, 19, 25, 24, 14, 17, 13, 9, 8, 14, 12, 11, 16, 17];
 
 $printTableHeader = function () use ($pdf, $columns, $colWidths) {
     $pdf->SetFont('helvetica', 'B', 7);
@@ -149,6 +150,7 @@ foreach ($requests as $row) {
         $row->plate_number ?: '-',
         $row->driver ?: '-',
         ucfirst($row->status),
+        $row->has_official_business_slip ? 'OB' : '',
         $row->passenger_count ?: '-',
         $duration,
         $km !== null ? number_format($km) : '-',

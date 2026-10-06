@@ -14,7 +14,11 @@ $ticketId = (int) get('id', 0);
 // Handle actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'list') {
     requireCsrf();
-    
+
+    // Plan #19 A2: the review buttons POST the ticket id in the body
+    // (`ticket_id`) — the GET `id` below is for view links only.
+    $ticketId = (int) (post('id', post('ticket_id', 0)) ?: 0);
+
     switch ($action) {
         case 'create':
             // Guards previously created tickets here; creation is driver-only via create_form
@@ -317,6 +321,7 @@ require_once INCLUDES_PATH . '/header.php';
     <div class="card mb-4">
         <div class="card-body">
             <form method="GET" class="row g-3">
+                <input type="hidden" name="page" value="trip-tickets">
                 <div class="col-md-3">
                     <label class="form-label">Status</label>
                     <select class="form-select" name="status">
@@ -542,7 +547,7 @@ function approveTicket(ticketId) {
         body: new URLSearchParams({
             ticket_id: ticketId,
             review_notes: notes || '',
-            '<?= csrf_token ?>': '<?= csrf_token ?>'
+            'csrf_token': '<?= csrfToken() ?>'
         })
     })
     .then(response => response.json())
@@ -577,7 +582,7 @@ function rejectTicket(ticketId) {
         body: new URLSearchParams({
             ticket_id: ticketId,
             rejection_reason: reason,
-            '<?= csrf_token ?>': '<?= csrf_token ?>'
+            'csrf_token': '<?= csrfToken() ?>'
         })
     })
     .then(response => response.json())

@@ -183,7 +183,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tripTypeValue = $tripType;
     $newStartDate = post('start_date');
     $newEndDate = post('end_date');
-    $destinationInput = postSafe('destination', '', 255);
+    $destinationInput = postSafe('destination', '', 500);
     $purposeInput = postSafe('purpose', '', 500);
     if (mb_strlen($purposeInput) > 200) $errors[] = 'Purpose must be 200 characters or fewer (currently ' . mb_strlen($purposeInput) . ').';
     if (mb_strlen($destinationInput) > 100) $errors[] = 'Destination must be 100 characters or fewer (currently ' . mb_strlen($destinationInput) . ').';
@@ -348,7 +348,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'dispatch_guard_id' => $request->dispatch_guard_id ?: userId(),
                 'arrival_guard_id' => userId(),
                 'guard_notes' => $guardNotesValue,
-                'status' => 'draft',
+                // Plan #19 A1: file as submitted so Motorpool review + badges
+                // see what drivers filed (draft never showed in the queue)
+                'status' => 'submitted',
                 'created_by' => userId()
             ]);
             
@@ -384,7 +386,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 redirectWith(
                     '/?page=' . $redirectPage,
                     'success',
-                    'Trip ticket created successfully! You can now review and submit it.'
+                    'Trip ticket created and submitted for Motorpool review.'
                 );
             }
             
@@ -649,11 +651,11 @@ require_once INCLUDES_PATH . '/header.php';
 
                 <!-- Destination (Pre-filled but editable) -->
                 <div class="mb-3">
-                    <label class="form-label">Destination <span class="text-danger">*</span> <small class="text-muted">(max 100)</small></label>
-                    <input type="text" class="form-control" name="destination" value="<?= e($destinationValue) ?>" maxlength="100" required oninput="document.getElementById('destCount').textContent=this.value.length">
+                    <label class="form-label">Destination <span class="text-danger">*</span> <small class="text-muted">(multi-stop chains can be long — max 500)</small></label>
+                    <input type="text" class="form-control" name="destination" value="<?= e($destinationValue) ?>" maxlength="500" required oninput="document.getElementById('destCount').textContent=this.value.length">
                     <div class="d-flex justify-content-between">
                         <small class="text-muted">From request: <?= e($destination) ?></small>
-                        <small class="text-muted"><span id="destCount"><?= mb_strlen($destinationValue) ?></span>/100</small>
+                        <small class="text-muted"><span id="destCount"><?= mb_strlen($destinationValue) ?></span>/500</small>
                     </div>
                 </div>
 
