@@ -46,6 +46,7 @@
 | #40 | AI assistant chatbot (experimental, role-scoped actions) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
 | #41 | Driver-phone GPS trip tracking (experimental) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
 | #42 | Full-system regression QA (all features / nothing broken) | DONE (2026-10-06; A–D pass; gaps closed — click-through, live AI/GPS, flags OFF) |
+| #43 | Central SSO for LOKA + Travel Order (OIDC, Python service) | IN PROGRESS (2026-10-09; service built + LIVE on sso.dictr2.cloud:8000, discovery/JWKS verified; DB pending panel creation; LOKA+TO integrations coded & tested, flag off) |
 
 **What's next (after #42):** see [Post–Plan #42 next steps](#postplan-42-next-steps) below the Plan #42 section.
 
@@ -4001,4 +4002,68 @@ Natural order after regression QA signed off. Prefer ship-what-we-verified befor
 `pages/admin/exports/{csv,pdf}.php`, `pages/gas-vouchers/approve.php`. Health healthy after put.
 
 If the goal is “ship what we just verified,” start with **(1)** prod trip-tickets.
+
+---
+
+# LOKA Plan #43: Central SSO for LOKA + Travel Order (OIDC) — PLANNED (2026-10-09, not started)
+
+## Goal
+One login for LOKA (`lokafleet.dictr2.cloud`) and Travel Order (`to.dictr2.cloud`) through a central OpenID Connect (OIDC) service. Built so other dictr2 apps can join later. Keep changes to the existing apps minimal: each app keeps its own users table, roles, sessions, and timeouts.
+
+## Decisions (2026-10-09)
+- Central OIDC login service, assumed `sso.dictr2.cloud`, written in **Python (FastAPI + Authlib)** per the project rule "Python for the backend", backed by MySQL.
+- Central user store in the SSO database. Existing bcrypt hashes are copied from each app's `users` table, so passwords stay the same. PHP `password_verify` and Laravel `$2y$` bcrypt both accept them.
+- Apps link local users by **email**. Roles stay per app: LOKA `requester`, `approver`, `motorpool_head`, `guard`, `admin`; Travel Order `employee`, `admin`, `hr`, `super_admin`. The SSO service does not own roles.
+- Each app keeps its existing session, idle and absolute timeouts, and fingerprint checks. SSO only replaces the credential step.
+- Rate limiting and lockout move to the SSO service (currently in `public_html/classes/Auth.php`).
+
+## Current state (read-only check 2026-10-09)
+| App | Stack | Login | Session |
+|-----|-------|-------|---------|
+| LOKA | Custom PHP | `public_html/pages/auth/login.php` calls `Auth::attempt()` in `public_html/classes/Auth.php` | `LOKA_SID`, file-based, host-only cookie (`COOKIE_DOMAIN = ''` in `public_html/config/security.php`) |
+| Travel Order | Laravel 12 + Filament 3 at `/DICT` | `app/Providers/Filament/DICTPanelProvider.php` (`->login(\App\Filament\Pages\Auth\Login::class)`) | Driver set by `SESSION_DRIVER` in `.env` |
+
+Travel Order panel access is limited to `@dict.gov.ph` by `User::canAccessPanel()` in `app/Models/User.php`. Keep that check.
+
+## Travel Order production access (temporary)
+- Target: site user `dictr2-to`, IP `187.77.150.203`. This is the same VPS as the Plan #12 staging host (`lokastage`).
+- **SSH login user for `dictr2-to`: `travel-ssh`** (member of group `dictr2-to`, has sudo). `to-ssh` and `dictr2-to` reject the key.
+- Generate an ed25519 key pair **locally** at `C:\Users\jayre\.ssh\dictr2_to_migration`. The private key stays on this machine. **Done 2026-10-09**, but created **without a passphrase** (deviation from the original plan). To add one, run `ssh-keygen -p -f C:\Users\jayre\.ssh\dictr2_to_migration`.
+- Public key installed for `travel-ssh` (not `dictr2-to`). **Login verified 2026-10-09**; `travel-ssh` can read `/home/dictr2-to/htdocs`. The key is also on `dictr2-sso` (SSO site user, see below).
+- Never commit the key, server passwords, or `.env` to git. See Security rules in Plan #12. Do not write key paths or secrets into code.
+- After migration: remove the public key (authorized_keys or hPanel), delete the local key files, and confirm the key is rejected.
+
+## Steps
+1. **Prod pull (read-only):** pull the production Travel Order code over SSH and diff it against `C:\xampp\htdocs\Projects\prod-to\to.dictr2.cloud`. Use production as the base. Never overwrite the server `.env`.
+2. **User audit:** compare LOKA and Travel Order users by email (overlap, role, status, `deleted_at`). Decide how duplicates are handled before copying hashes.
+3. **SSO service** (new folder, outside `public_html`): separate dev, test, and prod MySQL databases. Endpoints: `/.well-known/openid-configuration`, `/authorize`, `/token`, `/userinfo`, `/jwks`, `/logout`. Client registry with hashed client secrets and exact redirect URIs. PKCE, state, and nonce. Login rate limit, lockout, and audit log. pytest tests for each flow.
+4. **Travel Order:** replace the Filament login with an OIDC redirect and callback. The callback finds the local user by email and logs them in with Laravel auth. Keep `canAccessPanel`. Feature tests.
+5. **LOKA:** replace the login form with a redirect to SSO. The callback finds the local user by email and calls `Auth::login()`, so the existing session code runs unchanged. Add a config flag to keep local login as a fallback during rollout. `php -l` on touched files.
+6. **Logout:** local logout plus SSO logout redirect. Back-channel logout deferred.
+7. **Rollout:** test on localhost and the staging host first, then production. Remove the temporary SSH key after migration.
+
+## Progress (2026-10-09, implementation session)
+- **Step 1 done:** TO production code pulled & compared — local `prod-to` copy now matches prod byte-for-byte on code dirs (41 files refreshed; prior local deltas backed up in `_plan43_backup_20261009/`; local-only WIP files left inert: Dashboard, PreviewTravelOrder, TravelOrderParticipantNotified, TevPackService, config/travel.php).
+- **Step 2 done:** user audit — TO 95 users, LOKA 115, **86 emails overlap** (9 TO-only, 29 LOKA-only). Roles confirmed per-app. Import rule: SSO DB keeps BOTH app hashes (loka_hash/to_hash) with LOKA's as primary; non-bcrypt hashes skipped.
+- **Step 3 done:** SSO service in repo `sso/` (FastAPI + MySQL). JWT layer uses **joserfc** (authlib 1.8 deprecated/broke `authlib.jose` — recorded deviation). Endpoints: discovery, /authorize (PKCE S256 only), /login, /token (basic+post auth), /userinfo, /jwks, /logout. Exact redirect matching, single-use hashed codes (60s), lockout 5/15min per email+IP, audit log. **pytest 15/15 green** incl. PHP `$2y$` hash interop.
+- **Step 4 done (code+tests):** TO — `app/Services/SsoClient.php`, `SsoController` (+routes /auth/sso/redirect|callback), Filament Login mount() redirect when `SSO_LOGIN_ENABLED=true` (?local=1 fallback), `canAccessPanel` untouched. **Feature tests 5/5 green** (mocked exchange; live E2E at rollout).
+- **Step 5 done:** LOKA — `config/sso.php` (SSO_ENABLED flag, off), `includes/sso_client.php` (PKCE/state/nonce, curl exchange, openssl RS256 JWKS verify with byte-verified DER builder), `pages/sso-callback.php`, login-page hook (?local=1 fallback), router wiring, SSO-aware logout (step 6). Local **end-to-end OIDC login PASS** (real redirects, real tokens, Auth::login session).
+- **Deployed:** SSO service live on the VPS (`~/sso` as dictr2-sso, venv, keys generated, reverse-proxy port discovered = **8000**, `@reboot` cron; `https://sso.dictr2.cloud` discovery + /jwks return 200). LOKA staging has the integration code with SSO_ENABLED off (login unchanged, verified).
+- **BLOCKED (needs panel):** SSO MySQL database + user must be created in the Hostinger panel (dictr2-sso has no root/sudo). Then: fill `~/sso/.env`, apply schema, run import_users.py (needs LOKA + TO prod DB creds), register_client.py for loka-staging/to-prod, then flip SSO_ENABLED/SSO_LOGIN_ENABLED.
+
+## Open items
+- Decide how emails that exist in both user tables are handled (step 2).
+- Confirm whether production `lokafleet.dictr2.cloud` is on the same VPS (`187.77.150.203`).
+- Confirm whether the key should also be installed for `lokacloud-ssh` / `lokaloka` (LOKA staging).
+
+## QA (fill at implementation time)
+- [ ] SSH key login works for `dictr2-to`; key removed and rejected after migration
+- [ ] SSO discovery, authorize, token, userinfo, and logout pass pytest
+- [ ] Travel Order login via SSO creates a session; `@dict.gov.ph` gate still enforced
+- [ ] LOKA login via SSO creates a session; fingerprint and timeouts unchanged
+- [ ] Local-login fallback flag works
+- [ ] No secrets or key paths committed
+
+## Status
+IN PROGRESS. Service built, tested (20 automated tests green) and live on sso.dictr2.cloud (no DB yet). Both app integrations coded, locally verified end-to-end, deployed to staging with flags OFF. Remaining: panel-created SSO DB, user import, client registration, then staged rollout (staging first, prod gated on DICT sign-off).
 

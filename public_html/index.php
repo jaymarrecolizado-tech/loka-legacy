@@ -37,6 +37,7 @@ require_once __DIR__ . '/config/security.php';
 require_once __DIR__ . '/config/mail.php';
 require_once __DIR__ . '/config/sms.php';
 require_once __DIR__ . '/config/channels.php';
+require_once __DIR__ . '/config/sso.php';
 
 // Environment-based error reporting
 // Auto-detect production: check if not localhost and HTTPS is enabled
@@ -160,7 +161,7 @@ if (
 // evaluations + ob-requests: only the token-gated actions are public; the
 // case handlers re-gate everything else behind requireAuth().
 // channels: messenger webhooks (Plan #35) — the endpoint validates secrets itself.
-$publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'verify-ticket', 'verify-coa', 'cron', 'evaluations', 'ob-requests', 'channels'];
+$publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'verify-ticket', 'verify-coa', 'cron', 'evaluations', 'ob-requests', 'channels', 'sso-callback'];
 
 // Route handling
 if (!in_array($page, $publicPages)) {
@@ -184,8 +185,19 @@ switch ($page) {
         break;
 
     case 'logout':
+        // Plan #43: end the SSO session too when this login came through it.
+        $wasSso = isset($_SESSION['sso_login_at']);
         $auth->logout();
+        if ($wasSso && ssoEnabled()) {
+            require_once INCLUDES_PATH . '/sso_client.php';
+            $postLogout = urlencode(rtrim(APP_URL, '/') . '/?page=login&local=1');
+            redirect(SSO_BASE_URL . '/logout?post_logout_redirect_uri=' . $postLogout);
+        }
         redirectWith('/?page=login', 'success', 'You have been logged out.');
+        break;
+
+    case 'sso-callback':
+        require_once PAGES_PATH . '/sso-callback.php';
         break;
 
     case 'forgot-password':

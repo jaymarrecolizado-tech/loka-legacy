@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in — DICT CAR SSO</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f0f4f8;
+         display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+  .card { background: #fff; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,40,80,.12);
+          padding: 2rem 2.25rem; width: 100%; max-width: 380px; }
+  h1 { font-size: 1.15rem; margin: 0 0 .25rem; }
+  p.sub { color: #64748b; font-size: .85rem; margin: 0 0 1.25rem; }
+  label { display: block; font-size: .8rem; font-weight: 600; color: #334155; margin-bottom: .25rem; }
+  input[type=email], input[type=password] { width: 100%; box-sizing: border-box; padding: .55rem .65rem;
+          border: 1px solid #cbd5e1; border-radius: 6px; font-size: .95rem; margin-bottom: 1rem; }
+  button { width: 100%; padding: .6rem; background: #1d4ed8; color: #fff; border: 0; border-radius: 6px;
+           font-size: .95rem; font-weight: 600; cursor: pointer; }
+  button:hover { background: #1e40af; }
+  .error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; border-radius: 6px;
+           padding: .6rem .75rem; font-size: .85rem; margin-bottom: 1rem; }
+  .foot { color: #94a3b8; font-size: .72rem; text-align: center; margin-top: 1.25rem; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Sign in</h1>
+    <p class="sub">to continue to <strong>{{ app_name }}</strong></p>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <form method="POST" action="/login" autocomplete="off">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" required autofocus>
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required>
+      <button type="submit">Sign in</button>
+    </form>
+    <p class="foot">DICT CAR Central Login — one account for LOKA, Travel Order and friends.</p>
+  </div>
+</body>
+</html>

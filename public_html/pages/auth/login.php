@@ -3,6 +3,16 @@ if (isLoggedIn()) {
     redirect('/?page=dashboard');
 }
 
+// Plan #43: when the central SSO is enabled, the login form hands off to it.
+// ?local=1 is the documented escape hatch if SSO is ever unreachable.
+require_once CONFIG_PATH . '/sso.php';
+require_once INCLUDES_PATH . '/sso_client.php';
+if (ssoEnabled() && get('local', '') !== '1') {
+    // redirect() prefixes APP_URL — SSO needs an absolute Location header.
+    header('Location: ' . ssoAuthorizeUrl());
+    exit;
+}
+
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
