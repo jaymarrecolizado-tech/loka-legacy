@@ -4005,7 +4005,7 @@ If the goal is “ship what we just verified,” start with **(1)** prod trip-ti
 
 ---
 
-# LOKA Plan #43: Central SSO for LOKA + Travel Order (OIDC) — PLANNED (2026-10-09, not started)
+# LOKA Plan #43: Central SSO for LOKA + Travel Order (OIDC) — IN PROGRESS (2026-10-09; service code + app integrations done, SSO database not yet created)
 
 ## Goal
 One login for LOKA (`lokafleet.dictr2.cloud`) and Travel Order (`to.dictr2.cloud`) through a central OpenID Connect (OIDC) service. Built so other dictr2 apps can join later. Keep changes to the existing apps minimal: each app keeps its own users table, roles, sessions, and timeouts.
@@ -4016,6 +4016,7 @@ One login for LOKA (`lokafleet.dictr2.cloud`) and Travel Order (`to.dictr2.cloud
 - Apps link local users by **email**. Roles stay per app: LOKA `requester`, `approver`, `motorpool_head`, `guard`, `admin`; Travel Order `employee`, `admin`, `hr`, `super_admin`. The SSO service does not own roles.
 - Each app keeps its existing session, idle and absolute timeouts, and fingerprint checks. SSO only replaces the credential step.
 - Rate limiting and lockout move to the SSO service (currently in `public_html/classes/Auth.php`).
+- **Credentials (decided 2026-10-10):** keep existing passwords by copying bcrypt hashes. No shared default password and no mass-email blast app. Users with no usable hash (non-bcrypt, or not in the SSO store) get a one-time set-password link, reusing the LOKA reset flow pattern (`Auth::requestPasswordReset`). SSO usernames are the unique emails from both apps: 124 expected (95 TO + 115 LOKA - 86 shared, from the 2026-10-09 audit); confirm with a query once DB access is set up.
 
 ## Current state (read-only check 2026-10-09)
 | App | Stack | Login | Session |
@@ -4049,21 +4050,23 @@ Travel Order panel access is limited to `@dict.gov.ph` by `User::canAccessPanel(
 - **Step 4 done (code+tests):** TO — `app/Services/SsoClient.php`, `SsoController` (+routes /auth/sso/redirect|callback), Filament Login mount() redirect when `SSO_LOGIN_ENABLED=true` (?local=1 fallback), `canAccessPanel` untouched. **Feature tests 5/5 green** (mocked exchange; live E2E at rollout).
 - **Step 5 done:** LOKA — `config/sso.php` (SSO_ENABLED flag, off), `includes/sso_client.php` (PKCE/state/nonce, curl exchange, openssl RS256 JWKS verify with byte-verified DER builder), `pages/sso-callback.php`, login-page hook (?local=1 fallback), router wiring, SSO-aware logout (step 6). Local **end-to-end OIDC login PASS** (real redirects, real tokens, Auth::login session).
 - **Deployed:** SSO service live on the VPS (`~/sso` as dictr2-sso, venv, keys generated, reverse-proxy port discovered = **8000**, `@reboot` cron; `https://sso.dictr2.cloud` discovery + /jwks return 200). LOKA staging has the integration code with SSO_ENABLED off (login unchanged, verified).
-- **BLOCKED (needs panel):** SSO MySQL database + user must be created in the Hostinger panel (dictr2-sso has no root/sudo). Then: fill `~/sso/.env`, apply schema, run import_users.py (needs LOKA + TO prod DB creds), register_client.py for loka-staging/to-prod, then flip SSO_ENABLED/SSO_LOGIN_ENABLED.
+- **SSO database (done 2026-10-10):** database and user created in hPanel; `~/sso/.env` `SSO_DB_DSN` set (chmod 600, no secrets in git or this file); `migrations/schema.sql` applied (5 tables). Service restarted; `/authorize` without a registered client returns 400 (expected). **Rotate the DB password later** (it was shared in chat).
+- **Still open:** (a) user import — `import_users.py` needs LOKA + Travel Order production DB credentials (staging LOKA creds exist; TO prod creds live in `/home/dictr2-to/htdocs/to.dictr2.cloud/.env` on the VPS); (b) client registration — `register_client.py` for loka-staging + to-prod (secret shown once, goes straight into each app's `.env`); (c) flip `SSO_ENABLED` (LOKA staging `.env`) and `SSO_LOGIN_ENABLED` (TO `.env`), then verify a real login on staging; (d) rotate the SSO DB password (it was shared in chat).
 
 ## Open items
-- Decide how emails that exist in both user tables are handled (step 2).
+- Resolved: emails in both user tables are handled per Progress step 2 (SSO DB keeps both app hashes).
 - Confirm whether production `lokafleet.dictr2.cloud` is on the same VPS (`187.77.150.203`).
 - Confirm whether the key should also be installed for `lokacloud-ssh` / `lokaloka` (LOKA staging).
 
 ## QA (fill at implementation time)
-- [ ] SSH key login works for `dictr2-to`; key removed and rejected after migration
-- [ ] SSO discovery, authorize, token, userinfo, and logout pass pytest
+- [x] SSH key login works for `travel-ssh` (verified 2026-10-09); [ ] key removed and rejected after migration
+- [x] SSO discovery, authorize, token, userinfo, and logout pass pytest (15/15, `sso/tests/`)
 - [ ] Travel Order login via SSO creates a session; `@dict.gov.ph` gate still enforced
 - [ ] LOKA login via SSO creates a session; fingerprint and timeouts unchanged
 - [ ] Local-login fallback flag works
 - [ ] No secrets or key paths committed
 
 ## Status
-IN PROGRESS. Service built, tested (20 automated tests green) and live on sso.dictr2.cloud (no DB yet). Both app integrations coded, locally verified end-to-end, deployed to staging with flags OFF. Remaining: panel-created SSO DB, user import, client registration, then staged rollout (staging first, prod gated on DICT sign-off).
+IN PROGRESS. Service built, tested (20 automated tests green) and live on sso.dictr2.cloud (database configured 2026-10-10, schema applied, tables empty — no users or clients imported yet). Both app integrations coded, locally verified end-to-end, deployed to staging with flags OFF. Remaining: user import (needs prod DB credentials), client registration, flag flip, then staged rollout (staging first, prod gated on DICT sign-off).
+Checked 2026-10-10 (post-DB): `https://sso.dictr2.cloud` discovery 200; `/authorize` without a registered client returns **400 Unknown client_id** (expected); all 5 tables exist and are empty (0 users / 0 clients). Travel Order `SsoLoginTest` 5/5 pass locally (`travelorder_test`). Production Travel Order and LOKA have no SSO flags enabled yet.
 
