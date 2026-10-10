@@ -1,4 +1,4 @@
-# DICT CAR Central SSO (Plan #43)
+# DICT Region 2 SSO (Plan #43)
 
 One OpenID Connect login for LOKA (`lokafleet.dictr2.cloud`), Travel Order
 (`to.dictr2.cloud`), and future dictr2 apps. FastAPI + MySQL; JWT layer is

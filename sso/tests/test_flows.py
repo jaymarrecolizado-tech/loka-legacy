@@ -181,3 +181,93 @@ def test_lockout_after_threshold(client):
     still = client.post("/login", data={"email": "locked@dict.gov.ph", "password": TEST_PASSWORD},
                         follow_redirects=False)
     assert still.status_code == 429
+
+
+# ---- set-password / forgot-password -------------------------------------------
+
+def test_portal_login_shows_app_chooser(client, db_session):
+    from app.models import User
+    from app.security import hash_password
+    from app.db import utcnow
+
+    email = "portal@dict.gov.ph"
+    db_session.add(User(
+        email=email, name="Portal User", password_hash=hash_password("portal-pass-1"),
+        active=True, created_at=utcnow(), updated_at=utcnow(),
+    ))
+    db_session.commit()
+
+    assert client.get("/", follow_redirects=False).status_code == 302  # → portal-login
+    bad = client.post("/portal-login", data={"email": email, "password": "wrong"},
+                      follow_redirects=False)
+    assert bad.status_code == 401
+    ok = client.post("/portal-login", data={"email": email, "password": "portal-pass-1"},
+                     follow_redirects=False)
+    assert ok.status_code == 302 and ok.headers["location"] == "/"
+    home = client.get("/", follow_redirects=False)
+    assert home.status_code == 200
+    assert "Choose an application" in home.text
+    assert "LOKA Fleet" in home.text and "Travel Order" in home.text
+
+
+def test_forgot_password_generic_success(client):
+    resp = client.post("/forgot-password", data={"email": "ghost@dict.gov.ph"})
+    assert resp.status_code == 200
+    assert "If an SSO account exists" in resp.text
+
+
+def test_accepts_to_hash_when_primary_is_loka(client, db_session):
+    """User typing their Travel Order password should still succeed."""
+    from app.models import User
+    from app.security import hash_password
+    from app.db import utcnow
+
+    loka = hash_password("loka-only-pass")
+    to_pw = hash_password("to-only-pass")
+    email = "dual-hash@dict.gov.ph"
+    db_session.add(User(
+        email=email, name="Dual", password_hash=loka, loka_hash=loka, to_hash=to_pw,
+        active=True, created_at=utcnow(), updated_at=utcnow(),
+    ))
+    db_session.commit()
+
+    bad, _ = full_login(client, email=email, password="wrong")
+    assert bad.status_code == 401
+    ok, _ = full_login(client, email=email, password="to-only-pass")
+    assert ok.status_code == 302
+
+
+def test_set_password_flow_and_login(client, db_session):
+    from app.models import User
+    from app.password_reset import issue_reset_token, reset_link
+    from app.security import hash_password
+    from app.db import utcnow
+
+    email = "needs-reset@dict.gov.ph"
+    user = User(email=email, name="Needs Reset",
+                password_hash=hash_password("old-unused"),
+                active=True, created_at=utcnow(), updated_at=utcnow())
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    token = issue_reset_token(db_session, user)
+    assert "/set-password?token=" in reset_link(token)
+
+    bad = client.post("/set-password", data={
+        "token": token, "password": "short", "password2": "short",
+    })
+    assert bad.status_code == 400 and "at least" in bad.text
+
+    ok = client.post("/set-password", data={
+        "token": token, "password": "brand-new-pass", "password2": "brand-new-pass",
+    })
+    assert ok.status_code == 200 and "Password saved" in ok.text
+
+    # Token is single-use.
+    reuse = client.post("/set-password", data={
+        "token": token, "password": "another-pass1", "password2": "another-pass1",
+    })
+    assert reuse.status_code == 400
+
+    form, _ = full_login(client, email=email, password="brand-new-pass")
+    assert form.status_code == 302

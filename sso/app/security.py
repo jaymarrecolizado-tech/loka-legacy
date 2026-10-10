@@ -15,6 +15,8 @@ from sqlalchemy import select, update
 
 def verify_password(plain: str, password_hash: str) -> bool:
     """Accepts $2y$ (PHP password_hash) and $2b$/$2a$ bcrypt hashes."""
+    if not password_hash:
+        return False
     h = password_hash.encode()
     if h.startswith(b"$2y$"):
         h = b"$2b$" + h[4:]
@@ -22,6 +24,22 @@ def verify_password(plain: str, password_hash: str) -> bool:
         return bcrypt.checkpw(plain.encode(), h)
     except (ValueError, TypeError):
         return False
+
+
+def verify_user_password(user: User, plain: str) -> bool:
+    """
+    Try the primary hash, then the per-app originals (Plan #43 keeps both).
+    Users often type the password from the app they just came from.
+    """
+    candidates = [user.password_hash, user.loka_hash, user.to_hash]
+    seen: set[str] = set()
+    for h in candidates:
+        if not h or h in seen:
+            continue
+        seen.add(h)
+        if verify_password(plain, h):
+            return True
+    return False
 
 
 def hash_password(plain: str) -> str:

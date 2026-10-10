@@ -22,9 +22,9 @@
     <div class="form-wrap">
       <div class="eyebrow fade-up delay-150"><span class="eyebrow-mark"></span>Identity Verification Desk</div>
       <h1 class="fade-up delay-150">Sign in</h1>
-      <p class="sub fade-up delay-200">to continue to <strong>{{ app_name }}</strong></p>
+      <p class="sub fade-up delay-200">Then choose LOKA Fleet or Travel Order.</p>
       {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
-      <form method="POST" action="/login" autocomplete="off">
+      <form method="POST" action="/portal-login" autocomplete="off">
         <div class="field fade-up delay-250">
           <label for="email">Government Email <span class="req">*</span></label>
           <input type="email" id="email" name="email" required autofocus placeholder="name@dict.gov.ph">
@@ -41,6 +41,11 @@
         </div>
       </form>
       <a class="link-muted fade-up delay-400" href="/forgot-password">Forgot password?</a>
+      <div class="app-hints fade-up delay-450">
+        <span><i></i>LOKA Fleet Ops</span>
+        <span>•</span>
+        <span><i></i>Travel Order System</span>
+      </div>
     </div>
     <footer class="colophon fade-up delay-450">
       Republic of the Philippines • Department of Information and Communications Technology • Region 2 (Cagayan Valley)
