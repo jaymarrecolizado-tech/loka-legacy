@@ -96,6 +96,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $startDatetime = postSafe('start_datetime', '', 20);
     $endDatetime = postSafe('end_datetime', '', 20);
     $purpose = postSafe('purpose', '', 500);
+
+    // Plan #44 — when linked to a Travel Order, the authority document owns
+    // purpose/dates/destination: server-side ignore whatever the form posted.
+    $authorityLocked = !empty($request->to_request_id);
+    if ($authorityLocked) {
+        $startDatetime = $request->start_datetime;
+        $endDatetime = $request->end_datetime;
+        $purpose = $request->purpose;
+    }
+
     $destinationRaw = $_POST['destinations'] ?? [];
     $passengerIds = $_POST['passengers'] ?? [];
     
@@ -104,6 +114,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         return !empty($d);
     });
     $destination = implode(' -> ', $destinations);
+    if ($authorityLocked) {
+        $destination = $request->destination; // authority-owned (Plan #44)
+    }
     
     // Count passengers properly - filter out empty values
     $passengerIds = array_filter($passengerIds, function($p) {
@@ -505,12 +518,26 @@ require_once INCLUDES_PATH . '/header.php';
                     <form method="POST" enctype="multipart/form-data">
                         <?= csrfField() ?>
 
+                        <?php $authorityLocked = !empty($request->to_request_id); ?>
+                        <?php if ($authorityLocked): ?>
+                        <?php require_once INCLUDES_PATH . '/authority_link.php'; ?>
+                        <div class="alert alert-warning d-flex align-items-start">
+                            <i class="bi bi-lock-fill me-2 mt-1"></i>
+                            <div>
+                                <strong>Linked to Travel Order <?= e($request->to_code ?: ('#' . $request->to_request_id)) ?>.</strong>
+                                Purpose, dates and destination come from the Travel Order and are locked here —
+                                <a href="<?= e(authorityLinkToUrl((int) $request->to_request_id)) ?>" target="_blank" rel="noopener">edit them in the Travel Order</a>.
+                                Vehicle, driver and passengers remain editable below.
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="start_datetime" class="form-label">Start Date/Time <span
                                         class="text-danger">*</span></label>
                                 <input type="text" class="form-control datetimepicker" id="start_datetime"
-                                    name="start_datetime"
+                                    name="start_datetime" <?= $authorityLocked ? 'disabled' : '' ?>
                                     value="<?= e(post('start_datetime', $request->start_datetime)) ?>" required>
                             </div>
 
@@ -519,14 +546,14 @@ require_once INCLUDES_PATH . '/header.php';
                                         class="text-danger">*</span></label>
                                 <input type="text" class="form-control datetimepicker" id="end_datetime"
                                     name="end_datetime" value="<?= e(post('end_datetime', $request->end_datetime)) ?>"
-                                    required>
+                                    <?= $authorityLocked ? 'disabled' : '' ?> required>
                             </div>
 
                             <div class="col-12">
                                 <label for="purpose" class="form-label">Purpose <span
                                         class="text-danger">*</span> <small class="text-muted fw-normal">(max 200)</small></label>
                                 <textarea class="form-control" id="purpose" name="purpose" rows="3" maxlength="200"
-                                    placeholder="Describe the purpose (max 200 characters)..." required><?= e(post('purpose', $request->purpose)) ?></textarea>
+                                    placeholder="Describe the purpose (max 200 characters)..." <?= $authorityLocked ? 'readonly' : '' ?> required><?= e(post('purpose', $request->purpose)) ?></textarea>
                                 <div class="d-flex justify-content-between">
                                     <small class="text-muted">Short purpose keeps trip tickets readable (Destination max 100 each).</small>
                                     <small class="text-muted"><span id="purposeCount">0</span>/200</small>

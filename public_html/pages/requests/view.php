@@ -5,6 +5,9 @@
 
 $requestId = (int) get('id');
 
+// Plan #44 — authority (TO) deep-link helper
+require_once INCLUDES_PATH . '/authority_link.php';
+
 // Get request with all related data
 $request = db()->fetch(
     "SELECT r.*,
@@ -431,6 +434,26 @@ require_once INCLUDES_PATH . '/header.php';
                                 </small>
                             </div>
                             <?= fileDownloadLink($request->travel_order_file, 'Download') ?>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <!-- Authority document link: Travel Order (Plan #44) -->
+            <?php if (!empty($request->to_request_id)): ?>
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-signpost-2 me-2"></i>Authority Document — Travel Order</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded flex-wrap gap-2">
+                            <div>
+                                <div class="fw-bold"><i class="bi bi-file-earmark-text me-1"></i><?= e($request->to_code ?: ('TO #' . $request->to_request_id)) ?></div>
+                                <small class="text-muted">Purpose, dates, destination and travelers are managed by the Travel Order — edit them there, not here.</small>
+                            </div>
+                            <a href="<?= e(authorityLinkToUrl((int) $request->to_request_id)) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+                                Open in Travel Order <i class="bi bi-box-arrow-up-right ms-1"></i>
+                            </a>
                         </div>
                     </div>
                 </div>

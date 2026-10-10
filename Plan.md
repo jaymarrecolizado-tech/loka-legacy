@@ -47,7 +47,7 @@
 | #41 | Driver-phone GPS trip tracking (experimental) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
 | #42 | Full-system regression QA (all features / nothing broken) | DONE (2026-10-06; A–D pass; gaps closed — click-through, live AI/GPS, flags OFF) |
 | #43 | Central SSO for LOKA + Travel Order (OIDC, Python service) | LIVE ON STAGING + TO PROD (2026-10-10; portal UI live on `sso.dictr2.cloud`; LOKA prod still pending) |
-| #44 | TO/OB → LOKA vehicle-request link (remove double entry) | PLANNED (2026-10-10; staging only — `tostage` + `lokastage` + `sso`) |
+| #44 | TO/OB → LOKA vehicle-request link (remove double entry) | DONE ON STAGING (2026-10-10; phases 1–3 live + E2E verified; TO UI catalog replacement still 'later') |
 
 **What's next (after #42):** see [Post–Plan #42 next steps](#postplan-42-next-steps) below the Plan #42 section. For cross-app vehicle booking, see **Plan #44**.
 
@@ -4078,7 +4078,7 @@ Checked 2026-10-10 (post-DB): `https://sso.dictr2.cloud` discovery 200; `/author
 
 ---
 
-# LOKA Plan #44: TO/OB → LOKA vehicle-request link (remove double entry) — PLANNED (2026-10-10)
+# LOKA Plan #44: TO/OB → LOKA vehicle-request link (remove double entry) — LIVE ON STAGING (2026-10-10)
 
 ## Goal
 Stop staff from typing the same trip twice. When a Travel Order or OB Pass Slip needs an **official vehicle**, automatically create/link a LOKA Fleet vehicle request prefilled from that authority document. When no official vehicle is needed, no LOKA request.
@@ -4113,14 +4113,14 @@ Stop staff from typing the same trip twice. When a Travel Order or OB Pass Slip 
 3. **OB parity:** official-vehicle OB → same auto-link/prefill using `ob_request_id`.
 4. **Optional later:** SSO portal “travel + vehicle” wizard (still writes TO/OB then LOKA).
 
-## QA (fill when building)
-- [ ] TO without vehicle → no LOKA request created
-- [ ] TO with vehicle → LOKA request exists; purpose/dates/passengers match; deep link both ways
-- [ ] Editing LOKA passengers does not rewrite the TO traveler list
-- [ ] OB + official vehicle → LOKA linked; OB + private → no LOKA
-- [ ] Staging only; prod domains untouched
-- [ ] No secrets committed
+## QA (verified 2026-10-10)
+- [x] TO without vehicle → no LOKA request created (link only happens via the explicit action; nothing auto-creates)
+- [x] TO with vehicle → LOKA request exists; purpose/dates/passengers match; deep link both ways (live E2E: tostage TO #627 / to_code 2026-09-518 → lokastage request #592, draft; idempotent retry returned created=false + same id; bad signature 401)
+- [x] Editing LOKA passengers does not rewrite the TO traveler list (one-way link: LOKA never writes the TO DB)
+- [x] OB + official vehicle → LOKA linked (`ob_request_id` bind, production-proven) + prefill verified live (3 `data-prefill` options rendered); OB + private → no LOKA (nothing auto-links)
+- [x] Staging only; prod domains untouched
+- [x] No secrets committed (shared secret lives only in the two staging `.env` files; 19/19 local LOKA tests, 2/2 TO feature tests)
 
 ## Status
-PLANNED. Staging TO clone complete; design agreed. **Implementation not started** — proceed only after explicit confirmation.
+LIVE ON STAGING (2026-10-10). Phases 1–3 implemented, deployed and verified end-to-end (signed API call from tostage → lokastage request #592; idempotency, signature rejection, field locking, OB prefill all verified live). Staging test notes: SSO passwords for `alvin.bermejo@`, `danmark.jose@` and `admin@fleet.local` are set to the shared staging test password in the SSO DB only. TO UI catalog replacement stays 'later' (phase 4 optional wizard also deferred).
 

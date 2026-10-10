@@ -164,7 +164,10 @@ if (
 $publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'verify-ticket', 'verify-coa', 'cron', 'evaluations', 'ob-requests', 'channels', 'sso-callback'];
 
 // Route handling
-if (!in_array($page, $publicPages)) {
+// Plan #44: the TO->LOKA authority link is server-to-server (HMAC shared
+// secret, verified inside the endpoint) — no session, so it skips requireAuth.
+$isAuthorityLinkApi = ($page === 'api' && get('action') === 'authority_vehicle_link');
+if (!in_array($page, $publicPages) && !$isAuthorityLinkApi) {
     requireAuth();
 }
 
@@ -186,12 +189,15 @@ switch ($page) {
 
     case 'logout':
         // Plan #43: end the SSO session too when this login came through it.
+        // redirect() always prefixes APP_URL — use header() for the absolute SSO URL.
         $wasSso = isset($_SESSION['sso_login_at']);
         $auth->logout();
         if ($wasSso && ssoEnabled()) {
             require_once INCLUDES_PATH . '/sso_client.php';
             $postLogout = urlencode(rtrim(APP_URL, '/') . '/?page=login&local=1');
-            redirect(SSO_BASE_URL . '/logout?post_logout_redirect_uri=' . $postLogout);
+            session_write_close();
+            header('Location: ' . SSO_BASE_URL . '/logout?post_logout_redirect_uri=' . $postLogout);
+            exit;
         }
         redirectWith('/?page=login', 'success', 'You have been logged out.');
         break;
@@ -701,6 +707,10 @@ switch ($page) {
             require_once PAGES_PATH . '/api/gps-ping.php';
         } elseif ($action === 'global_search') {
             require_once PAGES_PATH . '/api/global_search.php';
+        } elseif ($action === 'authority_vehicle_link') {
+            // Plan #44 — TO -> LOKA vehicle-request link (HMAC shared secret,
+            // no session; enforced inside the endpoint).
+            require_once PAGES_PATH . '/api/authority-vehicle-link.php';
         } elseif ($action === 'check_conflict') {
             require_once PAGES_PATH . '/api/check_conflict.php';
         } elseif ($action === 'list' || $action === 'get' || $action === 'create' || $action === 'update' || $action === 'delete') {

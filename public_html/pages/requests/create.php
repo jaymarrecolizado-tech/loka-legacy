@@ -756,18 +756,45 @@ require_once INCLUDES_PATH . '/header.php';
                                 <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Travel Order / Official Business Slip</h6>
                             </div>
                             <div class="card-body">
-                                <?php $obBindable = obBindableForRequest((int) userId()); ?>
+                                <?php
+                                $obBindable = obBindableForRequest((int) userId());
+                                // Plan #44 phase 3 — prefill data per OB (purpose/date/participants)
+                                $obPrefill = [];
+                                if (!empty($obBindable)) {
+                                    $obIds = array_map(fn($o) => (int) $o->id, $obBindable);
+                                    $ph = implode(',', array_fill(0, count($obIds), '?'));
+                                    $pRows = db()->fetchAll(
+                                        "SELECT op.ob_request_id, u.name, u.email
+                                         FROM ob_request_participants op
+                                         JOIN users u ON u.id = op.user_id
+                                         WHERE op.ob_request_id IN ($ph)
+                                         ORDER BY op.ob_request_id, op.sort_order",
+                                        $obIds
+                                    );
+                                    foreach ($pRows as $pr) {
+                                        $obPrefill[(int) $pr->ob_request_id][] = ['name' => $pr->name, 'email' => $pr->email];
+                                    }
+                                }
+                                ?>
                                 <?php if (!empty($obBindable)): ?>
                                 <div class="mb-3">
                                     <label class="form-label">Attach an approved OB Pass Slip <span class="text-muted">(instead of a TO file)</span></label>
-                                    <select class="form-select" name="ob_request_id">
+                                    <select class="form-select" name="ob_request_id" id="ob_request_id">
                                         <option value="">— None —</option>
                                         <?php foreach ($obBindable as $obOpt): ?>
-                                        <option value="<?= (int) $obOpt->id ?>" <?= postInt('ob_request_id') === (int) $obOpt->id ? 'selected' : '' ?>>
+                                        <?php
+                                        $obPre = [
+                                            'purpose' => $obOpt->purpose,
+                                            'ob_date' => $obOpt->ob_date,
+                                            'participants' => $obPrefill[(int) $obOpt->id] ?? [],
+                                        ];
+                                        ?>
+                                        <option value="<?= (int) $obOpt->id ?>" <?= postInt('ob_request_id') === (int) $obOpt->id ? 'selected' : '' ?> data-prefill='<?= e(json_encode($obPre, JSON_UNESCAPED_UNICODE)) ?>'>
                                             <?= e($obOpt->pass_slip_no) ?> — <?= e(date('M j, Y', strtotime($obOpt->ob_date))) ?> (must match trip date)
                                         </option>
                                         <?php endforeach; ?>
                                     </select>
+                                    <div id="obPrefillNote" class="small text-muted mt-1 d-none"></div>
                                     <small class="text-muted">1 OB = 1 vehicle request. If attached, no TO file is needed (and both together are not allowed).</small>
                                 </div>
                                 <?php else: ?>
@@ -1868,6 +1895,42 @@ ob_start();
             }
         }, 500);
     }
+})();
+
+// Plan #44 phase 3 — prefill purpose/dates from an attached OB Pass Slip.
+// Destination stays manual (OB has none); participants are surfaced as a
+// reminder so the officer adds them as passengers.
+(function () {
+    var sel = document.getElementById('ob_request_id');
+    if (!sel) return;
+    var note = document.getElementById('obPrefillNote');
+    sel.addEventListener('change', function () {
+        var opt = sel.options[sel.selectedIndex];
+        if (!opt || !opt.value || !opt.dataset.prefill) {
+            if (note) note.classList.add('d-none');
+            return;
+        }
+        var d;
+        try { d = JSON.parse(opt.dataset.prefill); } catch (e) { return; }
+        if (d.purpose) {
+            var purpose = document.getElementById('purpose');
+            if (purpose && !purpose.value.trim()) purpose.value = d.purpose;
+        }
+        if (d.ob_date) {
+            var s = document.getElementById('start_datetime');
+            var e = document.getElementById('end_datetime');
+            if (s && !s.value) s.value = d.ob_date + ' 08:00';
+            if (e && !e.value) e.value = d.ob_date + ' 17:00';
+        }
+        if (note) {
+            var names = (d.participants || []).map(function (p) { return p.name; });
+            note.innerHTML = names.length
+                ? '<i class="bi bi-people me-1"></i>Prefilled from the OB. Participants to add as passengers: <strong>' +
+                  names.join(', ') + '</strong>'
+                : '<i class="bi bi-info-circle me-1"></i>Prefilled purpose and dates from the OB.';
+            note.classList.remove('d-none');
+        }
+    });
 })();
 </script>
 <?php 
