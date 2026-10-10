@@ -49,7 +49,7 @@
 | #43 | Central SSO for LOKA + Travel Order (OIDC, Python service) | LIVE ON STAGING + TO PROD (2026-10-10; portal UI live on `sso.dictr2.cloud`; LOKA prod still pending) |
 | #44 | TO/OB → LOKA vehicle-request link (remove double entry) | DONE ON STAGING (2026-10-10; phases 1–3 live + E2E verified; TO UI catalog replacement still 'later') |
 
-**What's next (after #42):** see [Post–Plan #42 next steps](#postplan-42-next-steps) below the Plan #42 section. For cross-app vehicle booking, see **Plan #44**.
+**What's next:** see [Post–Plan #44 next steps](#postplan-44-next-steps-2026-10-10) (current). Older backlog still in [Post–Plan #42 next steps](#postplan-42-next-steps).
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -4107,11 +4107,12 @@ Stop staff from typing the same trip twice. When a Travel Order or OB Pass Slip 
 - [x] Staging `.env` preserved (`APP_URL=https://tostage.dictr2.cloud`).
 - [x] Smoke: `https://tostage.dictr2.cloud/` and `/DICT/login` return 200.
 
-## Implementation phases (not started — wait for explicit go-ahead)
-1. **Link + prefills:** TO “needs official vehicle” → create LOKA draft/request; store TO id/`to_code` on LOKA `requests`; map purpose/dates/place/travelers → passengers.
-2. **Stop double entry:** lock/hide duplicated fields on LOKA when linked to TO (or OB).
-3. **OB parity:** official-vehicle OB → same auto-link/prefill using `ob_request_id`.
-4. **Optional later:** SSO portal “travel + vehicle” wizard (still writes TO/OB then LOKA).
+## Implementation phases
+1. **Link + prefills:** DONE — TO “Request official vehicle in LOKA Fleet” → HMAC API → LOKA draft; `to_request_id` / `to_code` on `requests`; travelers → passengers.
+2. **Stop double entry:** DONE — purpose/dates/destination locked on LOKA edit when TO-linked; deep links both ways.
+3. **OB parity:** DONE — attach approved OB on LOKA create prefills purpose/dates/participants; private vehicle = no auto-link; no TO created from OB.
+4. **Optional later:** SSO portal “travel + vehicle” wizard (still writes TO/OB then LOKA) — **not started**.
+5. **TO UI polish (still open):** replace static `car_name|plate` catalog picker with “Needs official vehicle?” + LOKA link/status.
 
 ## QA (verified 2026-10-10)
 - [x] TO without vehicle → no LOKA request created (link only happens via the explicit action; nothing auto-creates)
@@ -4122,5 +4123,37 @@ Stop staff from typing the same trip twice. When a Travel Order or OB Pass Slip 
 - [x] No secrets committed (shared secret lives only in the two staging `.env` files; 19/19 local LOKA tests, 2/2 TO feature tests)
 
 ## Status
-LIVE ON STAGING (2026-10-10). Phases 1–3 implemented, deployed and verified end-to-end (signed API call from tostage → lokastage request #592; idempotency, signature rejection, field locking, OB prefill all verified live). Staging test notes: SSO passwords for `alvin.bermejo@`, `danmark.jose@` and `admin@fleet.local` are set to the shared staging test password in the SSO DB only. TO UI catalog replacement stays 'later' (phase 4 optional wizard also deferred).
+DONE ON STAGING (2026-10-10). Phases 1–3 implemented, deployed and verified end-to-end (signed API call from tostage → lokastage request #592; idempotency, signature rejection, field locking, OB prefill all verified live). Staging test notes: SSO passwords for `alvin.bermejo@`, `danmark.jose@` and `admin@fleet.local` are set to the shared staging test password in the SSO DB only. Remaining on #44: TO catalog UI replacement + optional phase-4 wizard. See [Post–Plan #44 next steps](#postplan-44-next-steps-2026-10-10).
+
+---
+
+# Post–Plan #44 next steps (2026-10-10)
+
+Current order of work after Plans #43 (SSO) and #44 (TO/OB→LOKA link) on staging.
+
+## Staging domains (implementation / QA only)
+| Role | Domain |
+|------|--------|
+| Travel Order | `https://tostage.dictr2.cloud` |
+| LOKA Fleet | `https://lokastage.dictr2.cloud` |
+| SSO | `https://sso.dictr2.cloud` |
+
+Do **not** touch prod for this work until DICT sign-off: `to.dictr2.cloud`, `lokafleet.dictr2.cloud`.
+
+## Immediate (staging polish) — DONE (2026-10-10)
+1. **✅ Plan #44 leftover — TO vehicle UI:** the static catalog picker is replaced by a **Transport arrangement** radio — Private / own · Public transport · Official vehicle via LOKA Fleet (legacy `car|plate` entries stay editable as "Legacy entry" options; the column is JSON in prod and varchar on tostage, both handled). The infolist entry, Calendar tooltips, and the completed-TO PDF now render friendly labels (`vehicle_label` accessor), with "Official vehicle (LOKA Fleet — request #N)" deep-linked from the infolist. The "Request official vehicle in LOKA Fleet" action stays as the booking step. 10/10 TO feature tests pass (SSO 5, LOKA link 2, vehicle arrangement 3). Deployed to tostage (view cache cleared).
+2. **✅ Plan #43 leftover — LOKA logout fix:** confirmed the absolute-`header()` logout is deployed on `lokastage` and verified live: SSO login → `?page=logout` → `302 https://sso.dictr2.cloud/logout?post_logout_redirect_uri=<lokastage login&local=1>`.
+
+## Before production
+3. **DICT sign-off** on staging: SSO portal login → choose app; TO “request official vehicle” → LOKA draft with prefilled purpose/dates/passengers; OB attach prefill; no double entry on locked fields.
+4. **LOKA prod SSO:** register client `loka-prod`, set secrets in prod `.env`, flip `SSO_ENABLED` after sign-off (TO prod SSO / `to-prod` already live).
+5. **Plan #44 prod rollout:** deploy LOKA authority-link API + migration `062` to `lokafleet`; deploy TO `LokaVehicleLink` + columns to `to.dictr2.cloud`; shared `AUTHORITY_LINK_SECRET` only in server `.env` files; smoke E2E on prod with a test TO.
+6. **Housekeeping:** invite LOKA users skipped at SSO import (non-bcrypt / inactive); remove temporary SSH public keys when migration/handover is complete (`travel-ssh` / `to_staging` keys per Plan #43 / #44 prep).
+
+## Optional later
+7. **Plan #44 phase 4:** SSO portal “Travel with vehicle” wizard (one form that writes TO or OB, then LOKA under the hood).
+8. **Broader backlog:** Plan #16 (overdue PDF + daily motorpool report); Plan #19 Phase D VAPT; experimental Plans #38–#41 deploy only if DICT wants them on staging/prod.
+
+## Suggested next build
+Start with **(1) TO vehicle UI polish on `tostage`**, then a short DICT walkthrough of TO → LOKA on staging, then gate prod behind sign-off.
 
