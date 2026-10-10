@@ -46,7 +46,7 @@
 | #40 | AI assistant chatbot (experimental, role-scoped actions) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
 | #41 | Driver-phone GPS trip tracking (experimental) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
 | #42 | Full-system regression QA (all features / nothing broken) | DONE (2026-10-06; A–D pass; gaps closed — click-through, live AI/GPS, flags OFF) |
-| #43 | Central SSO for LOKA + Travel Order (OIDC, Python service) | IN PROGRESS (2026-10-09; service built + LIVE on sso.dictr2.cloud:8000, discovery/JWKS verified; DB pending panel creation; LOKA+TO integrations coded & tested, flag off) |
+| #43 | Central SSO for LOKA + Travel Order (OIDC, Python service) | LIVE ON STAGING (2026-10-10; SSO DB + 116 users + `loka-staging` client; LOKA prod and TO rollouts pending DICT sign-off) |
 
 **What's next (after #42):** see [Post–Plan #42 next steps](#postplan-42-next-steps) below the Plan #42 section.
 
@@ -4005,7 +4005,7 @@ If the goal is “ship what we just verified,” start with **(1)** prod trip-ti
 
 ---
 
-# LOKA Plan #43: Central SSO for LOKA + Travel Order (OIDC) — IN PROGRESS (2026-10-09; service code + app integrations done, SSO database not yet created)
+# LOKA Plan #43: Central SSO for LOKA + Travel Order (OIDC) — LIVE ON STAGING (2026-10-10; SSO service + database + LOKA staging integration; production rollouts pending)
 
 ## Goal
 One login for LOKA (`lokafleet.dictr2.cloud`) and Travel Order (`to.dictr2.cloud`) through a central OpenID Connect (OIDC) service. Built so other dictr2 apps can join later. Keep changes to the existing apps minimal: each app keeps its own users table, roles, sessions, and timeouts.
@@ -4016,7 +4016,7 @@ One login for LOKA (`lokafleet.dictr2.cloud`) and Travel Order (`to.dictr2.cloud
 - Apps link local users by **email**. Roles stay per app: LOKA `requester`, `approver`, `motorpool_head`, `guard`, `admin`; Travel Order `employee`, `admin`, `hr`, `super_admin`. The SSO service does not own roles.
 - Each app keeps its existing session, idle and absolute timeouts, and fingerprint checks. SSO only replaces the credential step.
 - Rate limiting and lockout move to the SSO service (currently in `public_html/classes/Auth.php`).
-- **Credentials (decided 2026-10-10):** keep existing passwords by copying bcrypt hashes. No shared default password and no mass-email blast app. Users with no usable hash (non-bcrypt, or not in the SSO store) get a one-time set-password link, reusing the LOKA reset flow pattern (`Auth::requestPasswordReset`). SSO usernames are the unique emails from both apps: 124 expected (95 TO + 115 LOKA - 86 shared, from the 2026-10-09 audit); confirm with a query once DB access is set up.
+- **Credentials (decided 2026-10-10):** keep existing passwords by copying bcrypt hashes. No shared default password and no mass-email blast app. Users with no usable hash (non-bcrypt, or not in the SSO store) get a one-time set-password link, reusing the LOKA reset flow pattern (`Auth::requestPasswordReset`). SSO usernames are the unique emails from both apps: 124 expected (95 TO + 115 LOKA - 86 shared, from the 2026-10-09 audit); confirmed 2026-10-10: 124 unique emails, 116 users loaded into the SSO DB.
 
 ## Current state (read-only check 2026-10-09)
 | App | Stack | Login | Session |
@@ -4051,7 +4051,7 @@ Travel Order panel access is limited to `@dict.gov.ph` by `User::canAccessPanel(
 - **Step 5 done:** LOKA — `config/sso.php` (SSO_ENABLED flag, off), `includes/sso_client.php` (PKCE/state/nonce, curl exchange, openssl RS256 JWKS verify with byte-verified DER builder), `pages/sso-callback.php`, login-page hook (?local=1 fallback), router wiring, SSO-aware logout (step 6). Local **end-to-end OIDC login PASS** (real redirects, real tokens, Auth::login session).
 - **Deployed:** SSO service live on the VPS (`~/sso` as dictr2-sso, venv, keys generated, reverse-proxy port discovered = **8000**, `@reboot` cron; `https://sso.dictr2.cloud` discovery + /jwks return 200). LOKA staging has the integration code with SSO_ENABLED off (login unchanged, verified).
 - **SSO database (done 2026-10-10):** database and user created in hPanel; `~/sso/.env` `SSO_DB_DSN` set (chmod 600, no secrets in git or this file); `migrations/schema.sql` applied (5 tables). Service restarted; `/authorize` without a registered client returns 400 (expected). **Rotate the DB password later** (it was shared in chat).
-- **Import + clients + staging live (done 2026-10-10):** imported **124 users** into the SSO DB (116 added, 8 skipped non-bcrypt/inactive; sources: staging LOKA DB = the 2026-10-04 prod dump copy, TO production). LOKA note: hashes reflect passwords as of 2026-10-10 — anyone who changed their LOKA password earlier uses the one-time set-password link. Registered client `loka-staging` (secret in staging `.env.lokastage`). `SSO_ENABLED=1` on staging: **real SSO login round trip verified twice over live HTTPS** (authorize → login → RS256-verified callback → dashboard session). SSO DB password rotated (`dunsso@%`, new value only in `~/sso/.env`) and service restarted + re-verified. `to-prod` client registration + `SSO_LOGIN_ENABLED` flip deferred to the TO rollout (prod gated on DICT sign-off).
+- **Import + clients + staging live (done 2026-10-10):** loaded **116 users** into the SSO DB (124 unique emails, 8 skipped non-bcrypt/inactive; sources: staging LOKA DB = the 2026-10-04 prod dump copy, TO production). LOKA note: hashes reflect passwords as of 2026-10-10 — anyone who changed their LOKA password earlier uses the one-time set-password link. Registered client `loka-staging` (secret in staging `.env.lokastage`). `SSO_ENABLED=1` on staging: **real SSO login round trip verified twice over live HTTPS** (authorize → login → RS256-verified callback → dashboard session). SSO DB password rotated (`dunsso@%`, new value only in `~/sso/.env`) and service restarted + re-verified. `to-prod` client registration + `SSO_LOGIN_ENABLED` flip deferred to the TO rollout (prod gated on DICT sign-off).
 - **Still open:** (a) TO rollout — deploy the integration code to Travel Order, register `to-prod`, flip `SSO_LOGIN_ENABLED`; (b) LOKA prod rollout after DICT sign-off (deploy + client `loka-prod` + flip); (c) tell users their SSO password = the one from ~2026-10-10, else use the set-password link; (d) remove the temporary SSH keys after migration (plan rule).
 
 ## Open items
@@ -4066,12 +4066,12 @@ Travel Order panel access is limited to `@dict.gov.ph` by `User::canAccessPanel(
 - [x] LOKA login via SSO creates a session — verified twice over live staging HTTPS 2026-10-10 (existing session/fingerprint machinery reused via Auth::login)
 - [x] Local-login fallback flag works (`?local=1` on both apps; SSO_ENABLED/SSO_LOGIN_ENABLED flags)
 - [x] No secrets or key paths committed (client secrets live only in each app's `.env`; RS256 keys gitignored)
-- [ ] Travel Order login via SSO creates a session; `@dict.gov.ph` gate still enforced
-- [ ] LOKA login via SSO creates a session; fingerprint and timeouts unchanged
-- [ ] Local-login fallback flag works
-- [ ] No secrets or key paths committed
+- [ ] Travel Order login via SSO creates a session; `@dict.gov.ph` gate still enforced (pending TO rollout)
+- [ ] LOKA production: fingerprint and timeouts unchanged after SSO login (pending prod rollout)
+- [ ] Local-login fallback verified on production (pending rollout)
+- [x] Re-check no secrets are committed before merging the SSO work to `main` (audited 2026-10-10: no `.env`/`*.pem` tracked and gitignore-verified; zero known secret values in tracked files or the three SSO commit diffs; only intentional test fixtures `sso-test-password`/`test-client-secret` in `sso/tests/conftest.py`, which work solely against the throwaway `sso_test` DB)
 
 ## Status
 LIVE ON STAGING. SSO service on sso.dictr2.cloud with 124 users imported and the `loka-staging` client registered; `SSO_ENABLED=1` on lokastage and real SSO logins verified over live HTTPS (2026-10-10). Remaining: Travel Order rollout + LOKA production rollout (both gated on DICT sign-off), user communication about passwords, temporary SSH key cleanup.
-Checked 2026-10-10 (post-DB): `https://sso.dictr2.cloud` discovery 200; `/authorize` without a registered client returns **400 Unknown client_id** (expected); all 5 tables exist and are empty (0 users / 0 clients). Travel Order `SsoLoginTest` 5/5 pass locally (`travelorder_test`). Production Travel Order and LOKA have no SSO flags enabled yet.
+Checked 2026-10-10 (post-DB): `https://sso.dictr2.cloud` discovery 200; `/authorize` without a registered client returns **400 Unknown client_id** (expected); 116 users and 1 client (`loka-staging`) in the SSO DB; `lokastage` login redirects to `sso.dictr2.cloud` (302); `lokafleet` and `to.dictr2.cloud` login pages are not redirected (SSO off in production). Travel Order `SsoLoginTest` 5/5 pass locally (`travelorder_test`). Production Travel Order and LOKA have no SSO flags enabled yet.
 
