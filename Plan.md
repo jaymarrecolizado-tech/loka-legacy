@@ -46,9 +46,10 @@
 | #40 | AI assistant chatbot (experimental, role-scoped actions) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
 | #41 | Driver-phone GPS trip tracking (experimental) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
 | #42 | Full-system regression QA (all features / nothing broken) | DONE (2026-10-06; A–D pass; gaps closed — click-through, live AI/GPS, flags OFF) |
-| #43 | Central SSO for LOKA + Travel Order (OIDC, Python service) | LIVE ON STAGING (2026-10-10; SSO DB + 116 users + `loka-staging` client; LOKA prod and TO rollouts pending DICT sign-off) |
+| #43 | Central SSO for LOKA + Travel Order (OIDC, Python service) | LIVE ON STAGING + TO PROD (2026-10-10; portal UI live on `sso.dictr2.cloud`; LOKA prod still pending) |
+| #44 | TO/OB → LOKA vehicle-request link (remove double entry) | PLANNED (2026-10-10; staging only — `tostage` + `lokastage` + `sso`) |
 
-**What's next (after #42):** see [Post–Plan #42 next steps](#postplan-42-next-steps) below the Plan #42 section.
+**What's next (after #42):** see [Post–Plan #42 next steps](#postplan-42-next-steps) below the Plan #42 section. For cross-app vehicle booking, see **Plan #44**.
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -4072,6 +4073,54 @@ Travel Order panel access is limited to `@dict.gov.ph` by `User::canAccessPanel(
 - [x] Re-check no secrets are committed before merging the SSO work to `main` (audited 2026-10-10: no `.env`/`*.pem` tracked and gitignore-verified; zero known secret values in tracked files or the three SSO commit diffs; only intentional test fixtures `sso-test-password`/`test-client-secret` in `sso/tests/conftest.py`, which work solely against the throwaway `sso_test` DB)
 
 ## Status
-LIVE ON STAGING. SSO service on sso.dictr2.cloud with 124 users imported and the `loka-staging` client registered; `SSO_ENABLED=1` on lokastage and real SSO logins verified over live HTTPS (2026-10-10). Remaining: Travel Order rollout + LOKA production rollout (both gated on DICT sign-off), user communication about passwords, temporary SSH key cleanup.
+LIVE ON STAGING + TO PROD SSO. SSO service on `sso.dictr2.cloud` with 124 users imported and the `loka-staging` / `to-prod` clients; `SSO_ENABLED=1` on lokastage; real SSO logins verified. Done 2026-10-10: set-password/forgot-password; dual-hash verify; **portal app launcher** + institutional Stitch UI (navy/paper split, animations) deployed to `sso.dictr2.cloud` (commit `91c8655`). Remaining Plan #43: (1) deploy LOKA `index.php` logout fix to lokastage; (2) LOKA prod client + flag after DICT sign-off; (3) invite LOKA skipped users; (4) SSH key cleanup.
 Checked 2026-10-10 (post-DB): `https://sso.dictr2.cloud` discovery 200; `/authorize` without a registered client returns **400 Unknown client_id** (expected); 116 users and 1 client (`loka-staging`) in the SSO DB; `lokastage` login redirects to `sso.dictr2.cloud` (302); `lokafleet` and `to.dictr2.cloud` login pages are not redirected (SSO off in production). Travel Order `SsoLoginTest` 5/5 pass locally (`travelorder_test`). Production Travel Order and LOKA have no SSO flags enabled yet.
+
+---
+
+# LOKA Plan #44: TO/OB → LOKA vehicle-request link (remove double entry) — PLANNED (2026-10-10)
+
+## Goal
+Stop staff from typing the same trip twice. When a Travel Order or OB Pass Slip needs an **official vehicle**, automatically create/link a LOKA Fleet vehicle request prefilled from that authority document. When no official vehicle is needed, no LOKA request.
+
+## Domains for this implementation (staging only)
+| Role | Domain | Notes |
+|------|--------|-------|
+| Travel Order staging | `https://tostage.dictr2.cloud` | Site user `tostage`; DB `travelorderstage` |
+| LOKA Fleet staging | `https://lokastage.dictr2.cloud` | Existing Plan #12 / #43 staging |
+| SSO | `https://sso.dictr2.cloud` | Shared login (already live) |
+
+**Out of scope until DICT sign-off:** `to.dictr2.cloud`, `lokafleet.dictr2.cloud`.
+
+## Decisions (2026-10-10)
+- **Authority first:** TO for official travel; OB Pass Slip for local official business. One trip → one authority doc (TO **or** OB), not both.
+- **LOKA only if official vehicle:** Yes → create/link LOKA request; No (private/own/public) → authority doc only.
+- **TO/OB own:** purpose, dates/itinerary, destinations, travelers/participants (enter once).
+- **LOKA owns:** vehicle assignment, driver, motorpool approval, guard dispatch, trip ticket.
+- **Passengers:** default = all TO travelers (or OB participants) prefilled into LOKA `request_passengers`; editable on LOKA before/during motorpool; avoid double-counting the requester.
+- **TO UI change (later):** replace static `car_name|plate` catalog picker with “Needs official vehicle?” + link/status to LOKA.
+- **OB path:** same pattern using existing `requests.ob_request_id` bind; do not auto-create a TO from OB.
+
+## Staging prep (done 2026-10-10)
+- [x] SSH key for site user `tostage` (`~/.ssh/to_staging_ed25519`; host alias `to-staging` → `187.77.150.203`).
+- [x] Cloned **production** TO code + MySQL data (`travelorder`: 520 travel orders, 95 users) onto `tostage.dictr2.cloud` / DB `travelorderstage`.
+- [x] Staging `.env` preserved (`APP_URL=https://tostage.dictr2.cloud`).
+- [x] Smoke: `https://tostage.dictr2.cloud/` and `/DICT/login` return 200.
+
+## Implementation phases (not started — wait for explicit go-ahead)
+1. **Link + prefills:** TO “needs official vehicle” → create LOKA draft/request; store TO id/`to_code` on LOKA `requests`; map purpose/dates/place/travelers → passengers.
+2. **Stop double entry:** lock/hide duplicated fields on LOKA when linked to TO (or OB).
+3. **OB parity:** official-vehicle OB → same auto-link/prefill using `ob_request_id`.
+4. **Optional later:** SSO portal “travel + vehicle” wizard (still writes TO/OB then LOKA).
+
+## QA (fill when building)
+- [ ] TO without vehicle → no LOKA request created
+- [ ] TO with vehicle → LOKA request exists; purpose/dates/passengers match; deep link both ways
+- [ ] Editing LOKA passengers does not rewrite the TO traveler list
+- [ ] OB + official vehicle → LOKA linked; OB + private → no LOKA
+- [ ] Staging only; prod domains untouched
+- [ ] No secrets committed
+
+## Status
+PLANNED. Staging TO clone complete; design agreed. **Implementation not started** — proceed only after explicit confirmation.
 
