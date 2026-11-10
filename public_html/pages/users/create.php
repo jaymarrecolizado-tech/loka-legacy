@@ -19,6 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $name = postSafe('name', '', 100);
     $email = $security->sanitizeEmail(post('email'));
+    $officialEmail = normalizeOptionalEmail($security->sanitizeEmail(post('official_email')));
     $password = post('password'); // Don't sanitize password
     $phone = postSafe('phone', '', 20);
     $role = post('role');
@@ -28,9 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($name))
         $errors[] = 'Name is required';
     if (empty($email))
-        $errors[] = 'Email is required';
+        $errors[] = 'Individual email is required';
     elseif (!filter_var($email, FILTER_VALIDATE_EMAIL))
-        $errors[] = 'Invalid email format';
+        $errors[] = 'Invalid individual email format';
+    if ($officialEmail !== '' && !filter_var($officialEmail, FILTER_VALIDATE_EMAIL))
+        $errors[] = 'Invalid official email format';
 
     if (empty($password)) {
         $errors[] = 'Password is required';
@@ -46,11 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Invalid role selected';
     }
 
-    if ($email) {
-        $existing = db()->fetch("SELECT id FROM users WHERE email = ? AND deleted_at IS NULL", [$email]);
-        if ($existing)
-            $errors[] = 'Email already exists';
-    }
+    if ($email && userIndividualEmailTaken($email))
+        $errors[] = 'This individual email is already registered';
 
     if (empty($errors)) {
         db()->beginTransaction();
@@ -60,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $userId = db()->insert('users', [
                 'name' => $name,
                 'email' => $email,
+                'official_email' => $officialEmail !== '' ? $officialEmail : null,
                 'password' => $auth->hashPassword($password),
                 'phone' => $phone,
                 'role' => $role,
@@ -98,7 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 . ($esignError !== null ? ' (Specimen e-sign failed: ' . $esignError . ')' : ''));
         } catch (Exception $e) {
             db()->rollback();
-            $errors[] = 'Failed to create user.';
+            $dup = $e instanceof PDOException && (int) ($e->errorInfo[1] ?? 0) === 1062;
+            $errors[] = $dup ? 'This individual email is already registered' : 'Failed to create user.';
         }
     }
 }
@@ -141,9 +143,17 @@ require_once INCLUDES_PATH . '/header.php';
                                     required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Email <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" name="email"
-                                    value="<?= e(post('email', '')) ?>" required>
+                                <label class="form-label">Individual Email <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" name="email" id="individualEmail"
+                                    value="<?= e(post('email', '')) ?>" required autocomplete="off">
+                                <small class="text-muted">Login and notifications. Must be unique.</small>
+                                <div id="individualEmailHint" class="form-text"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Official / Office Email</label>
+                                <input type="email" class="form-control" name="official_email"
+                                    value="<?= e(post('official_email', '')) ?>">
+                                <small class="text-muted">Shared unit mailbox is allowed (not unique).</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Password <span class="text-danger">*</span></label>
@@ -230,4 +240,8 @@ require_once INCLUDES_PATH . '/header.php';
     </div>
 </div>
 
-<?php require_once INCLUDES_PATH . '/footer.php'; ?>
+<?php
+$emailCheckExcludeId = 0;
+require __DIR__ . '/partials/email_unique_check.php';
+require_once INCLUDES_PATH . '/footer.php';
+?>

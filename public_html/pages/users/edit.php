@@ -13,12 +13,14 @@ if (!$user)
 $errors = [];
 $departments = getDepartments(); // Use cached departments
 $validRoles = array_keys(ROLE_LABELS);
+$security = Security::getInstance();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
 
     $name = postSafe('name', '', 100);
-    $email = post('email');
+    $email = $security->sanitizeEmail(post('email'));
+    $officialEmail = normalizeOptionalEmail($security->sanitizeEmail(post('official_email')));
     $password = post('password');
     $phone = postSafe('phone', '', 20);
     $role = (string) post('role');
@@ -27,9 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($name))
         $errors[] = 'Name is required';
     if (empty($email))
-        $errors[] = 'Email is required';
+        $errors[] = 'Individual email is required';
     elseif (!filter_var($email, FILTER_VALIDATE_EMAIL))
-        $errors[] = 'Invalid email format';
+        $errors[] = 'Invalid individual email format';
+    if ($officialEmail !== '' && !filter_var($officialEmail, FILTER_VALIDATE_EMAIL))
+        $errors[] = 'Invalid official email format';
     if ($password && strlen($password) < 8)
         $errors[] = 'Password must be at least 8 characters';
     if ($role === '')
@@ -44,19 +48,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Re-fetch with lock to ensure atomicity
             $user = db()->fetch("SELECT * FROM users WHERE id = ? AND deleted_at IS NULL FOR UPDATE", [$userId]);
 
-            // Check unique email (exclude current)
-            if ($email && $email !== $user->email) {
-                $existing = db()->fetch("SELECT id FROM users WHERE email = ? AND id != ? AND deleted_at IS NULL", [$email, $userId]);
-                if ($existing) {
-                    db()->rollback();
-                    $errors[] = 'Email already exists';
-                }
+            if ($email && userIndividualEmailTaken($email, $userId)) {
+                db()->rollback();
+                $errors[] = 'This individual email is already registered';
             }
 
             if (empty($errors)) {
                 $updateData = [
                     'name' => $name,
                     'email' => $email,
+                    'official_email' => $officialEmail !== '' ? $officialEmail : null,
                     'phone' => $phone,
                     'role' => $role,
                     'department_id' => $departmentId,
@@ -103,7 +104,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Exception $e) {
             db()->rollback();
             error_log('Failed to update user #' . $userId . ': ' . $e->getMessage());
-            $errors[] = 'Failed to update user';
+            $dup = $e instanceof PDOException && (int) ($e->errorInfo[1] ?? 0) === 1062;
+            $errors[] = $dup ? 'This individual email is already registered' : 'Failed to update user';
         }
     }
 }
@@ -147,9 +149,17 @@ require_once INCLUDES_PATH . '/header.php';
                                     value="<?= e(post('name', $user->name)) ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Email <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" name="email"
-                                    value="<?= e(post('email', $user->email)) ?>" required>
+                                <label class="form-label">Individual Email <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" name="email" id="individualEmail"
+                                    value="<?= e(post('email', $user->email)) ?>" required autocomplete="off">
+                                <small class="text-muted">Login and notifications. Must be unique.</small>
+                                <div id="individualEmailHint" class="form-text"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Official / Office Email</label>
+                                <input type="email" class="form-control" name="official_email"
+                                    value="<?= e(post('official_email', $user->official_email ?? '')) ?>">
+                                <small class="text-muted">Shared unit mailbox is allowed (not unique).</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">New Password</label>
@@ -249,4 +259,8 @@ require_once INCLUDES_PATH . '/header.php';
     </div>
 </div>
 
-<?php require_once INCLUDES_PATH . '/footer.php'; ?>
+<?php
+$emailCheckExcludeId = (int) $userId;
+require __DIR__ . '/partials/email_unique_check.php';
+require_once INCLUDES_PATH . '/footer.php';
+?>

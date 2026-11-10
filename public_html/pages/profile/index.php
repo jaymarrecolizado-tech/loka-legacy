@@ -181,7 +181,10 @@ require_once INCLUDES_PATH . '/header.php';
                         <?= strtoupper(substr($user->name, 0, 1)) ?>
                     </div>
                     <h5 class="mb-1"><?= e($user->name) ?></h5>
-                    <p class="text-muted mb-2"><?= e($user->email) ?></p>
+                    <p class="text-muted mb-1"><?= e($user->email) ?></p>
+                    <?php if (!empty($user->official_email)): ?>
+                    <p class="small text-muted mb-2">Office: <?= e($user->official_email) ?></p>
+                    <?php endif; ?>
                     <?= roleBadge($user->role) ?>
                     <hr>
                     <div class="text-start">
@@ -287,9 +290,14 @@ require_once INCLUDES_PATH . '/header.php';
                                 <input type="text" class="form-control" name="name" value="<?= e(post('name', $user->name)) ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Email</label>
+                                <label class="form-label">Individual Email</label>
                                 <input type="email" class="form-control" value="<?= e($user->email) ?>" disabled>
                                 <small class="text-muted">Contact admin to change email</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Official / Office Email</label>
+                                <input type="email" class="form-control" value="<?= e($user->official_email ?? '') ?>" disabled>
+                                <small class="text-muted">Shared unit mailbox; contact admin to change</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Phone</label>

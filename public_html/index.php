@@ -714,6 +714,8 @@ switch ($page) {
             require_once PAGES_PATH . '/api/authority-vehicle-link.php';
         } elseif ($action === 'check_conflict') {
             require_once PAGES_PATH . '/api/check_conflict.php';
+        } elseif ($action === 'check_email') {
+            require_once PAGES_PATH . '/api/check_email.php';
         } elseif ($action === 'list' || $action === 'get' || $action === 'create' || $action === 'update' || $action === 'delete') {
             // Determine API type from query parameter or referer
             $apiType = get('type');

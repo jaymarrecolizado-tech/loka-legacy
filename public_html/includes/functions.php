@@ -40,6 +40,30 @@ function e(?string $string): string
 }
 
 /**
+ * True when another active user already has this individual (login) email.
+ * Official/office email is not checked — units may share one mailbox.
+ */
+function userIndividualEmailTaken(string $email, ?int $excludeUserId = null): bool
+{
+    $email = strtolower(trim($email));
+    if ($email === '') {
+        return false;
+    }
+    $sql = "SELECT id FROM users WHERE LOWER(TRIM(email)) = ? AND deleted_at IS NULL";
+    $params = [$email];
+    if ($excludeUserId !== null && $excludeUserId > 0) {
+        $sql .= " AND id != ?";
+        $params[] = $excludeUserId;
+    }
+    return db()->fetch($sql, $params) !== null;
+}
+
+function normalizeOptionalEmail(string $raw): string
+{
+    return strtolower(trim($raw));
+}
+
+/**
  * Redirect to URL
  */
 function redirect(string $url): void
