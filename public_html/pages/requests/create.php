@@ -310,10 +310,8 @@ $vehicleId = postInt('vehicle_id') ?: null;
             if (!empty($_FILES['travel_order_file']['name'])) {
                 $travelOrderUpload = handleTravelOrderFileUpload($requestId);
                 if ($travelOrderUpload['error']) {
-                    if (requireTravelOrderUpload()) {
-                        throw new Exception($travelOrderUpload['error']);
-                    }
-                    error_log('Travel Order upload skipped (non-blocking): ' . $travelOrderUpload['error']);
+                    // User selected a file — never silently ignore a failed upload.
+                    throw new Exception($travelOrderUpload['error']);
                 }
             }
             if ($travelOrderUpload && $travelOrderUpload['path']) {
@@ -457,7 +455,10 @@ $vehicleId = postInt('vehicle_id') ?: null;
             error_log("Request creation error: " . $e->getMessage() . "\nTrace: " . $e->getTraceAsString());
             
             // Show detailed error in development
-            if (APP_ENV === 'development') {
+            $uploadErr = function_exists('travelOrderUploadUserError') ? travelOrderUploadUserError($e) : '';
+            if ($uploadErr !== '') {
+                $errors[] = $uploadErr;
+            } elseif (APP_ENV === 'development') {
                 $errors[] = 'Error: ' . $e->getMessage();
             } else {
                 $errors[] = 'Failed to submit request. Please try again.';
@@ -812,7 +813,7 @@ require_once INCLUDES_PATH . '/header.php';
                                         <?php else: ?>
                                             Optional. 
                                         <?php endif; ?>
-                                        Upload your Travel Order or Official Business Slip (PDF, JPG, PNG - max 5 MB).
+                                        Upload your Travel Order or Official Business Slip (PDF, JPG, PNG — max 12 MB). Phone photos are compressed automatically.
                                     </small>
                                 </div>
                             </div>

@@ -46,8 +46,9 @@
 | #40 | AI assistant chatbot (experimental, role-scoped actions) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
 | #41 | Driver-phone GPS trip tracking (experimental) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
 | #42 | Full-system regression QA (all features / nothing broken) | DONE (2026-10-06; A–D pass; gaps closed — click-through, live AI/GPS, flags OFF) |
-| #43 | Central SSO for LOKA + Travel Order (OIDC, Python service) | LIVE ON STAGING + TO PROD (2026-10-10; portal UI live on `sso.dictr2.cloud`; LOKA prod still pending) |
+| #43 | Central SSO for LOKA + Travel Order (OIDC, Python service) | LIVE ON STAGING (2026-10-10; portal UI live on `sso.dictr2.cloud`; TO **prod SSO turned OFF 2026-10-13** — logout was broken; classic TO login restored; LOKA prod still pending) |
 | #44 | TO/OB → LOKA vehicle-request link (remove double entry) | DONE ON STAGING (2026-10-10; phases 1–3 live + E2E verified; TO UI catalog replacement still 'later') |
+| #45 | Show / attach TO / OB on vehicle requests (approvals + request view) | LIVE prod + staging + local (2026-10-13; FileUpload fix; health 200) |
 
 **What's next:** see [Post–Plan #44 next steps](#postplan-44-next-steps-2026-10-10) (current). Older backlog still in [Post–Plan #42 next steps](#postplan-42-next-steps).
 
@@ -4146,7 +4147,7 @@ Do **not** touch prod for this work until DICT sign-off: `to.dictr2.cloud`, `lok
 
 ## Before production
 3. **DICT sign-off** on staging: SSO portal login → choose app; TO “request official vehicle” → LOKA draft with prefilled purpose/dates/passengers; OB attach prefill; no double entry on locked fields.
-4. **LOKA prod SSO:** register client `loka-prod`, set secrets in prod `.env`, flip `SSO_ENABLED` after sign-off (TO prod SSO / `to-prod` already live).
+4. **LOKA prod SSO:** register client `loka-prod`, set secrets in prod `.env`, flip `SSO_ENABLED` after sign-off. **TO prod SSO:** turned OFF 2026-10-13 (`SSO_LOGIN_ENABLED=false` on `to.dictr2.cloud`) because Filament logout → `/DICT/login` immediately re-entered SSO and looked broken; classic local login/logout restored. Re-enable only after a working SSO logout redirect (portal-login) is deployed and verified on tostage first.
 5. **Plan #44 prod rollout:** deploy LOKA authority-link API + migration `062` to `lokafleet`; deploy TO `LokaVehicleLink` + columns to `to.dictr2.cloud`; shared `AUTHORITY_LINK_SECRET` only in server `.env` files; smoke E2E on prod with a test TO.
 6. **Housekeeping:** invite LOKA users skipped at SSO import (non-bcrypt / inactive); remove temporary SSH public keys when migration/handover is complete (`travel-ssh` / `to_staging` keys per Plan #43 / #44 prep).
 
@@ -4156,4 +4157,65 @@ Do **not** touch prod for this work until DICT sign-off: `to.dictr2.cloud`, `lok
 
 ## Suggested next build
 Start with **(1) TO vehicle UI polish on `tostage`**, then a short DICT walkthrough of TO → LOKA on staging, then gate prod behind sign-off.
+
+---
+
+# LOKA Plan #45: Show TO / OB slip file to approvers (prod) — LIVE on `lokafleet.dictr2.cloud` (2026-10-12)
+
+## Goal
+Motorpool Head, Department Approver, and All Father must see the Travel Order / OB slip the requester attached, on the approval screen they act from. Before this, only `pages/requests/view.php` showed the file.
+
+## Findings (prod package)
+- `pages/approvals/view.php` had no travel-document section. Approvers act from it (`approvals/index.php` links there). Its gate `requireRole(ROLE_APPROVER)` already admits Department Approver, Motorpool Head, Admin, and All Father.
+- The uploaded-file card lived only in `pages/requests/view.php`.
+- Prod has no OB module (`pages/ob-requests` absent). On prod, "OB slip" is the same `travel_order_file` upload.
+- Upload is optional by default (`require_travel_order_upload` = `0`, migration `042`). Admin or All Father can make it required in System Control.
+- Possible cause of missing files: `pages/requests/create.php` (~285-296) logs a failed optional TO upload and still saves the request.
+
+## Changes (`prod/public_html` only; `public_html` untouched)
+- New `pages/requests/partials/travel_document.php`: file name, upload date, and Download link, or a warning when no file was uploaded.
+- `pages/requests/view.php`: the inline card is replaced by the partial. The warning now also shows when no file exists.
+- `pages/approvals/view.php`: the partial is included after Request Details and before Vehicle Information.
+
+## QA
+- [x] `php -l` passes on the three touched PHP files.
+- [x] Smoke render of the partial with a file and without one (stub helpers, scratch harness outside the repo, removed after).
+- [ ] Role click-through (Department Approver, Motorpool Head, All Father, Requester) on pending and approved requests.
+- [ ] Prod check: `error_log` for `Travel Order upload skipped` and count of requests with NULL `travel_order_file`, to confirm the root cause.
+
+## Deploy
+- Surgical upload of the three prod files only: `pages/approvals/view.php`, `pages/requests/view.php`, `pages/requests/partials/travel_document.php`. No migration, no DB change, prod `.env` and uploads untouched.
+- `prod/` is git-ignored (`.gitignore:38`), so these changes are not committed.
+
+## Out of scope (flagged, not changed)
+- `pages/file-view.php` serves anything under `uploads/` without a login check.
+- Upload limits (5 MB, PDF/JPG/PNG only) and silent non-blocking failure when the upload is optional.
+- Mirroring to `public_html` is not done. Port separately if wanted.
+
+## Deploy (2026-10-12)
+- Surgical upload to `lokafleet.dictr2.cloud` via `_deploy_tmp/deploy_plan45.py` (SSH key `loka-live`).
+- Live `pages/requests/partials/` is `755`, so the new partial could not be created without sudo. Deployed by **inlining** the shared card into the two world-writable view files (`pages/approvals/view.php`, `pages/requests/view.php`). Local `prod/public_html` still keeps the shared partial for future clean deploys.
+- Backup: `/home/lokafleet-ssh/backups/pre_plan45_20261012_150702/`
+- Verified live: Plan #45 markers + no-file warning present in both views; no `travel_document.php` require left on live; `health.php` → 200.
+- Prod DB / uploads / `.env` untouched. No migration.
+
+## Follow-up fix (2026-10-13) — upload actually broken on prod
+- Symptom: request #744 (and others) showed Plan #45 "No Travel Order or OB Slip file was uploaded" after the requester edited and attached an image.
+- Root cause in `logs/error.log`: `handleTravelOrderFileUpload: Class "FileUpload" not found` then `Travel Order upload skipped during edit (non-blocking)`. `classes/FileUpload.php` existed but was never loaded by `bootstrap.php` / `index.php`. Because upload is optional by default, the request saved with a NULL file and no UI error.
+- Fix deployed live: load `FileUpload` in `trip-enhancements.php`, `config/bootstrap.php`, and `index.php`; create/edit now throw when a selected file fails (no silent skip). Backup `/home/lokafleet-ssh/backups/pre_plan45_fileupload_20261013_103522/`. `health.php` → 200.
+- Requester must **Edit Request #744 again** and re-upload the OB/TO image (PDF/JPG/PNG, max 5 MB). Prior attempts never wrote a file.
+
+## Local + staging (2026-10-13)
+- Shared partial [`public_html/pages/requests/partials/travel_documents.php`](public_html/pages/requests/partials/travel_documents.php): uploaded TO/OB file (download or warning), authority TO link (Plan #44), attached OB Pass Slip (View/Print), optional late-bind form on request view.
+- Wired into [`requests/view.php`](public_html/pages/requests/view.php) (late-bind on) and [`approvals/view.php`](public_html/pages/approvals/view.php) (view-only for approvers).
+- Attach on create/edit already present; FileUpload load + fail-loud upload errors mirrored from the prod fix (`index.php`, `bootstrap.php`, `trip-enhancements.php`, create/edit).
+- Staging deploy (`lokastage.dictr2.cloud`) via `_deploy_tmp/deploy_plan45_staging.py`: 8 files; backup `/home/lokaloka/backups/pre_plan45_staging_20261013_150700/`; `php -l` clean; `health.php` → 200.
+
+## Follow-up (2026-11-09) — revision attach failed on phone photos
+- Prod `error.log` for request #837: `Request update error: File size exceeds maximum allowed size of 5 MB`. Edit swallowed that as "Failed to update request. Please try again."
+- TO/OB upload limit raised to **12 MB**; JPEG/PNG are compressed in place (max 1920px). Stored path now `uploads/travel_orders/{id}/…` (was wrongly `uploads/{id}/…`).
+- Create/edit now show the real upload error. Deployed prod + staging (`pre_plan45_tosize_20261109_082029`); health 200. Local `public_html` updated too.
+
+## Status
+LIVE on `lokafleet.dictr2.cloud` (card + FileUpload fix + 12 MB revision attach) and `lokastage.dictr2.cloud` + local `public_html`. Re-upload the TO/OB image on the revision (PDF/JPG/PNG, max 12 MB).
 

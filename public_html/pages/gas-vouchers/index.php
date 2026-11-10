@@ -19,7 +19,7 @@ $whereClause = 'gv.deleted_at IS NULL';
 $params = [];
 
 // Non-admins see only their own vouchers unless they are approvers or Chief Admin/Finance
-if (!isAdmin() && !isMotorpool() && !isApprover() && !isChiefAdminFinance()) {
+if (!isAdmin() && !isMotorpool() && !isApprover() && !isChiefAdminFinance() && !isBudgetOfficer()) {
     $whereClause .= ' AND gv.requested_by_user_id = ?';
     $params[] = userId();
 }
@@ -142,6 +142,7 @@ require_once INCLUDES_PATH . '/header.php';
             ['Pending Review', $counts['pending_review'] ?? 0, 'text-warning'],
             ['Pending Budget', $counts['pending_budget'] ?? 0, 'text-primary'],
             ['Pending Approval', $counts['pending_approval'] ?? 0, 'text-info'],
+            ['For Revision', $counts['revision'] ?? 0, 'text-warning'],
             ['Approved', $counts['approved'] ?? 0, 'text-success'],
             ['Total Vouchers', array_sum($counts), 'text-secondary'],
         ]; ?>
@@ -171,6 +172,7 @@ require_once INCLUDES_PATH . '/header.php';
                         <option value="pending_review" <?= $statusFilter === 'pending_review' ? 'selected' : '' ?>>Pending Review</option>
                         <option value="pending_budget" <?= $statusFilter === 'pending_budget' ? 'selected' : '' ?>>Pending Budget</option>
                         <option value="pending_approval" <?= $statusFilter === 'pending_approval' ? 'selected' : '' ?>>Pending Approval</option>
+                        <option value="revision" <?= $statusFilter === 'revision' ? 'selected' : '' ?>>For Revision</option>
                         <option value="approved" <?= $statusFilter === 'approved' ? 'selected' : '' ?>>Approved</option>
                         <option value="rejected" <?= $statusFilter === 'rejected' ? 'selected' : '' ?>>Rejected</option>
                         <option value="cancelled" <?= $statusFilter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
@@ -270,7 +272,7 @@ require_once INCLUDES_PATH . '/header.php';
                                        class="btn btn-sm btn btn-light text-primary" title="View">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    <?php if ($v->status === 'draft' && ($v->requested_by_user_id == userId() || isAdmin())): ?>
+                                    <?php if (in_array($v->status, ['draft', 'revision'], true) && ($v->requested_by_user_id == userId() || isAdmin())): ?>
                                     <a href="<?= APP_URL ?>/?page=gas-vouchers&action=edit&id=<?= $v->id ?>"
                                        class="btn btn-sm btn btn-light" title="Edit">
                                         <i class="bi bi-pencil"></i>

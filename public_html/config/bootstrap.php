@@ -47,6 +47,7 @@ require_once __DIR__ . '/../classes/EmailQueue.php';
 require_once __DIR__ . '/sms.php';
 require_once __DIR__ . '/../classes/SmsGateway.php';
 require_once __DIR__ . '/../classes/SmsQueue.php';
+require_once __DIR__ . '/../classes/FileUpload.php';
 require_once __DIR__ . '/../config/channels.php';
 require_once __DIR__ . '/../classes/ChannelQueue.php';
 require_once __DIR__ . '/../classes/TelegramGateway.php';

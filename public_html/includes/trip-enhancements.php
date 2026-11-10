@@ -46,6 +46,10 @@ if (!defined('TRIP_ENHANCEMENTS_LOADED')) {
         }
 
         try {
+            // FileUpload is not always loaded by bootstrap/index — require it here.
+            if (!class_exists('FileUpload', false)) {
+                require_once dirname(__DIR__) . '/classes/FileUpload.php';
+            }
             $handler = FileUpload::createTravelOrderHandler($requestId);
             $path = $handler->upload($_FILES['travel_order_file'], 'to_');
 
@@ -76,6 +80,31 @@ if (!defined('TRIP_ENHANCEMENTS_LOADED')) {
             $cached = tripSetting('require_travel_order_upload', '0') === '1';
         }
         return $cached;
+    }
+
+    /**
+     * Safe user-facing copy for a failed TO/OB upload (never leak stack traces).
+     */
+    function travelOrderUploadUserError(Throwable $e): string
+    {
+        $msg = trim($e->getMessage());
+        if ($msg === '') {
+            return '';
+        }
+        $lower = strtolower($msg);
+        if (str_contains($lower, 'too large')
+            || str_contains($lower, 'file size exceeds')
+            || str_contains($lower, 'upload_max_filesize')
+            || str_contains($lower, 'max_file_size')
+            || str_contains($lower, 'post too large')) {
+            return 'This photo or file is too large (max 12 MB). Please upload a smaller JPG, PNG, or PDF.';
+        }
+        foreach (['file', 'upload', 'travel order', 'image', 'pdf', 'png', 'jpg', 'jpeg', 'mb'] as $needle) {
+            if (str_contains($lower, $needle)) {
+                return $msg;
+            }
+        }
+        return '';
     }
 
     // =====================================================================

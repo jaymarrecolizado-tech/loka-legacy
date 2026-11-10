@@ -321,6 +321,10 @@ define('MAIL_TEMPLATES', [
         'subject' => 'Gas Voucher Rejected',
         'template' => 'A gas voucher has been rejected. Please check the comments.'
     ],
+    'gas_voucher_revision' => [
+        'subject' => 'Gas Voucher Returned for Revision',
+        'template' => 'A gas voucher was returned for revision. Please correct it and resubmit for Motorpool review.'
+    ],
     'gas_voucher_cancelled' => [
         'subject' => 'Gas Voucher Cancelled',
         'template' => 'A gas voucher has been cancelled.'

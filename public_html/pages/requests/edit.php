@@ -274,10 +274,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($_FILES['travel_order_file']['name'])) {
                 $travelOrderUpload = handleTravelOrderFileUpload($requestId);
                 if ($travelOrderUpload['error']) {
-                    if (requireTravelOrderUpload() && !$hasExistingTravelOrderFile) {
-                        throw new Exception($travelOrderUpload['error']);
-                    }
-                    error_log('Travel Order upload skipped during edit (non-blocking): ' . $travelOrderUpload['error']);
+                    // User selected a file — never silently ignore a failed upload.
+                    throw new Exception($travelOrderUpload['error']);
                 }
                 if ($travelOrderUpload && $travelOrderUpload['path']) {
                     // Remove the previous file (if any) before storing the new one
@@ -444,8 +442,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } catch (Exception $e) {
             db()->rollback();
-            $errors[] = 'Failed to update request. Please try again.';
             error_log("Request update error: " . $e->getMessage());
+            $uploadErr = function_exists('travelOrderUploadUserError') ? travelOrderUploadUserError($e) : '';
+            $errors[] = $uploadErr !== '' ? $uploadErr : 'Failed to update request. Please try again.';
         }
     }
 }
@@ -772,7 +771,7 @@ require_once INCLUDES_PATH . '/header.php';
                                         <?php else: ?>
                                             Optional. 
                                         <?php endif; ?>
-                                        Travel Order or Official Business Slip (PDF, JPG, PNG - max 5 MB).
+                                        Travel Order or Official Business Slip (PDF, JPG, PNG — max 12 MB). Phone photos are compressed automatically.
                                     </small>
                                 </div>
                             </div>

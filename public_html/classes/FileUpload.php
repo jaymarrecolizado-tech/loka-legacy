@@ -101,7 +101,7 @@ class FileUpload
 
         // Validate file size
         if ($fileFile['size'] > $this->maxFileSize) {
-            $this->errors[] = 'File size exceeds maximum allowed size of ' . $this->formatBytes($this->maxFileSize);
+            $this->errors[] = 'This photo or file is too large (max ' . $this->formatBytes($this->maxFileSize) . '). Please upload a smaller JPG, PNG, or PDF.';
             return false;
         }
 
@@ -147,8 +147,9 @@ class FileUpload
         // Set proper permissions
         chmod($uploadPath, 0644);
 
-        // Return relative path for database storage
-        return 'uploads/' . basename($this->uploadDir) . '/' . $uniqueName;
+        $this->compressImageInPlace($uploadPath, $fileExt);
+
+        return $this->relativePathFromUploads($uniqueName);
     }
 
     /**
@@ -260,8 +261,8 @@ class FileUpload
     private function getUploadErrorMessage(int $errorCode): string
     {
         return match ($errorCode) {
-            UPLOAD_ERR_INI_SIZE => 'The uploaded file exceeds the upload_max_filesize directive in php.ini',
-            UPLOAD_ERR_FORM_SIZE => 'The uploaded file exceeds the MAX_FILE_SIZE directive specified in the HTML form',
+            UPLOAD_ERR_INI_SIZE => 'This photo or file is too large. Please upload a smaller JPG, PNG, or PDF.',
+            UPLOAD_ERR_FORM_SIZE => 'This photo or file is too large. Please upload a smaller JPG, PNG, or PDF.',
             UPLOAD_ERR_PARTIAL => 'The uploaded file was only partially uploaded',
             UPLOAD_ERR_NO_FILE => 'No file was uploaded',
             UPLOAD_ERR_NO_TMP_DIR => 'Missing a temporary folder',
@@ -304,8 +305,56 @@ class FileUpload
             'image/png'
         ]);
         $handler->setAllowedExtensions(['pdf', 'jpg', 'jpeg', 'png']);
-        $handler->setMaxFileSize(5242880); // 5MB
+        $handler->setMaxFileSize(12 * 1024 * 1024); // 12MB — phone photos
         return $handler;
+    }
+
+    /**
+     * Relative path from public_html for files stored under uploads/.
+     */
+    private function relativePathFromUploads(string $uniqueName): string
+    {
+        $uploadsRoot = realpath(__DIR__ . '/../uploads');
+        $dirReal = realpath(rtrim($this->uploadDir, '/\\'));
+        if ($uploadsRoot && $dirReal && str_starts_with($dirReal, $uploadsRoot)) {
+            $rel = ltrim(str_replace('\\', '/', substr($dirReal, strlen($uploadsRoot))), '/');
+            return 'uploads/' . ($rel !== '' ? $rel . '/' : '') . $uniqueName;
+        }
+        return 'uploads/' . basename(rtrim($this->uploadDir, '/\\')) . '/' . $uniqueName;
+    }
+
+    /**
+     * Shrink JPEG/PNG phone photos in place (max 1920px).
+     */
+    private function compressImageInPlace(string $path, string $ext): void
+    {
+        $ext = strtolower($ext);
+        if (!in_array($ext, ['jpg', 'jpeg', 'png'], true) || !function_exists('imagecreatetruecolor')) {
+            return;
+        }
+        $src = $ext === 'png' ? @imagecreatefrompng($path) : @imagecreatefromjpeg($path);
+        if (!$src) {
+            return;
+        }
+        $w = imagesx($src);
+        $h = imagesy($src);
+        $scale = min(1, 1920 / max($w, $h, 1));
+        $nw = max(1, (int) round($w * $scale));
+        $nh = max(1, (int) round($h * $scale));
+        $dst = imagecreatetruecolor($nw, $nh);
+        if ($ext === 'png') {
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+        }
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+        if ($ext === 'png') {
+            imagepng($dst, $path, 6);
+        } else {
+            imagejpeg($dst, $path, 82);
+        }
+        imagedestroy($src);
+        imagedestroy($dst);
+        @chmod($path, 0644);
     }
 
     /**

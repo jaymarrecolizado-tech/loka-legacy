@@ -83,6 +83,19 @@
             
             <!-- Right Side -->
             <div class="ms-auto ms-lg-2 d-flex align-items-center">
+                <?php
+                // Plan #43 — jump back to the SSO app chooser when SSO is on.
+                if (!function_exists('ssoEnabled')) {
+                    @require_once CONFIG_PATH . '/sso.php';
+                }
+                if (function_exists('ssoEnabled') && ssoEnabled() && defined('SSO_BASE_URL') && SSO_BASE_URL !== ''):
+                    $ssoAppsUrl = rtrim(SSO_BASE_URL, '/') . '/';
+                ?>
+                <a class="nav-link text-white me-2 d-flex align-items-center" href="<?= e($ssoAppsUrl) ?>" title="Back to app selection">
+                    <i class="bi bi-grid-3x3-gap me-1"></i>
+                    <span class="d-none d-md-inline">Apps</span>
+                </a>
+                <?php endif; ?>
                 <!-- Notifications -->
                 <div class="dropdown me-3">
                     <a class="nav-link text-white position-relative" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="notificationDropdown">
@@ -131,6 +144,9 @@
                         <li><h6 class="dropdown-header"><?= e(currentUser()->email ?? '') ?></h6></li>
                         <li><span class="dropdown-item-text"><?= roleBadge(userRole()) ?></span></li>
                         <li><hr class="dropdown-divider"></li>
+                        <?php if (function_exists('ssoEnabled') && ssoEnabled() && defined('SSO_BASE_URL') && SSO_BASE_URL !== ''): ?>
+                        <li><a class="dropdown-item" href="<?= e(rtrim(SSO_BASE_URL, '/') . '/') ?>"><i class="bi bi-grid-3x3-gap me-2"></i>All applications</a></li>
+                        <?php endif; ?>
                         <li><a class="dropdown-item" href="<?= APP_URL ?>/?page=profile"><i class="bi bi-person me-2"></i>Profile</a></li>
                         <li><a class="dropdown-item text-danger" href="<?= APP_URL ?>/?page=logout"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
                     </ul>

@@ -594,6 +594,47 @@ if ($__verifyUrl) {
             .tbl-trip td {
                 padding: 0 !important;
             }
+
+            /* Empty pad rows: keep the grid, drop placeholder / native date chrome */
+            input::placeholder,
+            textarea::placeholder {
+                color: transparent !important;
+                opacity: 0 !important;
+            }
+
+            input.print-empty,
+            textarea.print-empty {
+                visibility: hidden !important;
+            }
+
+            input.print-empty[type="date"],
+            input.print-empty[type="time"] {
+                color: transparent !important;
+                -webkit-text-fill-color: transparent !important;
+                caret-color: transparent !important;
+            }
+
+            input.print-empty[type="date"]::-webkit-datetime-edit,
+            input.print-empty[type="date"]::-webkit-datetime-edit-fields-wrapper,
+            input.print-empty[type="date"]::-webkit-datetime-edit-text,
+            input.print-empty[type="date"]::-webkit-datetime-edit-month-field,
+            input.print-empty[type="date"]::-webkit-datetime-edit-day-field,
+            input.print-empty[type="date"]::-webkit-datetime-edit-year-field,
+            input.print-empty[type="time"]::-webkit-datetime-edit,
+            input.print-empty[type="time"]::-webkit-datetime-edit-fields-wrapper,
+            input.print-empty[type="time"]::-webkit-datetime-edit-text,
+            input.print-empty[type="time"]::-webkit-datetime-edit-hour-field,
+            input.print-empty[type="time"]::-webkit-datetime-edit-minute-field,
+            input.print-empty[type="time"]::-webkit-datetime-edit-ampm-field {
+                color: transparent !important;
+                -webkit-text-fill-color: transparent !important;
+            }
+
+            input.print-empty[type="date"]::-webkit-calendar-picker-indicator,
+            input.print-empty[type="time"]::-webkit-calendar-picker-indicator {
+                display: none !important;
+                opacity: 0 !important;
+            }
         }
 
         td[rowspan] input {
@@ -847,7 +888,7 @@ if ($__verifyUrl) {
         <a href="<?= APP_URL ?>/" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><span>🏠</span> Home</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">← Back to My Trip Tickets</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets&action=generate-summary" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">↩ Generate</a>
-        <button class="btn btn-print" onclick="if(validateTicket()) { resizeTripTextareas(); requestAnimationFrame(function () { window.print(); }); }">🖨 Print / Save PDF</button>
+        <button class="btn btn-print" onclick="if(validateTicket()) { resizeTripTextareas(); markEmptyDateTimesForPrint(); requestAnimationFrame(function () { window.print(); }); }">🖨 Print / Save PDF</button>
         <button class="btn btn-reset" onclick="resetForm()">↺ Clear Form</button>
     </div>
     <?php if ($__verifyUrl): ?>
@@ -1000,7 +1041,7 @@ if ($__verifyUrl) {
                     $remaining = 8 - $tripRowCount;
                     for ($j = 0; $j < max(0, $remaining); $j++):
                     ?>
-                        <tr>
+                        <tr class="blank-pad">
                             <td><input type="date"></td>
                             <td><input type="time"></td>
                             <td><input type="time"></td>
@@ -1155,14 +1196,19 @@ if ($__verifyUrl) {
                 <select class="sig-select" id="sigApprover" onchange="updateApproverTitle()">
                     <option value="">Select Approver...</option>
                     <?php
-                    $defaultApprover = 'MINA FLOR T. VILLAFUERTE';
-                    $approverRows = $approvers ?? [];
-                    $hasDefault = false;
+                    $approverRows = array_values(array_filter($approvers ?? [], function ($arow) {
+                        return stripos((string) $arow->name, 'VILLAFUERTE') === false;
+                    }));
+                    $defaultApprover = '';
                     foreach ($approverRows as $arow) {
-                        if (strcasecmp($arow->name, $defaultApprover) === 0) { $hasDefault = true; break; }
+                        $n = strtoupper(preg_replace('/\s+/', ' ', trim((string) $arow->name)));
+                        if (strpos($n, 'JEMAR') !== false && strpos($n, 'DEL ROSARIO') !== false) {
+                            $defaultApprover = $arow->name;
+                            break;
+                        }
                     }
-                    if (!$hasDefault) {
-                        $approverRows[] = (object) ['name' => $defaultApprover, 'role' => ROLE_CHIEF_ADMIN_FINANCE];
+                    if ($defaultApprover === '' && $approverRows) {
+                        $defaultApprover = $approverRows[0]->name;
                     }
                     foreach ($approverRows as $arow): ?>
                         <option value="<?= e($arow->name) ?>" data-role="<?= e($arow->role) ?>" <?= strcasecmp($arow->name, $defaultApprover) === 0 ? 'selected' : '' ?>><?= strtoupper(e($arow->name)) ?></option>
@@ -1282,6 +1328,31 @@ if ($__verifyUrl) {
             calcTotals();
         });
         window.addEventListener('beforeprint', resizeTripTextareas);
+
+        function markEmptyDateTimesForPrint() {
+            document.querySelectorAll('input, textarea').forEach(function (el) {
+                if (el.type === 'hidden' || el.type === 'checkbox' || el.type === 'radio') return;
+                if (!el.value) {
+                    el.classList.add('print-empty');
+                    if (el.placeholder) {
+                        el.dataset.printPh = el.placeholder;
+                        el.placeholder = '';
+                    }
+                } else {
+                    el.classList.remove('print-empty');
+                }
+            });
+        }
+        window.addEventListener('beforeprint', markEmptyDateTimesForPrint);
+        window.addEventListener('afterprint', function () {
+            document.querySelectorAll('.print-empty').forEach(function (el) {
+                el.classList.remove('print-empty');
+                if (el.dataset.printPh !== undefined) {
+                    el.placeholder = el.dataset.printPh;
+                    delete el.dataset.printPh;
+                }
+            });
+        });
 
         // Handle page numbering with CSS counter (most reliable method)
         window.addEventListener('beforeprint', function() {

@@ -47,12 +47,15 @@ if ($isEdit) {
     if (!$voucher) {
         redirectWith('/?page=gas-vouchers', 'danger', 'Voucher not found.');
     }
-    // Rules: Owner/Admin edit 'draft'. Approver/Motorpool/Admin edit 'pending_review'/'pending_approval'.
+    // Owner/Admin: draft or revision. Officers: pending_review / pending_budget / pending_approval.
     $canEdit = false;
-    if ($voucher->status === 'draft') {
-        if ($voucher->requested_by_user_id == userId() || isAdmin()) $canEdit = true;
-    } elseif (in_array($voucher->status, ['pending_review', 'pending_approval'])) {
+    $isOwner = ((int) $voucher->requested_by_user_id === (int) userId()) || isAdmin();
+    if (in_array($voucher->status, ['draft', 'revision'], true) && $isOwner) {
+        $canEdit = true;
+    } elseif (in_array($voucher->status, ['pending_review', 'pending_approval'], true)) {
         if (isApprover() || isMotorpool() || isAdmin() || isChiefAdminFinance()) $canEdit = true;
+    } elseif ($voucher->status === 'pending_budget' && isBudgetOfficer()) {
+        $canEdit = true;
     }
 
     if (!$canEdit) {
@@ -141,8 +144,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $vehicleId  = $vehicleRow ? $vehicleRow->id : null;
 
     if (empty($errors)) {
-        if ($isEdit && in_array($voucher->status, ['pending_review', 'pending_approval'])) {
-            $newStatus = $voucher->status; // Preserve status for approvers making corrections
+        $officerStatuses = ['pending_review', 'pending_budget', 'pending_approval'];
+        if ($isEdit && in_array($voucher->status, $officerStatuses, true)) {
+            $newStatus = $voucher->status; // Preserve status for officers making corrections
+        } elseif ($isEdit && $voucher->status === 'revision') {
+            $newStatus = ($action === 'submit') ? 'pending_review' : 'revision';
         } else {
             $newStatus = ($action === 'submit') ? 'pending_review' : 'draft';
         }
@@ -175,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             if ($isEdit) {
                 db()->update('gas_vouchers', $data, 'id = ?', [$voucherId]);
-                $message = $newStatus === 'pending_review'
+                $message = ($newStatus === 'pending_review' && $voucher->status !== 'pending_review')
                     ? 'Gas voucher submitted for review.'
                     : 'Gas voucher updated.';
                 auditLog('update', 'gas_voucher', $voucherId);
@@ -183,17 +189,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($newStatus === 'pending_review' && $voucher->status !== 'pending_review') {
                     // Notify only the selected reviewer, or all approvers if none selected
+                    $requester = currentUser();
+                    $resubmit = $voucher->status === 'revision';
+                    $nTitle = $resubmit ? 'Gas Voucher Resubmitted' : 'New Gas Voucher Request';
+                    $nMsg = $resubmit
+                        ? "Gas voucher {$voucher->voucher_no} was revised and resubmitted for review by {$requester->name}."
+                        : "A new gas voucher has been submitted for review by {$requester->name}.";
                     if ($requestedReviewerId) {
-                        $requester = currentUser();
-                        notify($requestedReviewerId, 'gas_voucher_submitted', 'New Gas Voucher Request', "A new gas voucher has been submitted for review by {$requester->name}.", '/?page=gas-vouchers&action=view&id=' . $voucherId, $voucherId);
+                        notify($requestedReviewerId, 'gas_voucher_submitted', $nTitle, $nMsg, '/?page=gas-vouchers&action=view&id=' . $voucherId, $voucherId);
                     } else {
                         $approvers = db()->fetchAll(
                             "SELECT id FROM users WHERE role IN (?, ?, ?) AND deleted_at IS NULL",
                             [ROLE_APPROVER, ROLE_MOTORPOOL, ROLE_ADMIN]
                         );
-                        $requester = currentUser();
                         foreach ($approvers as $approver) {
-                            notify($approver->id, 'gas_voucher_submitted', 'New Gas Voucher Request', "A new gas voucher has been submitted for review by {$requester->name}.", '/?page=gas-vouchers&action=view&id=' . $voucherId, $voucherId);
+                            notify($approver->id, 'gas_voucher_submitted', $nTitle, $nMsg, '/?page=gas-vouchers&action=view&id=' . $voucherId, $voucherId);
                         }
                     }
                 }
@@ -248,6 +258,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Pre-fill defaults
 $d = $voucher ?? null;
 $defaultDate = date('Y-m-d');
+$showSignatoryPicks = !$isEdit || in_array((string) ($voucher->status ?? ''), ['draft', 'revision'], true);
 
 require_once INCLUDES_PATH . '/header.php';
 ?>
@@ -276,6 +287,12 @@ require_once INCLUDES_PATH . '/header.php';
                 <i class="bi bi-arrow-left me-1"></i>Back
             </a>
         </div>
+
+        <?php if ($isEdit && ($voucher->status ?? '') === 'revision' && !empty($voucher->revision_reason)): ?>
+        <div class="alert alert-warning mb-4">
+            <strong>Returned for revision.</strong> <?= e($voucher->revision_reason) ?>
+        </div>
+        <?php endif; ?>
 
         <?php if (!empty($errors)): ?>
         <div class="alert alert-danger mb-4">
@@ -355,13 +372,18 @@ require_once INCLUDES_PATH . '/header.php';
                                 <span class="form-text text-muted d-block small text-muted">Select the gas station where the voucher will be used.</span>
                             </label>
                         </div>
-                        <?php if (!$isEdit): ?>
+                        <?php if (!$showSignatoryPicks): ?>
+                        <input type="hidden" name="requested_reviewer_id" value="<?= (int) ($voucher->requested_reviewer_id ?? 0) ?>">
+                        <input type="hidden" name="requested_budget_officer_id" value="<?= (int) ($voucher->requested_budget_officer_id ?? 0) ?>">
+                        <input type="hidden" name="requested_approver_id" value="<?= (int) ($voucher->requested_approver_id ?? 0) ?>">
+                        <?php endif; ?>
+                        <?php if ($showSignatoryPicks): ?>
                         <div class="col-md-4">
                             <label class="form-label small">Motorpool Head</label>
                             <select name="requested_reviewer_id" class="form-select w-100">
                                 <option value="">-- Auto-assign --</option>
                                 <?php foreach ($motorpoolHeads as $mp): ?>
-                                <option value="<?= $mp->id ?>"><?= e($mp->name) ?></option>
+                                <option value="<?= $mp->id ?>" <?= (int) ($d?->requested_reviewer_id ?? 0) === (int) $mp->id ? 'selected' : '' ?>><?= e($mp->name) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <label class="form-label">
@@ -389,7 +411,7 @@ require_once INCLUDES_PATH . '/header.php';
                             <select name="requested_approver_id" class="form-select w-100">
                                 <option value="">-- Auto-assign --</option>
                                 <?php foreach ($chiefFinanceUsers as $cf): ?>
-                                <option value="<?= $cf->id ?>"><?= e($cf->name) ?></option>
+                                <option value="<?= $cf->id ?>" <?= (int) ($d?->requested_approver_id ?? 0) === (int) $cf->id ? 'selected' : '' ?>><?= e($cf->name) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <label class="form-label">
@@ -577,9 +599,16 @@ require_once INCLUDES_PATH . '/header.php';
                 <a href="<?= APP_URL ?>/?page=gas-vouchers<?= $isEdit ? '&action=view&id=' . $voucherId : '' ?>" class="btn btn-secondary">
                     <i class="bi bi-x-lg me-1"></i>Cancel
                 </a>
-                <?php if ($isEdit && in_array($voucher->status, ['pending_review', 'pending_approval'])): ?>
+                <?php if ($isEdit && in_array($voucher->status, ['pending_review', 'pending_budget', 'pending_approval'], true)): ?>
                     <button type="submit" name="form_action" value="save" class="btn btn-primary">
                         <i class="bi bi-save me-1"></i>Save Corrections
+                    </button>
+                <?php elseif ($isEdit && ($voucher->status ?? '') === 'revision'): ?>
+                    <button type="submit" name="form_action" value="save_draft" class="btn btn-outline-primary">
+                        <i class="bi bi-floppy me-1"></i>Save Revision
+                    </button>
+                    <button type="submit" name="form_action" value="submit" class="btn btn-success">
+                        <i class="bi bi-send me-1"></i>Resubmit for Review
                     </button>
                 <?php else: ?>
                     <button type="submit" name="form_action" value="save_draft" class="btn btn-outline-primary">

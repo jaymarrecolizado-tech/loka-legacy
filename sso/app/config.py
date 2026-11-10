@@ -21,7 +21,7 @@ def _default_apps() -> list[dict]:
             "id": "to",
             "name": "Travel Order",
             "description": "Request, approve, and issue official Travel Orders.",
-            "url": _env("SSO_APP_TO_URL", "https://to.dictr2.cloud/DICT"),
+            "url": _env("SSO_APP_TO_URL", "https://tostage.dictr2.cloud/DICT"),
         },
     ]
 

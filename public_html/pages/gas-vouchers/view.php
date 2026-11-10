@@ -84,9 +84,11 @@ require_once INCLUDES_PATH . '/header.php';
                 ?>
                 <?php
                 $canEditView = false;
-                if ($voucher->status === 'draft' && ($voucher->requested_by_user_id == userId() || isAdmin())) {
+                if (in_array($voucher->status, ['draft', 'revision'], true) && ($voucher->requested_by_user_id == userId() || isAdmin())) {
                     $canEditView = true;
                 } elseif (in_array($voucher->status, ['pending_review', 'pending_approval']) && (isApprover() || isMotorpool() || isAdmin() || isChiefAdminFinance())) {
+                    $canEditView = true;
+                } elseif ($voucher->status === 'pending_budget' && isBudgetOfficer()) {
                     $canEditView = true;
                 }
                 if ($canEditView):
@@ -113,6 +115,8 @@ require_once INCLUDES_PATH . '/header.php';
                 — Awaiting certification by the Budget Officer.
                 <?php elseif ($voucher->status === 'pending_approval'): ?>
                 — Awaiting final approval by Chief, Admin. and Finance Division.
+                <?php elseif ($voucher->status === 'revision'): ?>
+                — Returned for revision. <?= $voucher->revision_reason ? 'Reason: ' . e($voucher->revision_reason) : 'Please correct and resubmit.' ?>
                 <?php elseif ($voucher->status === 'approved'): ?>
                 — This voucher is authorized. Bearer may secure the fuel/items.
                 <?php elseif ($voucher->status === 'rejected'): ?>
@@ -432,7 +436,7 @@ require_once INCLUDES_PATH . '/header.php';
                 <?php endif; ?>
 
                 <!-- Cancel button for owner -->
-                <?php if (in_array($voucher->status, ['draft', 'pending_review']) && $voucher->requested_by_user_id == userId()): ?>
+                <?php if (in_array($voucher->status, ['draft', 'pending_review', 'revision'], true) && $voucher->requested_by_user_id == userId()): ?>
                 <div class="card border-danger mb-4">
                     <div class="card-body">
                         <form method="POST" action="<?= APP_URL ?>/?page=gas-vouchers&action=cancel&id=<?= $voucher->id ?>"

@@ -59,7 +59,7 @@ function getNavSearchItems(): array
     }
     $add('Availability', '/?page=schedule&action=calendar', 'bi-calendar3', 'Main', 'availability schedule calendar planning');
 
-    if (isApprover()) {
+    if (canAccessMyTripTickets()) {
         $add('My Trip Tickets', '/?page=my-trip-tickets', 'bi-file-earmark-text', 'Main', 'my trip tickets');
     }
     if (canAccessGuardDashboard()) {

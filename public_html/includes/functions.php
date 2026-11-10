@@ -217,6 +217,15 @@ function canAccessReports(): bool
 }
 
 /**
+ * My Trip Tickets list + vehicle summary generate: approver+ or any tagged driver.
+ * Tagged drivers may generate summaries for the selected vehicle's trips, not only their own.
+ */
+function canAccessMyTripTickets(): bool
+{
+    return isApprover() || isDriver();
+}
+
+/**
  * Driver Rankings are for approver+ only — the people being ranked must not
  * see anonymous peer scores. hasRole() is effective-role-based, so View-as a
  * driver correctly loses access here too.
@@ -1820,6 +1829,7 @@ define('GAS_VOUCHER_STATUSES', [
     'approved'         => ['label' => 'Approved',           'color' => 'success'],
     'rejected'         => ['label' => 'Rejected',           'color' => 'danger'],
     'cancelled'        => ['label' => 'Cancelled',          'color' => 'dark'],
+    'revision'         => ['label' => 'For Revision',       'color' => 'warning'],
 ]);
 
 /**

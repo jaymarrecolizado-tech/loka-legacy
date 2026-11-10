@@ -606,6 +606,46 @@ if ($__verifyUrl) {
             .sig-title {
                 color: #555 !important;
             }
+
+            input::placeholder,
+            textarea::placeholder {
+                color: transparent !important;
+                opacity: 0 !important;
+            }
+
+            input.print-empty,
+            textarea.print-empty {
+                visibility: hidden !important;
+            }
+
+            input.print-empty[type="date"],
+            input.print-empty[type="time"] {
+                color: transparent !important;
+                -webkit-text-fill-color: transparent !important;
+                caret-color: transparent !important;
+            }
+
+            input.print-empty[type="date"]::-webkit-datetime-edit,
+            input.print-empty[type="date"]::-webkit-datetime-edit-fields-wrapper,
+            input.print-empty[type="date"]::-webkit-datetime-edit-text,
+            input.print-empty[type="date"]::-webkit-datetime-edit-month-field,
+            input.print-empty[type="date"]::-webkit-datetime-edit-day-field,
+            input.print-empty[type="date"]::-webkit-datetime-edit-year-field,
+            input.print-empty[type="time"]::-webkit-datetime-edit,
+            input.print-empty[type="time"]::-webkit-datetime-edit-fields-wrapper,
+            input.print-empty[type="time"]::-webkit-datetime-edit-text,
+            input.print-empty[type="time"]::-webkit-datetime-edit-hour-field,
+            input.print-empty[type="time"]::-webkit-datetime-edit-minute-field,
+            input.print-empty[type="time"]::-webkit-datetime-edit-ampm-field {
+                color: transparent !important;
+                -webkit-text-fill-color: transparent !important;
+            }
+
+            input.print-empty[type="date"]::-webkit-calendar-picker-indicator,
+            input.print-empty[type="time"]::-webkit-calendar-picker-indicator {
+                display: none !important;
+                opacity: 0 !important;
+            }
         }
 
         .tbl-wrap {
@@ -663,7 +703,7 @@ if ($__verifyUrl) {
         <a href="<?= APP_URL ?>/" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><span>🏠</span> Home</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">← Back to My Trip Tickets</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets&action=generate-summary" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">↩ Generate</a>
-        <button class="btn btn-print" onclick="if(validateTicket()) { resizeItineraryTextareas(); requestAnimationFrame(function () { window.print(); }); }">🖨 Print / Save PDF</button>
+        <button class="btn btn-print" onclick="if(validateTicket()) { resizeItineraryTextareas(); markEmptyDateTimesForPrint(); requestAnimationFrame(function () { window.print(); }); }">🖨 Print / Save PDF</button>
         <button class="btn btn-reset" onclick="resetForm()">↺ Reset Form</button>
     </div>
     <?php if ($__verifyUrl): ?>
@@ -783,7 +823,7 @@ if ($__verifyUrl) {
                     $remaining = 6 - $rowCount;
                     for ($j = 0; $j < max(0, $remaining); $j++):
                     ?>
-                        <tr>
+                        <tr class="blank-pad">
                             <td><input type="date"></td>
                             <td><input type="time"></td>
                             <td><input type="time"></td>
@@ -934,11 +974,18 @@ if ($__verifyUrl) {
                 <select class="sig-input" id="sigApprover2" style="background: transparent; text-transform: uppercase;" onchange="updateApproverTitle2()">
                     <option value="">Select Approver...</option>
                     <?php
-                    $defaultApprover2 = 'MINA FLOR T. VILLAFUERTE';
-                    $approverRows2 = $approvers ?? [];
-                    $hasDef2 = false;
-                    foreach ($approverRows2 as $ar) { if (strcasecmp($ar->name, $defaultApprover2)===0) {$hasDef2=true; break;}}
-                    if (!$hasDef2) $approverRows2[] = (object)['name'=>$defaultApprover2,'role'=>ROLE_CHIEF_ADMIN_FINANCE];
+                    $approverRows2 = array_values(array_filter($approvers ?? [], function ($ar) {
+                        return stripos((string) $ar->name, 'VILLAFUERTE') === false;
+                    }));
+                    $defaultApprover2 = '';
+                    foreach ($approverRows2 as $ar) {
+                        $n = strtoupper(preg_replace('/\s+/', ' ', trim((string) $ar->name)));
+                        if (strpos($n, 'JEMAR') !== false && strpos($n, 'DEL ROSARIO') !== false) {
+                            $defaultApprover2 = $ar->name;
+                            break;
+                        }
+                    }
+                    if ($defaultApprover2 === '' && $approverRows2) $defaultApprover2 = $approverRows2[0]->name;
                     foreach ($approverRows2 as $ar): ?>
                         <option value="<?= e($ar->name) ?>" data-role="<?= e($ar->role) ?>" <?= strcasecmp($ar->name,$defaultApprover2)===0?'selected':'' ?>><?= strtoupper(e($ar->name)) ?></option>
                     <?php endforeach; ?>
@@ -974,6 +1021,26 @@ if ($__verifyUrl) {
             const role=opt?opt.dataset.role:''; el.textContent=(role==='chief_admin_finance')?'Admin and Finance Division Chief':'OIC, Admin and Finance Division Chief';
         }
         window.addEventListener('load',updateApproverTitle2);
+        function markEmptyDateTimesForPrint() {
+            document.querySelectorAll('input, textarea').forEach(function (el) {
+                if (el.type === 'hidden' || el.type === 'checkbox' || el.type === 'radio') return;
+                if (!el.value) {
+                    el.classList.add('print-empty');
+                    if (el.placeholder) {
+                        el.dataset.printPh = el.placeholder;
+                        el.placeholder = '';
+                    }
+                } else {
+                    el.classList.remove('print-empty');
+                }
+            });
+        }
+        function resizeItineraryTextareas() {
+            document.querySelectorAll('.tbl-itinerary textarea').forEach(function (el) {
+                el.style.height = 'auto';
+                el.style.height = el.scrollHeight + 'px';
+            });
+        }
         function validateTicket(){
             const req=[document.getElementById('sigDriver'), document.getElementById('sigReviewer2'), document.getElementById('sigApprover2')].filter(Boolean);
             let first=null, cnt=0;
@@ -1010,18 +1077,22 @@ if ($__verifyUrl) {
 
             if(odoStart) odoStart.addEventListener('input', calcDistance);
             if(odoEnd) odoEnd.addEventListener('input', calcDistance);
-            function resizeItineraryTextareas() {
-                document.querySelectorAll('.tbl-itinerary textarea').forEach(function (el) {
-                    el.style.height = 'auto';
-                    el.style.height = el.scrollHeight + 'px';
-                });
-            }
             document.addEventListener('DOMContentLoaded', resizeItineraryTextareas); // Plan #29
             resizeItineraryTextareas();
             document.querySelectorAll('.tbl-itinerary textarea').forEach(function (el) {
                 el.addEventListener('input', function () { resizeItineraryTextareas(); });
             });
             window.addEventListener('beforeprint', resizeItineraryTextareas);
+            window.addEventListener('beforeprint', markEmptyDateTimesForPrint);
+            window.addEventListener('afterprint', function () {
+                document.querySelectorAll('.print-empty').forEach(function (el) {
+                    el.classList.remove('print-empty');
+                    if (el.dataset.printPh !== undefined) {
+                        el.placeholder = el.dataset.printPh;
+                        delete el.dataset.printPh;
+                    }
+                });
+            });
             document.querySelectorAll('#sigDriver, #sigReviewer2, #sigApprover2').forEach(el=>{
                 el.addEventListener('change', function(){ this.classList.remove('is-invalid'); this.style.borderColor=''; const e=this.parentElement.querySelector('.field-error'); if(e) e.remove(); });
                 el.addEventListener('input', function(){ this.classList.remove('is-invalid'); this.style.borderColor=''; const e=this.parentElement.querySelector('.field-error'); if(e) e.remove(); });

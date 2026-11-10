@@ -72,6 +72,7 @@ require_once __DIR__ . '/classes/SmsQueue.php';
 require_once __DIR__ . '/classes/ChannelQueue.php';
 require_once __DIR__ . '/classes/TelegramGateway.php';
 require_once __DIR__ . '/classes/NotificationService.php';
+require_once __DIR__ . '/classes/FileUpload.php';
 
 // Load notification templates
 require_once __DIR__ . '/config/notifications.php';
@@ -188,13 +189,13 @@ switch ($page) {
         break;
 
     case 'logout':
-        // Plan #43: end the SSO session too when this login came through it.
-        // redirect() always prefixes APP_URL — use header() for the absolute SSO URL.
-        $wasSso = isset($_SESSION['sso_login_at']);
+        // Plan #43: always end the SSO session (when enabled) and return to the
+        // central portal login — not the app's local login form.
+        require_once CONFIG_PATH . '/sso.php';
         $auth->logout();
-        if ($wasSso && ssoEnabled()) {
+        if (ssoEnabled()) {
             require_once INCLUDES_PATH . '/sso_client.php';
-            $postLogout = urlencode(rtrim(APP_URL, '/') . '/?page=login&local=1');
+            $postLogout = urlencode(rtrim(SSO_BASE_URL, '/') . '/portal-login');
             session_write_close();
             header('Location: ' . SSO_BASE_URL . '/logout?post_logout_redirect_uri=' . $postLogout);
             exit;

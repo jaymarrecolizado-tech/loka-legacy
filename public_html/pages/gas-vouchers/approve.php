@@ -81,7 +81,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($canReview)  $validDecisions[] = 'review_approve';
     if ($canBudget)  $validDecisions[] = 'budget_approve';
     if ($canApprove) $validDecisions[] = 'final_approve';
-    if ($canRejectAtStep) $validDecisions[] = 'reject';
+    if ($canRejectAtStep) {
+        $validDecisions[] = 'reject';
+        $validDecisions[] = 'return_revision';
+    }
 
     if (!in_array($decision, $validDecisions, true)) {
         $errors[] = 'Invalid decision.';
@@ -89,6 +92,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($decision === 'reject' && $rejectReason === '') {
         $errors[] = 'A rejection reason is required.';
+    }
+
+    $revisionReason = postSafe('revision_reason', '', 500);
+    if ($revisionReason === '') {
+        $revisionReason = $notes;
+    }
+    if ($decision === 'return_revision' && $revisionReason === '') {
+        $errors[] = 'A revision reason is required.';
     }
 
     if ($decision === 'review_approve' && $selectedReviewer <= 0) {
@@ -350,6 +361,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 db()->rollback();
                 $errors[] = 'Error: ' . $e->getMessage();
             }
+
+        } elseif ($decision === 'return_revision') {
+            $notificationsToSend[] = [
+                'user_id' => $requesterUserId,
+                'type' => 'gas_voucher_revision',
+                'title' => 'Gas Voucher Returned for Revision',
+                'message' => "Your gas voucher {$voucher->voucher_no} was returned for revision." . ($revisionReason ? " Reason: {$revisionReason}" : ''),
+                'link' => '/?page=gas-vouchers&action=view&id=' . $voucherId,
+                'requestId' => $voucherId
+            ];
+
+            db()->beginTransaction();
+            try {
+                db()->update('gas_vouchers', [
+                    'status' => 'revision',
+                    'revision_reason' => $revisionReason,
+                    'returned_for_revision_by' => userId(),
+                    'returned_for_revision_at' => date(DATETIME_FORMAT),
+                    'reviewed_by' => null,
+                    'reviewed_at' => null,
+                    'reviewer_notes' => null,
+                    'budget_reviewed_by' => null,
+                    'budget_reviewed_at' => null,
+                    'budget_officer_notes' => null,
+                    'approved_by' => null,
+                    'approved_at' => null,
+                    'approver_notes' => null,
+                    'updated_at' => date(DATETIME_FORMAT),
+                ], 'id = ?', [$voucherId]);
+                auditLog('return_revision', 'gas_voucher', $voucherId);
+                db()->commit();
+
+                foreach ($notificationsToSend as $notif) {
+                    notify($notif['user_id'], $notif['type'], $notif['title'], $notif['message'], $notif['link'], $notif['requestId']);
+                }
+
+                redirectWith('/?page=gas-vouchers&action=view&id=' . $voucherId, 'warning', 'Gas voucher returned to the requester for revision.');
+            } catch (Exception $e) {
+                db()->rollback();
+                $errors[] = 'Error: ' . $e->getMessage();
+            }
         }
     }
 }
@@ -463,17 +515,15 @@ require_once INCLUDES_PATH . '/header.php';
                     <i class="bi bi-clipboard-check text-primary"></i><strong>Your Decision</strong>
                 </div>
                 <div class="p-4">
-                    <?php if (!$canBudget): ?>
                     <div class="mb-4 d-flex align-items-center justify-content-between bg-light p-3 rounded border">
                         <div>
                             <strong>Need to change something?</strong>
-                            <div class="text-muted small">You can correct the fund source, quantity, or purpose before approving.</div>
+                            <div class="text-muted small">You can correct the fund source, quantity, or purpose before approving, or return it to the requester for revision.</div>
                         </div>
                         <a href="<?= APP_URL ?>/?page=gas-vouchers&action=edit&id=<?= $voucher->id ?>" class="btn btn-outline-primary btn-sm">
                             <i class="bi bi-pencil me-1"></i>Edit Voucher Fields
                         </a>
                     </div>
-                    <?php endif; ?>
                     <form method="POST">
                         <?= csrfField() ?>
                         <input type="hidden" name="decision" value="<?= $canReview ? 'review_approve' : ($canBudget ? 'budget_approve' : 'final_approve') ?>">
@@ -547,6 +597,18 @@ require_once INCLUDES_PATH . '/header.php';
                             <i class="bi bi-check2-all me-1"></i>Authorize Voucher
                         </button>
                         <?php endif; ?>
+                    </form>
+
+                    <form method="POST" class="mt-4 pt-4 border-top">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="decision" value="return_revision">
+                        <label class="form-label fw-semibold text-warning">Return for revision</label>
+                        <textarea name="revision_reason" class="form-control mb-2" rows="2" required
+                                  placeholder="What should the requester correct?" maxlength="500"></textarea>
+                        <button type="submit" class="btn btn-outline-warning"
+                                onclick="return confirm('Return this voucher to the requester for revision? They will resubmit it for Motorpool review.')">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>Return for Revision
+                        </button>
                     </form>
 
                     <form method="POST" class="mt-4 pt-4 border-top">

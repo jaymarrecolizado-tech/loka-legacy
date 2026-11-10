@@ -2,6 +2,19 @@
 <nav class="sidebar" id="sidebar">
     <div class="sidebar-content">
         <ul class="nav flex-column">
+            <?php
+            if (!function_exists('ssoEnabled')) {
+                @require_once CONFIG_PATH . '/sso.php';
+            }
+            if (function_exists('ssoEnabled') && ssoEnabled() && defined('SSO_BASE_URL') && SSO_BASE_URL !== ''):
+            ?>
+            <li class="nav-item">
+                <a class="nav-link" href="<?= e(rtrim(SSO_BASE_URL, '/') . '/') ?>">
+                    <i class="bi bi-grid-3x3-gap"></i>
+                    <span>All applications</span>
+                </a>
+            </li>
+            <?php endif; ?>
             <!-- Dashboard -->
             <li class="nav-item">
                 <a class="nav-link <?= activeMenu('dashboard') ?>" href="<?= APP_URL ?>/?page=dashboard">
@@ -89,8 +102,8 @@
                 </a>
             </li>
             
-            <?php if (isApprover()): ?>
-            <!-- My Trip Tickets (Approvers Only) -->
+            <?php if (canAccessMyTripTickets()): ?>
+            <!-- My Trip Tickets (approver+ or tagged driver) -->
             <li class="nav-item">
                 <a class="nav-link <?= activeMenu('my-trip-tickets') ?>" href="<?= APP_URL ?>/?page=my-trip-tickets">
                     <i class="bi bi-file-earmark-text"></i>

@@ -48,6 +48,7 @@ define('SMS_DEFAULT_ALLOWLIST', [
     'gas_voucher_budget_approved',
     'gas_voucher_approved',
     'gas_voucher_rejected',
+    'gas_voucher_revision',
     'gas_voucher_cancelled',
     'gas_voucher_payment_updated',
     'trip_ticket_approved',
