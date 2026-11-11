@@ -30,6 +30,8 @@ if (php_sapi_name() !== 'cli') {
     die('CLI access only');
 }
 
+require_once __DIR__ . '/../includes/harden_logs.php';
+
 // Output IMMEDIATELY so we can see the script started (before any config loading)
 echo date('[Y-m-d H:i:s]') . " [PID:" . getmypid() . "] process_queue.php started\n";
 

@@ -5,15 +5,18 @@
  * Hardened session security settings
  */
 
-// Ensure session save path exists and is writable
+// Prefer app_logs (outside the document root) so session files are not HTTP-served.
 $sessionSavePath = ini_get('session.save_path') ?: sys_get_temp_dir();
-if (!is_dir($sessionSavePath) || !is_writable($sessionSavePath)) {
+if (defined('LOKA_LOG_DIR') && LOKA_LOG_DIR !== '') {
+    $sessionSavePath = LOKA_LOG_DIR . '/sessions';
+} elseif (!is_dir($sessionSavePath) || !is_writable($sessionSavePath)) {
     $sessionSavePath = dirname(__DIR__) . '/logs/sessions';
-    if (!is_dir($sessionSavePath)) {
-        @mkdir($sessionSavePath, 0755, true);
-    }
-    ini_set('session.save_path', $sessionSavePath);
 }
+if (!is_dir($sessionSavePath)) {
+    @mkdir($sessionSavePath, 0750, true);
+}
+@chmod($sessionSavePath, 0770);
+ini_set('session.save_path', $sessionSavePath);
 
 // Session cookie settings
 $cookieParams = [

@@ -49,12 +49,16 @@ if ($isProduction) {
     error_reporting(0);
     ini_set('display_errors', 0);
     ini_set('log_errors', 1);
-    // Try to use Hostinger error log location, fallback to local
-    $errorLogPath = __DIR__ . '/logs/error.log';
-    if (!is_dir(__DIR__ . '/logs')) {
-        @mkdir(__DIR__ . '/logs', 0755, true);
+}
+
+require_once __DIR__ . '/includes/harden_logs.php';
+
+if ($isProduction) {
+    $errorLogDir = defined('LOKA_LOG_DIR') ? LOKA_LOG_DIR : (__DIR__ . '/logs');
+    if (!is_dir($errorLogDir)) {
+        @mkdir($errorLogDir, 0750, true);
     }
-    ini_set('error_log', $errorLogPath);
+    ini_set('error_log', $errorLogDir . '/error.log');
 } else {
     error_reporting(E_ALL);
     ini_set('display_errors', 1);

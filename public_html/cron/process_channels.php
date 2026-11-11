@@ -19,6 +19,8 @@ if (php_sapi_name() !== 'cli') {
     die('CLI access only');
 }
 
+require_once __DIR__ . '/../includes/harden_logs.php';
+
 echo date('[Y-m-d H:i:s]') . " [PID:" . getmypid() . "] process_channels.php started\n";
 
 register_shutdown_function(function () {
