@@ -1,0 +1,193 @@
+{\rtf1\ansi\deff0{\fonttbl{\f0 Calibri;}{\f1 Consolas;}}{\colortbl ;\red255\green255\blue255;\red15\green44\blue89;\red14\green116\blue100;\red51\green65\blue85;}\f0\fs22\cf3\pard\sa120\sl360\slmult1 \b \fs24 \cf3 LOKA FLEET MANAGEMENT SYSTEM\b0\par\pard\sa120\sl360\slmult1 \b \fs48 \cf2 Incident Report\b0\par\pard\sa120\sl360\slmult1 \fs26 \cf4 Public log-file exposure, damage scan, and mitigation\par\pard\sa120\sl360\slmult1 \fs20 \cf4 INTERNAL. Official Use Only. Do not publish. No passwords, app keys, or SSH credentials are included.\par\pard\par\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \b\fs18\cf1 Field\cell \pard\intbl \b\fs18\cf1 Value\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Document ID\cell \pard\intbl \fs18 LOKA-SEC-2026-11-11-001\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Classification\cell \pard\intbl \fs18 INTERNAL \u8212? Official Use Only\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 System\cell \pard\intbl \fs18 LOKA Fleet (lokafleet.dictr2.cloud)\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Environment\cell \pard\intbl \fs18 Production (CloudPanel / nginx)\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Incident date\cell \pard\intbl \fs18 11 November 2026\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Timezone\cell \pard\intbl \fs18 Asia/Manila (UTC+8)\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Report prepared\cell \pard\intbl \fs18 11 November 2026, 14:54 Asia/Manila\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Prepared by\cell \pard\intbl \fs18 JE Lite (engineering)\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Trigger\cell \pard\intbl \fs18 Remove public https://lokafleet.dictr2.cloud/logs/cron.log and security audit\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Related change\cell \pard\intbl \fs18 GitHub PR #1, branch cursor/cloud-agent-1794278023506-1io43\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Status\cell \pard\intbl \fs18 Contained. Residual hardening in Section 8.\cell \row
+\pard\par\pard\sa160\sl360\slmult1 \b \fs36 \cf2 1. Executive summary\b0\par\pard\sa120\sl360\slmult1 \fs22 From at least 4 September 2026 until the afternoon of 11 November 2026 (Asia/Manila), unauthenticated visitors could download application log files from the production web root. The largest file, /logs/cron.log, was about 22 MB. The same scan found other logs, the setup script, README, and Composer inventory also returning HTTP 200.\par\pard\sa120\sl360\slmult1 \fs22 The production .env file itself was not downloadable (HTTP 302 to login). .git was blocked (HTTP 403). No evidence in this scan showed mailbox passwords or APP_KEY in the public logs; the logs did expose operational detail (absolute paths, mail host, whether mail is enabled, queue depths, process names and timestamps).\par\pard\sa120\sl360\slmult1 \fs22 Containment is in place as of 14:10 Asia/Manila on 11 November 2026. Visiting https://lokafleet.dictr2.cloud/logs/cron.log now returns HTTP 302 to the login page. Cron jobs still run; their output is written beside the site root (app_logs), not under public_html.\par\pard\sa160\sl360\slmult1 \b \fs28 \cf2 1.1 Outcome at a glance\b0\par\pard\par\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \b\fs18\cf1 Question\cell \pard\intbl \b\fs18\cf1 Answer\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Was cron.log public?\cell \pard\intbl \fs18 Yes \u8212? HTTP 200, ~22.7 MB, content-type application/octet-stream\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Was the .env file public?\cell \pard\intbl \fs18 No \u8212? HTTP 302 to /?page=login\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Were passwords in the public log sample?\cell \pard\intbl \fs18 Not observed. Host names, paths, and mail flags were.\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Is cron.log public now?\cell \pard\intbl \fs18 No \u8212? HTTP 302, 0 bytes of log; browser shows the login screen\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Did login break?\cell \pard\intbl \fs18 Briefly (HTTP 500) when a full git index.php was uploaded. Restored. Login 200.\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Did cron keep running?\cell \pard\intbl \fs18 Yes. 14:10 Asia/Manila run wrote to app_logs/cron.log only.\cell \row
+\pard\par\pard\sa160\sl360\slmult1 \b \fs36 \cf2 2. Scope and method of the damage scan\b0\par\pard\sa160\sl360\slmult1 \b \fs28 \cf2 2.1 In scope\b0\par\pard\sa60\sl360\slmult1 \fs22 \u8226? Production site https://lokafleet.dictr2.cloud (A record 187.77.150.203).\par\pard\sa60\sl360\slmult1 \fs22 \u8226? Unauthenticated HTTP GET of likely-sensitive paths (logs, env, git, setup, README, vendor metadata, health, PHP under config/).\par\pard\sa60\sl360\slmult1 \fs22 \u8226? On-server inspection: file modes, ownership, nginx/php-fpm/varnish process users, crontab, log locations.\par\pard\sa60\sl360\slmult1 \fs22 \u8226? Application-code review of routing, file-view, cron HTTP endpoint, migrate.php, session path, and .htaccess.\par\pard\sa60\sl360\slmult1 \fs22 \u8226? Cache behaviour (CloudPanel Varnish 512 MB).\par\pard\sa160\sl360\slmult1 \b \fs28 \cf2 2.2 Out of scope\b0\par\pard\sa60\sl360\slmult1 \fs22 \u8226? Full penetration test and authenticated abuse of every role.\par\pard\sa60\sl360\slmult1 \fs22 \u8226? Copying or publishing log bodies, environment values, or credentials in this document.\par\pard\sa60\sl360\slmult1 \fs22 \u8226? Forensic recovery of every IP that downloaded cron.log (access.log exists; not mined in this pass).\par\pard\sa60\sl360\slmult1 \fs22 \u8226? Staging (lokastage) except as a comparison of env file location.\par\pard\sa160\sl360\slmult1 \b \fs28 \cf2 2.3 How the scan was run\b0\par\pard\sa120\sl360\slmult1 \fs22 Each URL was requested with curl without following redirects first, recording HTTP status, byte size, content-type, and the first bytes of the body. A second pass used cache-busting query strings and a Varnish purge. After mitigation, the same URLs were re-probed, including after the next 2-minute cron cycle.\par\pard\sa120\sl360\slmult1 \fs22 On the server, namei, process lists, php-fpm pool user (lokafleet_main), nginx workers, and varnishd were inspected. A chmod-000 experiment on setup.sh still returned HTTP 200 until the file bytes themselves changed, proving cache then proving live nginx can read the document root as root.\par\pard\sa160\sl360\slmult1 \b \fs36 \cf2 3. Damage scan results (before mitigation)\b0\par\pard\sa120\sl360\slmult1 \fs22 First live probe on 11 November 2026, about 13:50\u8211?13:58 Asia/Manila. Sizes are download bytes.\par\pard\par\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \b\fs18\cf1 URL\cell \pard\intbl \b\fs18\cf1 Status\cell \pard\intbl \b\fs18\cf1 Bytes\cell \pard\intbl \b\fs18\cf1 Meaning\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /logs/cron.log\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 22,672,337 then 22,673,708\cell \pard\intbl \fs18 Full email-queue cron log\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /logs/error.log\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 2,481,893\cell \pard\intbl \fs18 PHP error log\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /logs/cron_sms.log\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 5,306,224\cell \pard\intbl \fs18 SMS queue cron log\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /logs/cron_trips.log\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 2,532,621\cell \pard\intbl \fs18 Trip-confirmation cron log\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /logs/cron_care.log\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 3,944\cell \pard\intbl \fs18 Vehicle-care reminder log\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /setup.sh\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 8,424\cell \pard\intbl \fs18 VPS setup script\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /README.md\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 11,827\cell \pard\intbl \fs18 Production package notes\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /vendor/composer/installed.json\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 72,839\cell \pard\intbl \fs18 Installed PHP package inventory\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /.env\cell \pard\intbl \fs18 302\cell \pard\intbl \fs18 0\cell \pard\intbl \fs18 Not served. Redirects to login.\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /.env.lokastage\cell \pard\intbl \fs18 302\cell \pard\intbl \fs18 0\cell \pard\intbl \fs18 Not in the docroot\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /.git/HEAD\cell \pard\intbl \fs18 403\cell \pard\intbl \fs18 146\cell \pard\intbl \fs18 Git metadata blocked\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /health.php\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 100\cell \pard\intbl \fs18 Public JSON DB/redis checks\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /config/database.php\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 0\cell \pard\intbl \fs18 PHP executed, source not downloaded\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /migrations/063_users_official_email.php\cell \pard\intbl \fs18 404\cell \pard\intbl \fs18 146\cell \pard\intbl \fs18 File not present on prod\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /migrate.php\cell \pard\intbl \fs18 200 then 403\cell \pard\intbl \fs18 \u8212?\cell \pard\intbl \fs18 Later forced CLI-only\cell \row
+\pard\par\pard\sa160\sl360\slmult1 \b \fs28 \cf2 3.2 What the public cron.log contained\b0\par\pard\sa120\sl360\slmult1 \fs22 Content-Type was application/octet-stream. First lines were timestamps from 4 September 2026, 06:30 Asia/Manila, process_queue.php. The log class included:\par\pard\sa60\sl360\slmult1 \fs22 \u8226? process start with PID\par\pard\sa60\sl360\slmult1 \fs22 \u8226? absolute path used to load the site env file (parent of public_html, not the web root)\par\pard\sa60\sl360\slmult1 \fs22 \u8226? MAIL_ENABLED and MAIL_HOST hostname, with MAIL_USER shown only as SET/unset \u8212? not the password\par\pard\sa60\sl360\slmult1 \fs22 \u8226? queue counts: pending / processing / sent / failed\par\pard\sa120\sl360\slmult1 \fs22 This is reconnaissance data. It is not a dump of the database and it is not a copy of .env.\par\pard\sa160\sl360\slmult1 \b \fs28 \cf2 3.3 What was not leaked\b0\par\pard\par\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \b\fs18\cf1 Asset\cell \pard\intbl \b\fs18\cf1 Result\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 .env / .env.lokastage file bytes\cell \pard\intbl \fs18 Not downloadable over HTTP (302)\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 Git repository\cell \pard\intbl \fs18 403 on .git/HEAD\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 DB password, APP_KEY, SMTP password as file downloads\cell \pard\intbl \fs18 Not observed on the probed URLs\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 PHP class/config source\cell \pard\intbl \fs18 Scripts execute; they do not emit source\cell \row
+\pard\par\pard\sa160\sl360\slmult1 \b \fs28 \cf2 3.4 Window of exposure\b0\par\pard\sa120\sl360\slmult1 \fs22 cron.log on disk began at 4 September 2026 06:30 Asia/Manila and was still growing on 11 November 2026 (last public write around 14:02 before the move). Anyone who requested that URL in that window could have saved the file. Server nginx access logs can be grepped later for GET /logs/cron.log if a visitor list is required.\par\pard\sa160\sl360\slmult1 \b \fs28 \cf2 3.5 Broader audit findings\b0\par\pard\par\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \b\fs18\cf1 Finding\cell \pard\intbl \b\fs18\cf1 Severity\cell \pard\intbl \b\fs18\cf1 Status\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 public_html/logs/*.log downloadable\cell \pard\intbl \fs18 Critical\cell \pard\intbl \fs18 Fixed\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 setup.sh, README.md, .env.example downloadable\cell \pard\intbl \fs18 High\cell \pard\intbl \fs18 Fixed\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 migrate.php runnable over HTTP\cell \pard\intbl \fs18 High\cell \pard\intbl \fs18 Fixed\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 Composer installed.json\cell \pard\intbl \fs18 Low\cell \pard\intbl \fs18 Fixed\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 chmod cannot hide files: nginx workers run as root\cell \pard\intbl \fs18 High\cell \pard\intbl \fs18 Architecture\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 Apache .htaccess unused on this nginx\cell \pard\intbl \fs18 High\cell \pard\intbl \fs18 Architecture\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 file-view: any logged-in user who knows an uploads/ path can read it\cell \pard\intbl \fs18 Medium\cell \pard\intbl \fs18 Follow-up\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 HTTP cron ?page=cron&key= puts the secret in query strings\cell \pard\intbl \fs18 Medium\cell \pard\intbl \fs18 Follow-up\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 health.php public DB/redis status\cell \pard\intbl \fs18 Low\cell \pard\intbl \fs18 Follow-up\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 Old session and rate-limit JSON still under public_html/logs/\cell \pard\intbl \fs18 Medium\cell \pard\intbl \fs18 Follow-up\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 World-writable (666) files; many not chmod'd from SSH user\cell \pard\intbl \fs18 Medium\cell \pard\intbl \fs18 Follow-up\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 No vhost CSP; .htaccess headers ignored\cell \pard\intbl \fs18 Low\cell \pard\intbl \fs18 Follow-up\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 Site zip backups sit beside public_html (not web-served)\cell \pard\intbl \fs18 Low\cell \pard\intbl \fs18 OK\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 Git history previously held SMTP password / APP_KEY (redacted + force-push)\cell \pard\intbl \fs18 Medium\cell \pard\intbl \fs18 Working\cell \row
+\pard\par\pard\sa160\sl360\slmult1 \b \fs36 \cf2 4. Root cause\b0\par\pard\sa120\sl360\slmult1 \fs22 1. Cron jobs redirect stdout into public_html/logs (document root). The shell creates those files as ordinary static files.\par\pard\sa120\sl360\slmult1 \fs22 2. CloudPanel nginx treats existing files as static downloads. There is no location /logs/ \{ deny all; \} in the vhost.\par\pard\sa120\sl360\slmult1 \fs22 3. public_html/.htaccess denies .log and /logs/, but the site is nginx, not Apache.\par\pard\sa120\sl360\slmult1 \fs22 4. nginx workers for the public listener run as root. File mode 600 or directory mode 770 cannot hide a file still under the document root.\par\pard\sa120\sl360\slmult1 \fs22 5. Varnish (malloc, 512 MB) caches large static responses. Tightening permissions without a purge left the old 22 MB body in cache.\par\pard\sa120\sl360\slmult1 \fs22 6. PHP-FPM runs as lokafleet_main and can still write logs. Moving files out of public_html (or deleting them from the docroot) is the control that actually works.\par\pard\sa120\sl360\slmult1 \fs22 Net: the application believed Apache .htaccess would protect logs. Production is nginx as root plus Varnish. Protection has to be \u8220?file is not in the web tree\u8221? (and ideally an nginx deny), not chmod.\par\pard\sa160\sl360\slmult1 \b \fs36 \cf2 5. Mitigation steps (as performed)\b0\par\pard\sa120\sl360\slmult1 \fs22 Failed attempts (do not rely on these alone): clpctl permissions reset 770/660 still HTTP 200 due to Varnish and root nginx; chmod 000 on setup.sh still served from cache; chmod 600 on a new cron.log still 200; uploading git index.php wholesale caused HTTP 500 because prod is missing channels/SSO files \u8212? reverted.\par\pard\sa160\sl360\slmult1 \b \fs28 \cf2 5.2 Controls that worked\b0\par\pard\sa120\sl360\slmult1 \fs22 A. Scan and keep evidence. Purge Varnish after every change: clpctl varnish-cache:purge --purge=all.\par\pard\sa120\sl360\slmult1 \fs22 B. Create app_logs beside public_html (not inside it). Move public_html/logs/*.log there. Leave the logs directory so a crontab redirect does not fail the PHP command, but do not keep .log files there.\par\pard\sa120\sl360\slmult1 \fs22 C. Deploy public_html/includes/harden_logs.php: umask 027; LOKA_LOG_DIR = sibling app_logs; CLI output buffering writes to app_logs; unlink leftover public_html/logs/*.log on every PHP request.\par\pard\sa120\sl360\slmult1 \fs22 D. migrate.php CLI-only 403. Overwrite setup.sh, README.md, .env.example in the docroot (unlink was not possible from a 755 directory). Blank vendor/composer/installed.json to []. Add Apache deny rules for local/XAMPP.\par\pard\sa120\sl360\slmult1 \fs22 E. file-view.php extra requireAuth(); session path prefers LOKA_LOG_DIR/sessions; production error_log under LOKA_LOG_DIR.\par\pard\sa120\sl360\slmult1 \fs22 F. Purge Varnish. curl without -L: 302 and 0 bytes for /logs/cron.log. Wait for next cron; confirm public logs has no *.log while app_logs/cron.log gains a new stanza. Confirm login HTTP 200.\par\pard\sa160\sl360\slmult1 \b \fs28 \cf2 5.3 Code files changed\b0\par\pard\par\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \b\fs18\cf1 File\cell \pard\intbl \b\fs18\cf1 Change\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 public_html/includes/harden_logs.php\cell \pard\intbl \fs18 New. Log dir, CLI capture, unlink public *.log\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 public_html/index.php\cell \pard\intbl \fs18 Load harden_logs; error_log under LOKA_LOG_DIR\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 public_html/config/session.php\cell \pard\intbl \fs18 Session save path under LOKA_LOG_DIR\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 public_html/cron/*.php\cell \pard\intbl \fs18 require harden_logs.php at CLI start\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 public_html/migrate.php\cell \pard\intbl \fs18 CLI-only guard\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 public_html/pages/file-view.php\cell \pard\intbl \fs18 requireAuth() defence in depth\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 public_html/.htaccess\cell \pard\intbl \fs18 Deny logs/, migrations/, .log/.sql/.bak/.env/.sh\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 public_html/logs/.htaccess\cell \pard\intbl \fs18 Require all denied (Apache)\cell \row
+\pard\par\pard\sa160\sl360\slmult1 \b \fs28 \cf2 5.4 Production paths after mitigation\b0\par\pard\par\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \b\fs18\cf1 Path\cell \pard\intbl \b\fs18\cf1 Role\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 \u8230?/public_html\cell \pard\intbl \fs18 Document root (nginx)\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 \u8230?/public_html/logs/\cell \pard\intbl \fs18 Must stay empty of *.log\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 \u8230?/lokafleet.dictr2.cloud/app_logs/\cell \pard\intbl \fs18 Private application and cron logs\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 \u8230?/lokafleet.dictr2.cloud/.env.lokastage\cell \pard\intbl \fs18 Site env (already outside public_html)\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx4500 \cellx9000
+\pard\intbl \fs18 \u8230?/lokafleet.dictr2.cloud/private_static/\cell \pard\intbl \fs18 Moved copies of setup.sh, README, .env.example\cell \row
+\pard\par\pard\sa160\sl360\slmult1 \b \fs36 \cf2 6. Verification (after mitigation)\b0\par\pard\sa120\sl360\slmult1 \fs22 Re-probe on 11 November 2026, 14:08\u8211?14:10 Asia/Manila, including after the 14:10 cron run.\par\pard\par\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \b\fs18\cf1 URL\cell \pard\intbl \b\fs18\cf1 Status\cell \pard\intbl \b\fs18\cf1 Bytes\cell \pard\intbl \b\fs18\cf1 Result\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /logs/cron.log\cell \pard\intbl \fs18 302\cell \pard\intbl \fs18 0\cell \pard\intbl \fs18 Redirect to login \u8212? no log body\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /logs/cron_sms.log\cell \pard\intbl \fs18 302\cell \pard\intbl \fs18 0\cell \pard\intbl \fs18 Same\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /logs/error.log\cell \pard\intbl \fs18 302\cell \pard\intbl \fs18 0\cell \pard\intbl \fs18 Same\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /logs/cron_care.log\cell \pard\intbl \fs18 302\cell \pard\intbl \fs18 0\cell \pard\intbl \fs18 Same\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /logs/ (directory)\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 10\cell \pard\intbl \fs18 Stub Forbidden index.html only\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /setup.sh\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 34\cell \pard\intbl \fs18 Stub script\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /README.md\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 12\cell \pard\intbl \fs18 Stub\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /.env.example\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 12\cell \pard\intbl \fs18 Stub\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /migrate.php\cell \pard\intbl \fs18 403\cell \pard\intbl \fs18 8\cell \pard\intbl \fs18 CLI only\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /health.php\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 100\cell \pard\intbl \fs18 Unchanged public health JSON\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /?page=login\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 20,867\cell \pard\intbl \fs18 Login HTML OK\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 /logs/cron.log followed (-L)\cell \pard\intbl \fs18 200\cell \pard\intbl \fs18 20,867\cell \pard\intbl \fs18 Login page, not a 22 MB log\cell \row
+\pard\par\pard\sa120\sl360\slmult1 \fs22 On disk after 14:10 cron: public_html/logs contained .htaccess, index.html, rates/, sessions/ \u8212? no *.log files. app_logs/cron.log received the queue processor finished stanza. A browser request to /logs/cron.log renders the LOKA login screen.\par\pard\sa160\sl360\slmult1 \b \fs36 \cf2 7. Impact assessment\b0\par\pard\sa120\sl360\slmult1 \fs22 Confidentiality: High for operations metadata, low-to-medium for secrets. An unauthenticated party could learn internal paths, that Gmail SMTP is used, that mail is enabled, and historic queue health. Mailbox passwords and APP_KEY were not shown in the sampled public log lines.\par\pard\sa120\sl360\slmult1 \fs22 Integrity: No evidence an outsider wrote files or changed data. World-writable PHP remains a local-user risk on a multi-site VPS.\par\pard\sa120\sl360\slmult1 \fs22 Availability: Login returned HTTP 500 for a few minutes when git index.php was uploaded; rolled back. After rollback, login 200 and cron 14:10 completed.\par\pard\sa120\sl360\slmult1 \fs22 Accountability: nginx access logs can be searched for GET /logs/cron.log between 4 September 2026 and 11 November 2026 14:04 Asia/Manila.\par\pard\sa160\sl360\slmult1 \b \fs36 \cf2 8. Residual risk and recommended follow-up\b0\par\pard\par\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \b\fs18\cf1 #\cell \pard\intbl \b\fs18\cf1 Action\cell \pard\intbl \b\fs18\cf1 Why\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 1\cell \pard\intbl \fs18 Add nginx extra directives: location ^~ /logs/ \{ deny all; \} plus /vendor/, *.md, *.sh, *.sql\cell \pard\intbl \fs18 Root nginx will serve any file that reappears under public_html.\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 2\cell \pard\intbl \fs18 Point crontab redirects at app_logs instead of public_html/logs\cell \pard\intbl \fs18 Live writer recreated public logs until unlink-on-request.\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 3\cell \pard\intbl \fs18 Move public_html/logs/sessions and logs/rates into app_logs\cell \pard\intbl \fs18 Hashed names, but still in the web tree.\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 4\cell \pard\intbl \fs18 Planned clpctl permissions reset to clear 666 files\cell \pard\intbl \fs18 SSH user could not chmod ~248 files.\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 5\cell \pard\intbl \fs18 Restrict file-view to the owning record / role\cell \pard\intbl \fs18 IDOR-style read of e-signs and attachments.\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 6\cell \pard\intbl \fs18 Stop putting the HTTP cron secret in ?key=\cell \pard\intbl \fs18 Secret leaks into access logs and Referer.\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 7\cell \pard\intbl \fs18 Lock health.php if a public LB check is not required\cell \pard\intbl \fs18 Confirms DB up/down to the internet.\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 8\cell \pard\intbl \fs18 Do not rsync git index.php onto prod until channels/SSO files exist\cell \pard\intbl \fs18 Caused the brief 500.\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx3000 \cellx6000 \cellx9000
+\pard\intbl \fs18 9\cell \pard\intbl \fs18 Optional: grep nginx access.log* for /logs/*.log\cell \pard\intbl \fs18 Visitor list for the exposure window.\cell \row
+\pard\par\pard\sa160\sl360\slmult1 \b \fs36 \cf2 9. Rollback notes\b0\par\pard\sa120\sl360\slmult1 \fs22 If harden_logs.php misbehaves, cron still runs; only the log destination changes. Do not move app_logs back into public_html. Keep the migrate.php CLI guard.\par\pard\sa160\sl360\slmult1 \b \fs36 \cf2 10. References\b0\par\pard\sa60\sl360\slmult1 \fs22 \u8226? Production URL: https://lokafleet.dictr2.cloud/logs/cron.log\par\pard\sa60\sl360\slmult1 \fs22 \u8226? Git commit: c617c6c \u8212? Stop serving application logs and other static secrets over HTTP.\par\pard\sa60\sl360\slmult1 \fs22 \u8226? Pull request: https://github.com/jaymarrecolizado-tech/loka-legacy/pull/1\par\pard\sa60\sl360\slmult1 \fs22 \u8226? Env file on prod (not in docroot): .env.lokastage beside public_html\par\pard\sa160\sl360\slmult1 \b \fs36 \cf2 11. Document history\b0\par\pard\par\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \b\fs18\cf1 Version\cell \pard\intbl \b\fs18\cf1 Date (Asia/Manila)\cell \pard\intbl \b\fs18\cf1 Author\cell \pard\intbl \b\fs18\cf1 Notes\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 1.0\cell \pard\intbl \fs18 11 November 2026, 14:54\cell \pard\intbl \fs18 JE Lite\cell \pard\intbl \fs18 Initial incident report.\cell \row
+\trowd\trgaph70\trpaddl70\trpaddr70 \cellx2250 \cellx4500 \cellx6750 \cellx9000
+\pard\intbl \fs18 1.1\cell \pard\intbl \fs18 11 November 2026, 15:13\cell \pard\intbl \fs18 JE Lite\cell \pard\intbl \fs18 RTF copy requested for C:\\Users\\jayre\\Desktop\\ProtectG.\cell \row
+\pard\par\pard\sa120\sl360\slmult1 \fs18 \cf4 End of report. No passwords, app keys, or SSH credentials are included.\par}
