@@ -5,6 +5,8 @@
  * Main Entry Point / Router
  */
 
+require_once __DIR__ . '/includes/deny_sensitive_http.php';
+
 // Load environment variables
 $envFile = __DIR__ . '/.env';
 if (!file_exists($envFile)) {
