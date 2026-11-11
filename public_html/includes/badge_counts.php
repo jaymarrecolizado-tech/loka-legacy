@@ -29,6 +29,16 @@ function badgeCountGuardOps(): int
     return badgeUnseenCount('guard', badgePendingIdsGuard());
 }
 
+/**
+ * Unbound OB Pass Slips waiting at the gate: departure stamp or arrival time.
+ * Bound official-vehicle slips are excluded — they stamp from the vehicle row
+ * (Plan #24) and are covered by the Guard Dashboard badge.
+ */
+function badgeCountObGuardStamps(): int
+{
+    return badgeUnseenCount('ob_guard_stamps', badgePendingIdsObGuard());
+}
+
 function badgeCountRequestsNeedingRevision(): int
 {
     return badgeUnseenCount('requests_revision', badgePendingIdsRequestsRevision());
@@ -83,17 +93,26 @@ function badgePendingIdsApprovals(): array
 function badgePendingIdsGasVouchers(): array
 {
     try {
+        $ids = [];
         if (isChiefAdminFinance() || isAdmin()) {
-            return badgeFetchIds(
+            // CAF stays on the final step only (Plan #31)
+            $ids = badgeFetchIds(
                 "SELECT id FROM gas_vouchers WHERE status = 'pending_approval' AND deleted_at IS NULL"
             );
-        }
-        if (isMotorpool() || isApprover()) {
-            return badgeFetchIds(
+        } elseif (isMotorpool() || isApprover()) {
+            $ids = badgeFetchIds(
                 "SELECT id FROM gas_vouchers
                  WHERE status IN ('pending_review','pending_approval') AND deleted_at IS NULL"
             );
         }
+        // Budget Officers (flag pool) see the pending_budget step regardless of role
+        if (isBudgetOfficer()) {
+            $budgetIds = badgeFetchIds(
+                "SELECT id FROM gas_vouchers WHERE status = 'pending_budget' AND deleted_at IS NULL"
+            );
+            $ids = array_values(array_unique(array_merge($ids, $budgetIds)));
+        }
+        return $ids;
     } catch (Throwable $e) {
         error_log('badgePendingIdsGasVouchers: ' . $e->getMessage());
     }
@@ -136,7 +155,7 @@ function badgePendingIdsMaintenance(): array
 function badgePendingIdsGuard(): array
 {
     try {
-        if (!isGuard()) {
+        if (!canAccessGuardDashboard()) {
             return [];
         }
         return badgeFetchIds(
@@ -149,6 +168,83 @@ function badgePendingIdsGuard(): array
         );
     } catch (Throwable $e) {
         error_log('badgePendingIdsGuard: ' . $e->getMessage());
+    }
+    return [];
+}
+
+/**
+ * Unbound OB slips waiting for a guard stamp (Plan #27): departure stamp on
+ * approved slips, or the arrival time on slips already out. Mirrors the two
+ * queries in pages/guard/partials/ob_section.php. Bound official-vehicle
+ * slips are excluded (they stamp from the vehicle row).
+ *
+ * @return list<int>
+ */
+function badgePendingIdsObGuard(): array
+{
+    try {
+        if (!canAccessGuardDashboard()) {
+            return [];
+        }
+        return badgeFetchIds(
+            "SELECT o.id FROM ob_requests o
+             WHERE o.deleted_at IS NULL
+               AND (
+                 (o.ob_departure_datetime IS NULL
+                   AND o.status IN ('approved','coa_received','completed'))
+                 OR (o.ob_departure_datetime IS NOT NULL
+                   AND o.ob_arrival_datetime IS NULL
+                   AND o.status IN ('departed','coa_received','completed'))
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM requests r
+                 WHERE r.ob_request_id = o.id
+                   AND r.deleted_at IS NULL
+                   AND r.status <> 'cancelled'
+               )"
+        );
+    } catch (Throwable $e) {
+        error_log('badgePendingIdsObGuard: ' . $e->getMessage());
+    }
+    return [];
+}
+
+function badgeCountObApprovals(): int
+{
+    return badgeUnseenCount('ob_approvals', badgePendingIdsObApprovals());
+}
+
+/**
+ * OB slips awaiting MY approval (Plan #37): the named Immediate Supervisor
+ * counts pending_supervisor slips addressed to them; Motorpool/Admin add all
+ * pending_motorpool slips (any motorpool head may approve per process.php,
+ * so no head-ID filter). Self-gating — a user who supervises nobody counts 0.
+ *
+ * @return list<int>
+ */
+function badgePendingIdsObApprovals(): array
+{
+    try {
+        if (!isLoggedIn()) {
+            return [];
+        }
+        $ids = badgeFetchIds(
+            "SELECT id FROM ob_requests
+             WHERE deleted_at IS NULL
+               AND status = 'pending_supervisor'
+               AND supervisor_user_id = ?",
+            [userId()]
+        );
+        if (isMotorpool() || isAdmin()) {
+            $mpIds = badgeFetchIds(
+                "SELECT id FROM ob_requests
+                 WHERE deleted_at IS NULL AND status = 'pending_motorpool'"
+            );
+            $ids = array_values(array_unique(array_merge($ids, $mpIds)));
+        }
+        return $ids;
+    } catch (Throwable $e) {
+        error_log('badgePendingIdsObApprovals: ' . $e->getMessage());
     }
     return [];
 }
@@ -292,6 +388,7 @@ function badgeMarkSeen(string $key, array $ids): void
 
 /**
  * Mark badges as seen for the current page visit.
+ * Called from public_html/index.php after auth (Plan #27).
  */
 function badgeMarkSeenForCurrentPage(string $page, string $action = 'index'): void
 {
@@ -310,6 +407,13 @@ function badgeMarkSeenForCurrentPage(string $page, string $action = 'index'): vo
         'vehicles' => ['vehicles', badgePendingIdsVehiclesAttention()],
         'security' => ['security_lockouts', badgePendingIdsSecurityLockouts()],
     ];
+
+    // OB Pass Slips clear BOTH sidebar badges (guard stamps + approvals, Plan #37)
+    if ($page === 'ob-requests') {
+        badgeMarkSeen('ob_guard_stamps', badgePendingIdsObGuard());
+        badgeMarkSeen('ob_approvals', badgePendingIdsObApprovals());
+        return;
+    }
 
     if (!isset($map[$page]) || $map[$page] === null) {
         return;

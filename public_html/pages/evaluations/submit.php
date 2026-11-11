@@ -68,10 +68,22 @@ if (!$error && !$done && !$expired && $_SERVER['REQUEST_METHOD'] === 'POST') {
             ], 'id = ? AND submitted_at IS NULL', [$eval->id]);
 
             if ($affected > 0) {
-                auditLog('evaluation_submitted', 'driver_evaluation', (int) $eval->id, null, [
-                    'request_id' => (int) $eval->request_id,
-                    'driver_id' => (int) $eval->driver_id,
-                    'overall' => $overall
+                // Anonymous submit: never record the rater's session user id
+                // (auditLog() would stamp it) — identity-free audit entry only.
+                db()->insert('audit_logs', [
+                    'user_id' => null,
+                    'action' => 'evaluation_submitted',
+                    'entity_type' => 'driver_evaluation',
+                    'entity_id' => (int) $eval->id,
+                    'old_data' => null,
+                    'new_data' => json_encode([
+                        'request_id' => (int) $eval->request_id,
+                        'driver_id' => (int) $eval->driver_id,
+                        'overall' => $overall
+                    ]),
+                    'ip_address' => null,
+                    'user_agent' => null,
+                    'created_at' => date(DATETIME_FORMAT)
                 ]);
                 $done = true;
                 // Refresh eval for display

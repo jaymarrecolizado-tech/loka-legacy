@@ -13,11 +13,13 @@ $voucher = db()->fetch(
     "SELECT gv.*,
             u.name AS requester_name,
             reviewer.name AS reviewer_name,
-            approver.name AS approver_name_full
+            approver.name AS approver_name_full,
+            budget_officer.name AS budget_officer_name
      FROM gas_vouchers gv
      JOIN users u ON gv.requested_by_user_id = u.id
      LEFT JOIN users reviewer ON gv.reviewed_by = reviewer.id
      LEFT JOIN users approver ON gv.approved_by = approver.id
+     LEFT JOIN users budget_officer ON gv.budget_reviewed_by = budget_officer.id
      WHERE gv.id = ? AND gv.deleted_at IS NULL",
     [$voucherId]
 );
@@ -42,7 +44,7 @@ if (!in_array($printLayout, ['dual', 'single'], true)) {
 }
 $copyCount = 2;
 
-// QR Verification â€” gas stations scan this to confirm authenticity
+// QR Verification -- gas stations scan this to confirm authenticity
 $verifyUrl = gasVoucherVerifyUrl($voucher);
 $siteLooksLocal = (bool) preg_match('#://(localhost|127\.0\.0\.1)([:/]|$)#i', $verifyUrl);
 
@@ -55,7 +57,7 @@ $pngRaw = function_exists('imagecreate') ? $qrBarcode->getBarcodePngData(6, 6, [
 if (is_string($pngRaw) && $pngRaw !== '' && function_exists('imagecreatefromstring')) {
     $src = @imagecreatefromstring($pngRaw);
     if ($src !== false) {
-        // TCPDF marks white as transparent â€” flatten onto opaque white + quiet zone
+        // TCPDF marks white as transparent -- flatten onto opaque white + quiet zone
         $sw = imagesx($src);
         $sh = imagesy($src);
         $pad = (int) max(28, round(min($sw, $sh) * 0.14));
@@ -123,20 +125,25 @@ if ($qrHtml === '') {
             position: relative;
         }
 
-        /* Header block */
+        /* Header block — logos left/right, agency text centered */
         .grid-header {
-            display: d-flex;
+            display: flex;
             align-items: center;
+            justify-content: space-between;
+            gap: 12px;
             margin-bottom: 20px;
         }
         .header-logo {
             width: 100px;
+            height: auto;
+            flex-shrink: 0;
             object-fit: contain;
             mix-blend-mode: multiply; /* Fixes transparency/white background issues on print */
         }
         .header-text {
-            d-flex: 1;
+            flex: 1;
             text-align: center;
+            min-width: 0;
         }
         .header-text .republic {
             font-size: 10pt;
@@ -234,7 +241,7 @@ if ($qrHtml === '') {
         .signatures-row td {
             border: 1px solid #000;
             padding: 10px;
-            width: 33.33%;
+            width: 25%;
             vertical-align: top;
         }
 
@@ -301,8 +308,9 @@ if ($qrHtml === '') {
                 break-inside: avoid;
             }
             .no-print { display: none !important; }
-            .grid-header { margin-bottom: 2px !important; }
-            .header-logo { width: 48px !important; }
+            .grid-header { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 6px !important; margin-bottom: 2px !important; }
+            .header-logo { width: 48px !important; height: auto !important; flex-shrink: 0 !important; }
+            .header-text { flex: 1 !important; }
             .header-text .republic { font-size: 8pt !important; }
             .header-text .dept { font-size: 9pt !important; margin: 1px 0 !important; }
             .header-text .office { font-size: 7.5pt !important; }
@@ -332,7 +340,7 @@ if ($qrHtml === '') {
             .qr-block .qr-sub { font-size: 6.5pt !important; }
             .qr-container { margin-top: 0 !important; }
             .cut-line-separator { padding: 2px 0 !important; margin: 1.5mm 0 !important; font-size: 7pt !important; page-break-inside: avoid; }
-            .footer-row { display: d-flex; justify-content: space-between; align-items: d-flex-end; gap: 8px; margin-top: 3px !important; }
+            .footer-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; margin-top: 3px !important; }
             body.layout-single .page { page-break-after: always; break-after: page; }
             body.layout-single .page:last-of-type { page-break-after: auto; break-after: auto; }
             body.layout-single .cut-line-separator { display: none !important; }
@@ -359,7 +367,7 @@ if ($qrHtml === '') {
         .qr-block .qr-svg-pad {
             display: block;
             background: #fff;
-            padding: 14px; /* quiet zone â€” do not put text here */
+            padding: 14px; /* quiet zone -- do not put text here */
             line-height: 0;
         }
         .qr-block .qr-svg-pad svg {
@@ -391,12 +399,12 @@ if ($qrHtml === '') {
     </button>
     <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=dual" style="margin-left:12px;<?= $printLayout === 'dual' ? 'font-weight:bold;' : '' ?>">2-up (1 page)</a>
     <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=single" style="margin-left:8px;<?= $printLayout === 'single' ? 'font-weight:bold;' : '' ?>">1 copy / page</a>
-    <a href="javascript:history.back()" style="margin-left:15px;color:#666;text-decoration:none;">â† Back to App</a>
+    <a href="javascript:history.back()" style="margin-left:15px;color:#666;text-decoration:none;">&larr; Back to App</a>
     <div style="margin-top:10px;padding:8px 12px;background:#e7f1ff;border:1px solid #9ec5fe;border-radius:6px;display:inline-block;max-width:720px;font-size:13px;color:#084298;text-align:left;">
-        <strong>Phone scan tip:</strong> Join the same Wiâ€‘Fi as this PC, then scan again.<br>
+        <strong>Phone scan tip:</strong> Join the same Wi-Fi as this PC, then scan again.<br>
         Verify link: <code style="word-break:break-all;"><?= e($verifyUrl) ?></code>
         <?php if ($siteLooksLocal): ?>
-        <br><span style="color:#664d03;">Still using localhost â€” phones cannot open this. Set <code>SITE_URL</code> in <code>.env</code> to your LAN IP or public domain.</span>
+        <br><span style="color:#664d03;">Still using localhost -- phones cannot open this. Set <code>SITE_URL</code> in <code>.env</code> to your LAN IP or public domain.</span>
         <?php endif; ?>
     </div>
 </div>
@@ -410,13 +418,13 @@ if ($qrHtml === '') {
 
     <!-- Formal Header -->
     <div class="grid-header">
-        <img src="<?= APP_URL ?>/assets/img/dict_logo.png" class="header-logo" alt="DICT Logo" onerror="this.style.display='none'" style="margin-right:15px;">
+        <img src="<?= APP_URL ?>/assets/img/dict_logo.png" class="header-logo" alt="DICT Logo" onerror="this.style.display='none'">
         <div class="header-text">
             <div class="republic">Republic of the Philippines</div>
             <div class="dept">Department of Information and Communications Technology</div>
             <div class="office">Regional Office 02, 02 Bagay Road, San Gabriel, Tuguegarao City, Cagayan 3500</div>
         </div>
-        <img src="<?= APP_URL ?>/assets/img/bp_logo.png" class="header-logo" alt="BP Logo" onerror="this.style.display='none'" style="margin-left:15px;">
+        <img src="<?= APP_URL ?>/assets/img/bp_logo.png" class="header-logo" alt="BP Logo" onerror="this.style.display='none'">
     </div>
 
     <div class="header-title">G A S &nbsp; V O U C H E R</div>
@@ -454,7 +462,7 @@ if ($qrHtml === '') {
         <!-- Articles Data -->
         <?php
         $isFullTank = (strcasecmp((string) $voucher->unit, 'FULL TANK') === 0) || (float) $voucher->quantity <= 0;
-        $printQty = $isFullTank ? 'â€”' : e($voucher->quantity);
+        $printQty = $isFullTank ? '-' : e($voucher->quantity);
         $printUnit = $isFullTank ? 'FULL TANK' : e($voucher->unit);
         ?>
         <tr class="article-row">
@@ -499,6 +507,11 @@ if ($qrHtml === '') {
                 <div class="sig-title">OIC, Motor Pool Unit</div>
             </td>
             <td>
+                <div class="sig-label">Certified by:</div>
+                <div class="sig-name"><?= e(strtoupper($voucher->budget_officer_name ?? '')) ?></div>
+                <div class="sig-title">Budget Officer</div>
+            </td>
+            <td>
                 <div class="sig-label">Approved by:</div>
                 <div class="sig-name"><?= e(strtoupper($voucher->approver_name_full ?? 'MINA FLOR T. VILLAFUERTE')) ?></div>
                 <div class="sig-title">Chief, Admin. and Finance Division</div>
@@ -507,7 +520,7 @@ if ($qrHtml === '') {
     </table>
 
     
-    <div class="footer-row" style="display: d-flex; justify-content: space-between; align-items: d-flex-end; margin-top: 10px;">
+    <div class="footer-row" style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px;">
         <div class="distribution" style="margin-top: 0;">
             
         <strong>Distribution:</strong> Prepare three (3) copies.<br>

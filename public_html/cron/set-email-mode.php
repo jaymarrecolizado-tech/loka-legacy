@@ -8,6 +8,7 @@
  * Also available via System Control → Email (All Father UI).
  */
 if (php_sapi_name() !== 'cli') { http_response_code(403); exit('CLI only'); }
+require_once __DIR__ . '/../includes/harden_logs.php';
 chdir(dirname(__DIR__));
 require_once __DIR__ . '/../config/bootstrap.php';
 

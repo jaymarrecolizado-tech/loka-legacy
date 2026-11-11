@@ -96,6 +96,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $startDatetime = postSafe('start_datetime', '', 20);
     $endDatetime = postSafe('end_datetime', '', 20);
     $purpose = postSafe('purpose', '', 500);
+
+    // Plan #44 — when linked to a Travel Order, the authority document owns
+    // purpose/dates/destination: server-side ignore whatever the form posted.
+    $authorityLocked = !empty($request->to_request_id);
+    if ($authorityLocked) {
+        $startDatetime = $request->start_datetime;
+        $endDatetime = $request->end_datetime;
+        $purpose = $request->purpose;
+    }
+
     $destinationRaw = $_POST['destinations'] ?? [];
     $passengerIds = $_POST['passengers'] ?? [];
     
@@ -104,6 +114,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         return !empty($d);
     });
     $destination = implode(' -> ', $destinations);
+    if ($authorityLocked) {
+        $destination = $request->destination; // authority-owned (Plan #44)
+    }
     
     // Count passengers properly - filter out empty values
     $passengerIds = array_filter($passengerIds, function($p) {
@@ -176,10 +189,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Travel Order / OB Slip required check (toggled by admin / all_father)
+    // Attached OB Pass Slip (Plan #22) — must be the requester's approved slip on the trip date
+    $obRequestId = postInt('ob_request_id') ?: ($request->ob_request_id ?: null);
+    if ($obRequestId) {
+        $obError = obValidateBind((int) $obRequestId, (int) $request->user_id, $startDatetime, (int) $requestId);
+        if ($obError !== null) {
+            $errors[] = $obError;
+        }
+    }
+
+    // Travel document rule: approved OB OR TO file — one is enough, never both
     $hasExistingTravelOrderFile = !empty($request->travel_order_file);
-    if (requireTravelOrderUpload() && !$hasExistingTravelOrderFile && empty($_FILES['travel_order_file']['name'])) {
-        $errors[] = 'A Travel Order / Official Business Slip upload is required for this request.';
+    if ($obRequestId && (!empty($_FILES['travel_order_file']['name']))) {
+        $errors[] = 'Attach either an approved OB Pass Slip or a Travel Order file — not both.';
+    } elseif (requireTravelOrderUpload() && !$hasExistingTravelOrderFile && empty($_FILES['travel_order_file']['name']) && !$obRequestId) {
+        $errors[] = 'A Travel Order upload is required for this request (or attach your approved OB Pass Slip).';
     }
 
     if (empty($errors)) {
@@ -187,6 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             db()->beginTransaction();
 
             $oldData = (array) $request;
+            $previousObId = (int) ($request->ob_request_id ?? 0);
             
             // Initialize notification queue
             $deferredNotifications = [];
@@ -198,6 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'end_datetime' => $endDatetime,
                 'purpose' => $purpose,
                 'destination' => $destination,
+                'ob_request_id' => $obRequestId,
                 'notes' => $notes,
                 'vehicle_id' => $vehicleId,
                 'approver_id' => $approverId,
@@ -248,10 +274,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($_FILES['travel_order_file']['name'])) {
                 $travelOrderUpload = handleTravelOrderFileUpload($requestId);
                 if ($travelOrderUpload['error']) {
-                    if (requireTravelOrderUpload() && !$hasExistingTravelOrderFile) {
-                        throw new Exception($travelOrderUpload['error']);
-                    }
-                    error_log('Travel Order upload skipped during edit (non-blocking): ' . $travelOrderUpload['error']);
+                    // User selected a file — never silently ignore a failed upload.
+                    throw new Exception($travelOrderUpload['error']);
                 }
                 if ($travelOrderUpload && $travelOrderUpload['path']) {
                     // Remove the previous file (if any) before storing the new one
@@ -386,6 +410,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
 
             db()->commit();
+
+            if ($obRequestId && (int) $obRequestId !== $previousObId) {
+                obCopyTripTimesFromRequest((int) $obRequestId, (int) $requestId, userId());
+            }
             
             // =====================================================
             // SEND NOTIFICATIONS AFTER SUCCESSFUL COMMIT
@@ -414,8 +442,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } catch (Exception $e) {
             db()->rollback();
-            $errors[] = 'Failed to update request. Please try again.';
             error_log("Request update error: " . $e->getMessage());
+            $uploadErr = function_exists('travelOrderUploadUserError') ? travelOrderUploadUserError($e) : '';
+            $errors[] = $uploadErr !== '' ? $uploadErr : 'Failed to update request. Please try again.';
         }
     }
 }
@@ -488,12 +517,26 @@ require_once INCLUDES_PATH . '/header.php';
                     <form method="POST" enctype="multipart/form-data">
                         <?= csrfField() ?>
 
+                        <?php $authorityLocked = !empty($request->to_request_id); ?>
+                        <?php if ($authorityLocked): ?>
+                        <?php require_once INCLUDES_PATH . '/authority_link.php'; ?>
+                        <div class="alert alert-warning d-flex align-items-start">
+                            <i class="bi bi-lock-fill me-2 mt-1"></i>
+                            <div>
+                                <strong>Linked to Travel Order <?= e($request->to_code ?: ('#' . $request->to_request_id)) ?>.</strong>
+                                Purpose, dates and destination come from the Travel Order and are locked here —
+                                <a href="<?= e(authorityLinkToUrl((int) $request->to_request_id)) ?>" target="_blank" rel="noopener">edit them in the Travel Order</a>.
+                                Vehicle, driver and passengers remain editable below.
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="start_datetime" class="form-label">Start Date/Time <span
                                         class="text-danger">*</span></label>
                                 <input type="text" class="form-control datetimepicker" id="start_datetime"
-                                    name="start_datetime"
+                                    name="start_datetime" <?= $authorityLocked ? 'disabled' : '' ?>
                                     value="<?= e(post('start_datetime', $request->start_datetime)) ?>" required>
                             </div>
 
@@ -502,14 +545,14 @@ require_once INCLUDES_PATH . '/header.php';
                                         class="text-danger">*</span></label>
                                 <input type="text" class="form-control datetimepicker" id="end_datetime"
                                     name="end_datetime" value="<?= e(post('end_datetime', $request->end_datetime)) ?>"
-                                    required>
+                                    <?= $authorityLocked ? 'disabled' : '' ?> required>
                             </div>
 
                             <div class="col-12">
                                 <label for="purpose" class="form-label">Purpose <span
                                         class="text-danger">*</span> <small class="text-muted fw-normal">(max 200)</small></label>
                                 <textarea class="form-control" id="purpose" name="purpose" rows="3" maxlength="200"
-                                    placeholder="Describe the purpose (max 200 characters)..." required><?= e(post('purpose', $request->purpose)) ?></textarea>
+                                    placeholder="Describe the purpose (max 200 characters)..." <?= $authorityLocked ? 'readonly' : '' ?> required><?= e(post('purpose', $request->purpose)) ?></textarea>
                                 <div class="d-flex justify-content-between">
                                     <small class="text-muted">Short purpose keeps trip tickets readable (Destination max 100 each).</small>
                                     <small class="text-muted"><span id="purposeCount">0</span>/200</small>
@@ -677,12 +720,36 @@ require_once INCLUDES_PATH . '/header.php';
 
                         <hr class="my-4">
 
-                        <!-- Travel Order / Official Business Slip Upload -->
+                        <!-- Travel Order / Official Business Slip Upload + OB attach (Plan #22) -->
                         <div class="card border mb-4">
                             <div class="card-header bg-light py-2">
                                 <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Travel Order / Official Business Slip</h6>
                             </div>
                             <div class="card-body">
+                                <?php
+                                $obBindable = obBindableForRequest((int) $request->user_id);
+                                if ($request->ob_request_id) {
+                                    $boundOb = db()->fetch("SELECT id, pass_slip_no, ob_date FROM ob_requests WHERE id = ?", [$request->ob_request_id]);
+                                    if ($boundOb) {
+                                        $obBindable = array_values(array_filter($obBindable, fn($o) => (int) $o->id !== (int) $boundOb->id));
+                                        array_unshift($obBindable, $boundOb);
+                                    }
+                                }
+                                ?>
+                                <?php if (!empty($obBindable)): ?>
+                                <div class="mb-3">
+                                    <label class="form-label">Attach an approved OB Pass Slip <span class="text-muted">(instead of a TO file)</span></label>
+                                    <select class="form-select" name="ob_request_id">
+                                        <option value="">— None —</option>
+                                        <?php foreach ($obBindable as $obOpt): ?>
+                                        <option value="<?= (int) $obOpt->id ?>" <?= (int) ($request->ob_request_id ?? 0) === (int) $obOpt->id ? 'selected' : '' ?>>
+                                            <?= e($obOpt->pass_slip_no) ?> — <?= e(date('M j, Y', strtotime($obOpt->ob_date))) ?> (must match trip date)
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <small class="text-muted">1 OB = 1 vehicle request. If attached, no TO file is needed (and both together are not allowed).</small>
+                                </div>
+                                <?php endif; ?>
                                 <?php if (!empty($request->travel_order_file)): ?>
                                 <div class="mb-2">
                                     <div class="alert alert-success py-2 mb-2 d-flex align-items-center justify-content-between">
@@ -704,7 +771,7 @@ require_once INCLUDES_PATH . '/header.php';
                                         <?php else: ?>
                                             Optional. 
                                         <?php endif; ?>
-                                        Travel Order or Official Business Slip (PDF, JPG, PNG - max 5 MB).
+                                        Travel Order or Official Business Slip (PDF, JPG, PNG — max 12 MB). Phone photos are compressed automatically.
                                     </small>
                                 </div>
                             </div>

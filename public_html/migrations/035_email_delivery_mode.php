@@ -3,7 +3,7 @@
  * MIGRATION 035: Email delivery mode + HTTP cron secret
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'fleetdb';
 $dbUser = 'root';

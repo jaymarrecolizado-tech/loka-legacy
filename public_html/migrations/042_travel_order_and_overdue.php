@@ -8,7 +8,7 @@
  *  - settings defaults (idempotent)
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'fleetdb';
 $dbUser = 'root';
@@ -83,9 +83,9 @@ try {
     $now = date('Y-m-d H:i:s');
     $defaults = [
         // Admin / All Father toggle: enforce Travel Order / OB Slip upload on submission
-        ['require_travel_order_upload', '0', 'bool', 'booking'],
+        ['require_travel_order_upload', '0', 'boolean', 'booking'],
         // Overdue trip re-reminder cadence (hours) while a trip remains overdue
-        ['trip_overdue_renotify_hours', '24', 'int', 'trips'],
+        ['trip_overdue_renotify_hours', '24', 'integer', 'trips'],
     ];
 
     $stmt = $pdo->prepare(

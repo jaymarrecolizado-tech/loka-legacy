@@ -2,6 +2,19 @@
 <nav class="sidebar" id="sidebar">
     <div class="sidebar-content">
         <ul class="nav flex-column">
+            <?php
+            if (!function_exists('ssoEnabled')) {
+                @require_once CONFIG_PATH . '/sso.php';
+            }
+            if (function_exists('ssoEnabled') && ssoEnabled() && defined('SSO_BASE_URL') && SSO_BASE_URL !== ''):
+            ?>
+            <li class="nav-item">
+                <a class="nav-link" href="<?= e(rtrim(SSO_BASE_URL, '/') . '/') ?>">
+                    <i class="bi bi-grid-3x3-gap"></i>
+                    <span>All applications</span>
+                </a>
+            </li>
+            <?php endif; ?>
             <!-- Dashboard -->
             <li class="nav-item">
                 <a class="nav-link <?= activeMenu('dashboard') ?>" href="<?= APP_URL ?>/?page=dashboard">
@@ -26,6 +39,19 @@
                     <span>My Trips</span>
                 </a>
             </li>
+
+            <?php
+            // Plan #41 — show Trip Tracking to tagged drivers whenever the
+            // experimental flag is ON. The page itself explains "nothing to
+            // track" until guard Dispatch opens the window.
+            if (function_exists('gpsTrackingEnabled') && gpsTrackingEnabled()): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= activeMenu('gps-tracking') ?>" href="<?= APP_URL ?>/?page=gps-tracking">
+                        <i class="bi bi-geo-alt-fill"></i>
+                        <span>Trip Tracking</span>
+                    </a>
+                </li>
+            <?php endif; ?>
             <?php endif; ?>
 
             <!-- Completed Trips -->
@@ -33,6 +59,24 @@
                 <a class="nav-link <?= activeMenu('completed-trips') ?>" href="<?= APP_URL ?>/?page=completed-trips">
                     <i class="bi bi-check-all"></i>
                     <span>Completed Trips</span>
+                </a>
+            </li>
+
+            <!-- OB Pass Slips (Official Business) -->
+            <li class="nav-item">
+                <a class="nav-link <?= activeMenu('ob-requests') ?>" href="<?= APP_URL ?>/?page=ob-requests">
+                    <i class="bi bi-file-earmark-ruled"></i>
+                    <span>OB Pass Slips</span>
+                    <?php if (canAccessGuardDashboard()):
+                        $pendingObStamps = badgeCountObGuardStamps(); ?>
+                    <?php if ($pendingObStamps > 0): ?>
+                    <?= sidebarBadgeHtml($pendingObStamps) ?>
+                    <?php endif; ?>
+                    <?php endif; ?>
+                    <?php $pendingObApprovals = badgeCountObApprovals(); // Plan #37 — supervisor/motorpool approvals ?>
+                    <?php if ($pendingObApprovals > 0): ?>
+                    <?= sidebarBadgeHtml($pendingObApprovals) ?>
+                    <?php endif; ?>
                 </a>
             </li>
 
@@ -58,8 +102,8 @@
                 </a>
             </li>
             
-            <?php if (isApprover()): ?>
-            <!-- My Trip Tickets (Approvers Only) -->
+            <?php if (canAccessMyTripTickets()): ?>
+            <!-- My Trip Tickets (approver+ or tagged driver) -->
             <li class="nav-item">
                 <a class="nav-link <?= activeMenu('my-trip-tickets') ?>" href="<?= APP_URL ?>/?page=my-trip-tickets">
                     <i class="bi bi-file-earmark-text"></i>
@@ -76,19 +120,26 @@
             </li>
             <?php endif; ?>
             
-            <?php if (isGuard()): ?>
+            <?php if (canAccessGuardDashboard()): ?>
             <!-- Guard Dashboard -->
             <li class="nav-item">
                 <a class="nav-link <?= activeMenu('guard') ?>" href="<?= APP_URL ?>/?page=guard">
                     <i class="bi bi-shield-check"></i>
                     <span>Guard Dashboard</span>
+                    <?php $pendingGuardOps = badgeCountGuardOps(); ?>
+                    <?php if ($pendingGuardOps > 0): ?>
+                    <?= sidebarBadgeHtml($pendingGuardOps) ?>
+                    <?php endif; ?>
                 </a>
             </li>
-            <!-- Trip Tickets -->
+            <?php endif; ?>
+
+            <?php if (canAccessLiveBoard()): ?>
+            <!-- Live Trip Board -->
             <li class="nav-item">
-                <a class="nav-link <?= activeMenu('trip-tickets') ?>" href="<?= APP_URL ?>/?page=trip-tickets">
-                    <i class="bi bi-file-earmark-text"></i>
-                    <span>Trip Tickets</span>
+                <a class="nav-link <?= activeMenu('live-board') ?>" href="<?= APP_URL ?>/?page=live-board">
+                    <i class="bi bi-display"></i>
+                    <span>Live Trip Board</span>
                 </a>
             </li>
             <?php endif; ?>
@@ -173,6 +224,24 @@
                     <span>Schedule</span>
                 </a>
             </li>
+            <?php
+            // Plan #38 — Motorpool/Admin reach Repair History from here (never from
+            // the All Father System Control block) and only while the feature is on.
+            $repairHistoryOn = false;
+            if (!isRealAllFather()) {
+                $rhFlag = db()->fetch("SELECT value FROM settings WHERE `key` = 'repair_history_enabled'");
+                $repairHistoryOn = ($rhFlag && (string) $rhFlag->value === '1');
+            }
+            ?>
+            <?php if ($repairHistoryOn && (isMotorpool() || isAdmin())): ?>
+            <li class="nav-item">
+                <a class="nav-link <?= activeMenu('repair-history') ?>" href="<?= APP_URL ?>/?page=repair-history">
+                    <i class="bi bi-tools"></i>
+                    <span>Repair History</span>
+                </a>
+            </li>
+            <?php endif; ?>
+
             <?php if (function_exists('canManageCareAssignments') && canManageCareAssignments()): ?>
             <!-- Care Assignments -->
             <li class="nav-item">
@@ -193,6 +262,7 @@
                 </a>
             </li>
             <?php endif; ?>
+
             <?php endif; ?>
             
             <?php if (canAccessReports()): ?>
@@ -205,11 +275,20 @@
                     <span>Reports</span>
                 </a>
             </li>
-            <!-- Driver Rankings (anonymous evaluations) -->
+            <?php if (canViewDriverRankings()): ?>
+            <!-- Driver Rankings (anonymous evaluations, approver+ only) -->
             <li class="nav-item">
                 <a class="nav-link <?= (get('page')==='reports' && get('action')==='driver-rankings') ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=reports&action=driver-rankings">
                     <i class="bi bi-trophy"></i>
                     <span>Driver Rankings</span>
+                </a>
+            </li>
+            <?php endif; ?>
+            <!-- Driver Trip Extract (assigned trips + scores) -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page')==='reports' && get('action')==='driver-trip-extract') ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=reports&action=driver-trip-extract">
+                    <i class="bi bi-table"></i>
+                    <span>Driver Trip Extract</span>
                 </a>
             </li>
             <!-- Evaluations -->
@@ -250,17 +329,27 @@
                 </a>
             </li>
 
-            <!-- Request Rollback (admin only) -->
+            <!-- Workflow Rollback (admin only, Plan #39: Trips | OB | Gas) -->
             <?php
-            $rollbackEligible = db()->fetchColumn(
+            $rollbackEligible = (int) db()->fetchColumn(
                 "SELECT COUNT(*) FROM requests
                  WHERE deleted_at IS NULL AND status IN ('pending_motorpool','approved','completed','revision','rejected')"
+            );
+            $rollbackEligible += (int) db()->fetchColumn(
+                "SELECT COUNT(*) FROM ob_requests
+                 WHERE deleted_at IS NULL
+                   AND status IN ('pending_motorpool','approved','departed','coa_received')"
+            );
+            $rollbackEligible += (int) db()->fetchColumn(
+                "SELECT COUNT(*) FROM gas_vouchers
+                 WHERE deleted_at IS NULL
+                   AND status IN ('pending_review','pending_budget','pending_approval')"
             );
             ?>
             <li class="nav-item">
                 <a class="nav-link <?= activeMenu('rollback') ?>" href="<?= APP_URL ?>/?page=rollback">
                     <i class="bi bi-arrow-counterclockwise"></i>
-                    <span>Request Rollback</span>
+                    <span>Workflow Rollback</span>
                     <?php if ($rollbackEligible > 0): ?>
                     <span class="badge bg-secondary ms-auto"><?= $rollbackEligible > 99 ? '99+' : $rollbackEligible ?></span>
                     <?php endif; ?>
@@ -287,6 +376,23 @@
 
             <?php if (canAccessSystemControl()): ?>
             <li class="nav-header">System Control</li>
+
+            <!-- Gas voucher workflow assignees (Plan #31) -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'settings' && get('action') === 'gas-workflow') ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=settings&action=gas-workflow">
+                    <i class="bi bi-cash-coin"></i>
+                    <span>Gas Workflow</span>
+                </a>
+            </li>
+
+            <!-- Repair History (Plan #38, experimental) -->
+            <li class="nav-item">
+                <a class="nav-link <?= activeMenu('repair-history') ?>" href="<?= APP_URL ?>/?page=repair-history">
+                    <i class="bi bi-tools"></i>
+                    <span>Repair History</span>
+                </a>
+            </li>
 
             <!-- Lockouts -->
             <li class="nav-item">
@@ -316,6 +422,33 @@
                    href="<?= APP_URL ?>/?page=security&action=sms">
                     <i class="bi bi-phone"></i>
                     <span>SMS</span>
+                </a>
+            </li>
+
+            <!-- Telegram (Plan #35) -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'security' && get('action') === 'telegram') ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=security&action=telegram">
+                    <i class="bi bi-telegram"></i>
+                    <span>Telegram</span>
+                </a>
+            </li>
+
+            <!-- GPS Tracking (Plan #41, experimental) -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'security' && get('action') === 'gps-tracking') ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=security&action=gps-tracking">
+                    <i class="bi bi-geo-alt"></i>
+                    <span>GPS Tracking</span>
+                </a>
+            </li>
+
+            <!-- AI Assistant (Plan #40, experimental) -->
+            <li class="nav-item">
+                <a class="nav-link <?= (get('page') === 'security' && get('action') === 'ai-assistant') ? 'active' : '' ?>"
+                   href="<?= APP_URL ?>/?page=security&action=ai-assistant">
+                    <i class="bi bi-stars"></i>
+                    <span>AI Assistant</span>
                 </a>
             </li>
 

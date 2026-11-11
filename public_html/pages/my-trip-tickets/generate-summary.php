@@ -3,8 +3,7 @@
  * LOKA - Generate Vehicle Summary Trip Ticket
  */
 
-// Only drivers can access this page
-if (!isDriver() && !isMotorpool() && !isAdmin()) {
+if (!canAccessMyTripTickets()) {
     redirectWith('/?page=dashboard', 'danger', 'You do not have permission to view this page.');
 }
 
@@ -56,11 +55,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $isPrint) {
             [ROLE_MOTORPOOL, ROLE_ADMIN]
         );
         $approvers = db()->fetchAll(
-            "SELECT name, role FROM users WHERE role IN (?, ?, ?) AND status = 'active' AND deleted_at IS NULL ORDER BY name",
+            "SELECT name, role FROM users
+             WHERE role IN (?, ?, ?) AND status = 'active' AND deleted_at IS NULL
+               AND UPPER(name) NOT LIKE '%VILLAFUERTE%'
+             ORDER BY name",
             [ROLE_CHIEF_ADMIN_FINANCE, ROLE_OIC_CHIEF_ADMIN_FINANCE, ROLE_ADMIN]
         );
 
-        // Fetch all completed trips (requests) for this vehicle within date range
+        // Approved + completed trips for this vehicle whose travel window overlaps the date range
         $sql = "SELECT r.id as req_id, r.destination, r.purpose,
                        du.name as trip_driver_name, r.passenger_count as passengers,
                        COALESCE(r.actual_dispatch_datetime, r.start_datetime) as start_date,
@@ -73,12 +75,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $isPrint) {
                 LEFT JOIN drivers d ON r.driver_id = d.id
                 LEFT JOIN users du ON d.user_id = du.id
                 WHERE r.vehicle_id = ?
-                  AND r.status = 'completed'
-                  AND DATE(COALESCE(r.actual_dispatch_datetime, r.start_datetime)) >= ?
+                  AND r.deleted_at IS NULL
+                  AND r.status IN ('approved', 'completed')
                   AND DATE(COALESCE(r.actual_dispatch_datetime, r.start_datetime)) <= ?
+                  AND DATE(COALESCE(r.actual_arrival_datetime, r.end_datetime, r.actual_dispatch_datetime, r.start_datetime)) >= ?
                 ORDER BY COALESCE(r.actual_dispatch_datetime, r.start_datetime) ASC";
 
-        $trips = db()->fetchAll($sql, [$vehicleId, $dateFrom, $dateTo]);
+        $trips = db()->fetchAll($sql, [$vehicleId, $dateTo, $dateFrom]);
 
         // Fetch passengers for each trip
         foreach ($trips as $t) {
@@ -101,6 +104,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $isPrint) {
             if ($t->trip_driver_name) {
                 $t->all_people[] = ['name' => $t->trip_driver_name, 'role' => 'Driver'];
             }
+            $t->destination = formatDestinationChain($t->destination);
+            $t->purpose = trim((string) $t->purpose);
+
             foreach ($t->passengers_list as $p) {
                 $role = (strpos($p->display_name, '(Guest)') !== false) ? 'Guest' : 'Passenger';
                 $t->all_people[] = ['name' => $p->name, 'role' => $role];

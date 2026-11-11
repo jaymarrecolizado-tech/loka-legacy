@@ -24,6 +24,13 @@
     <!-- Chart.js for Analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
+    <!-- PWA (Plan #41 — installable, e.g. a driver's phone keeping Trip Tracking open) -->
+    <link rel="manifest" href="<?= APP_URL ?>/manifest.json">
+    <meta name="theme-color" content="#0d6efd">
+    <link rel="apple-touch-icon" href="<?= ASSETS_PATH ?>/icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="LOKA Fleet">
+
     <!-- Custom CSS -->
     <link href="<?= ASSETS_PATH ?>/css/style.css?v=<?= e(APP_VERSION) ?>" rel="stylesheet">
     <style>
@@ -42,7 +49,7 @@
     require_once INCLUDES_PATH . '/nav_search.php';
     $navItems = getNavSearchItems();
     ?>
-    <script>window.LOKA_NAV_ITEMS = <?= json_encode($navItems, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>; window.LOKA_USER_ID = <?= (int) userId() ?>; window.LOKA_APP_URL = "<?= e(rtrim(APP_URL,'/')) ?>"; window.LOKA_ASSETS_VER = "<?= e(APP_VERSION) ?>";</script>
+    <script>window.LOKA_NAV_ITEMS = <?= json_encode($navItems, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE) ?>; window.LOKA_USER_ID = <?= (int) userId() ?>; window.LOKA_APP_URL = "<?= e(rtrim(APP_URL,'/')) ?>"; window.LOKA_ASSETS_VER = "<?= e(APP_VERSION) ?>"; window.LOKA_CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;</script>
 </head>
 <body>
     <!-- Top Navigation -->
@@ -76,13 +83,26 @@
             
             <!-- Right Side -->
             <div class="ms-auto ms-lg-2 d-flex align-items-center">
+                <?php
+                // Plan #43 — jump back to the SSO app chooser when SSO is on.
+                if (!function_exists('ssoEnabled')) {
+                    @require_once CONFIG_PATH . '/sso.php';
+                }
+                if (function_exists('ssoEnabled') && ssoEnabled() && defined('SSO_BASE_URL') && SSO_BASE_URL !== ''):
+                    $ssoAppsUrl = rtrim(SSO_BASE_URL, '/') . '/';
+                ?>
+                <a class="nav-link text-white me-2 d-flex align-items-center" href="<?= e($ssoAppsUrl) ?>" title="Back to app selection">
+                    <i class="bi bi-grid-3x3-gap me-1"></i>
+                    <span class="d-none d-md-inline">Apps</span>
+                </a>
+                <?php endif; ?>
                 <!-- Notifications -->
                 <div class="dropdown me-3">
                     <a class="nav-link text-white position-relative" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="notificationDropdown">
                         <i class="bi bi-bell fs-5"></i>
                         <?php $unreadCount = unreadNotificationCount(); ?>
                         <?php if ($unreadCount > 0): ?>
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge">
                             <?= $unreadCount > 9 ? '9+' : $unreadCount ?>
                         </span>
                         <?php endif; ?>
@@ -124,6 +144,9 @@
                         <li><h6 class="dropdown-header"><?= e(currentUser()->email ?? '') ?></h6></li>
                         <li><span class="dropdown-item-text"><?= roleBadge(userRole()) ?></span></li>
                         <li><hr class="dropdown-divider"></li>
+                        <?php if (function_exists('ssoEnabled') && ssoEnabled() && defined('SSO_BASE_URL') && SSO_BASE_URL !== ''): ?>
+                        <li><a class="dropdown-item" href="<?= e(rtrim(SSO_BASE_URL, '/') . '/') ?>"><i class="bi bi-grid-3x3-gap me-2"></i>All applications</a></li>
+                        <?php endif; ?>
                         <li><a class="dropdown-item" href="<?= APP_URL ?>/?page=profile"><i class="bi bi-person me-2"></i>Profile</a></li>
                         <li><a class="dropdown-item text-danger" href="<?= APP_URL ?>/?page=logout"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
                     </ul>
@@ -141,10 +164,54 @@
         
         <!-- Main Content -->
         <main class="main-content" id="main-content">
+            <!-- Pending driver evaluation nag (Plan #14 + #28 soft-block at threshold) -->
+            <?php if (isLoggedIn() && function_exists('pendingDriverEvaluationsForUser') && !isViewingAs()):
+                $pendingEvals = pendingDriverEvaluationsForUser(userId());
+                if (!empty($pendingEvals)):
+                    $pendingCount = function_exists('pendingDriverEvaluationCount')
+                        ? pendingDriverEvaluationCount(userId())
+                        : count($pendingEvals);
+                    $blockAt = function_exists('driverEvaluationBlockAt') ? driverEvaluationBlockAt() : 3;
+                    $blocked = function_exists('userMustClearDriverEvaluations') && userMustClearDriverEvaluations();
+                    $alertClass = $blocked ? 'alert-danger' : 'alert-warning';
+                ?>
+                <div class="alert <?= $alertClass ?> <?= $blocked ? '' : 'alert-dismissible' ?> fade show m-3 mb-0" role="alert">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <div class="me-auto">
+                            <i class="bi bi-star-half me-1"></i>
+                            <?php if ($blocked): ?>
+                            <strong>Trip requests are blocked — finish all <?= (int) $pendingCount ?> pending driver evaluation<?= $pendingCount > 1 ? 's' : '' ?>.</strong>
+                            <span class="text-muted small ms-1">Threshold is <?= (int) $blockAt ?>. Your feedback is anonymous.</span>
+                            <?php elseif ($pendingCount >= max(1, $blockAt - 1)): ?>
+                            <strong>You have <?= (int) $pendingCount ?> of <?= (int) $blockAt ?> pending driver evaluation<?= $pendingCount > 1 ? 's' : '' ?>.</strong>
+                            <span class="text-muted small ms-1">At <?= (int) $blockAt ?>, new trip requests are blocked. Feedback is anonymous.</span>
+                            <?php else: ?>
+                            <strong>You have <?= (int) $pendingCount ?> driver evaluation<?= $pendingCount > 1 ? 's' : '' ?> to complete.</strong>
+                            <span class="text-muted small ms-1">Your feedback is anonymous.</span>
+                            <?php endif; ?>
+                        </div>
+                        <?php foreach ($pendingEvals as $pe): ?>
+                        <a class="btn btn-sm btn-primary text-nowrap" href="<?= APP_URL ?>/?page=evaluations&action=rate&id=<?= (int) $pe->request_id ?>">
+                            Rate now — Trip #<?= (int) $pe->request_id ?>
+                        </a>
+                        <?php endforeach; ?>
+                        <?php if (!$blocked): ?>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; endif; ?>
             <!-- Flash Messages -->
-            <?php if ($flash = getFlash()): ?>
-            <div class="alert alert-<?= e($flash['type']) ?> alert-dismissible fade show m-3" role="alert">
-                <?= e($flash['message']) ?>
+            <?php
+            // NOTE: deliberately NOT assigned to $flash. This include runs in the
+            // including page's scope, so writing $flash here used to clobber a
+            // page's own $flash list (['success', 'msg']) with the session flash
+            // array, producing "Undefined array key 0/1" on every page that sets
+            // its own flash without redirecting first.
+            if ($sessionFlash = getFlash()):
+            ?>
+            <div class="alert alert-<?= e($sessionFlash['type']) ?> alert-dismissible fade show m-3" role="alert">
+                <?= e($sessionFlash['message']) ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             <?php endif; ?>

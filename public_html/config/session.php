@@ -5,15 +5,18 @@
  * Hardened session security settings
  */
 
-// Ensure session save path exists and is writable
+// Prefer app_logs (outside the document root) so session files are not HTTP-served.
 $sessionSavePath = ini_get('session.save_path') ?: sys_get_temp_dir();
-if (!is_dir($sessionSavePath) || !is_writable($sessionSavePath)) {
+if (defined('LOKA_LOG_DIR') && LOKA_LOG_DIR !== '') {
+    $sessionSavePath = LOKA_LOG_DIR . '/sessions';
+} elseif (!is_dir($sessionSavePath) || !is_writable($sessionSavePath)) {
     $sessionSavePath = dirname(__DIR__) . '/logs/sessions';
-    if (!is_dir($sessionSavePath)) {
-        @mkdir($sessionSavePath, 0755, true);
-    }
-    ini_set('session.save_path', $sessionSavePath);
 }
+if (!is_dir($sessionSavePath)) {
+    @mkdir($sessionSavePath, 0750, true);
+}
+@chmod($sessionSavePath, 0770);
+ini_set('session.save_path', $sessionSavePath);
 
 // Session cookie settings
 $cookieParams = [
@@ -59,7 +62,19 @@ $security = Security::getInstance();
 
 // Validate session fingerprint (browser signature)
 // Only validate if user is logged in AND fingerprint exists (skip during login process)
-if (isset($_SESSION['user_id']) && isset($_SESSION['_fingerprint']) && !$security->validateFingerprint()) {
+// Skip on the CoA signing kiosk (Plan #25): the receiving client borrows the
+// employee's device/browser to sign, and a UA/Fingerprint change there must
+// never wipe the employee's live session mid-hand-off.
+$isCoaKioskGet = ($_GET['page'] ?? '') === 'ob-requests'
+    && ($_GET['action'] ?? '') === 'coa-sign';
+$isCoaKioskPost = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+    && trim((string) ($_POST['token'] ?? '')) !== ''
+    && (isset($_POST['coa_office']) || isset($_POST['coa_representative']) || isset($_POST['coa_signature']));
+$isCoaKioskRequest = $isCoaKioskGet || $isCoaKioskPost;
+if (
+    !$isCoaKioskRequest
+    && isset($_SESSION['user_id']) && isset($_SESSION['_fingerprint']) && !$security->validateFingerprint()
+) {
     // Possible session hijacking - destroy session
     if (LOG_PERMISSION_DENIALS) {
         $security->logSecurityEvent('session_fingerprint_mismatch', 'Session destroyed due to fingerprint mismatch', $_SESSION['user_id'] ?? null);

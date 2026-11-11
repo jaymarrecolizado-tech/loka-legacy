@@ -5,7 +5,7 @@
  * Handles recording of dispatch and arrival times
  */
 
-requireRole(ROLE_GUARD);
+requireGuardDashboardAccess();
 requireCsrf();
 
 require_once INCLUDES_PATH . '/odometer.php';
@@ -73,6 +73,11 @@ switch ($action) {
         // Format the datetime
         $formattedDispatchTime = date('Y-m-d H:i:s', strtotime($dispatchTime));
 
+        // Bound OB Pass Slip (Plan #24, revised by #36): dispatching the
+        // vehicle stamps the slip's departure — guard identity + timestamp,
+        // no signature required.
+        $obBound = obBoundObForRequest((int) $requestId);
+
         // Odometer reading (skip gracefully when broken/unreadable)
         $vehicleBroken = vehicleOdometerIsBroken(
             (object) [
@@ -126,6 +131,23 @@ switch ($action) {
         }
         db()->update('requests', $updateData, 'id = ?', [$requestId]);
 
+        // Pre-trip confirmation is no longer meaningful once the vehicle has left
+        if (function_exists('cancelPendingTripConfirmations')) {
+            cancelPendingTripConfirmations((int) $requestId, 'vehicle dispatched');
+        }
+
+        // Bound OB Pass Slip (Plan #24): stamp departure with the vehicle's
+        // dispatch datetime. Already-stamped slips are skipped, never overwritten.
+        $obStampNote = '';
+        if ($obBound !== null) {
+            $stamp = obApplyGuardDepartureStamp($obBound, $formattedDispatchTime, (int) userId());
+            if ($stamp['ok'] && !$stamp['skipped']) {
+                $obStampNote = ' Pass Slip ' . $obBound->pass_slip_no . ' stamped.';
+            } elseif (!$stamp['ok']) {
+                error_log('OB departure stamp failed after dispatch of request #' . $requestId . ': ' . $stamp['error']);
+            }
+        }
+
         // Keep vehicle odometer in sync
         if ($request->vehicle_id && $odo['mileage'] !== null) {
             db()->update('vehicles', [
@@ -174,9 +196,9 @@ switch ($action) {
         redirectWith(
             '/?page=guard',
             'success',
-            $odo['broken']
+            ($odo['broken']
                 ? "Dispatch recorded for request #{$requestId} (odometer reading skipped — broken/unreadable)."
-                : "Dispatch recorded for request #{$requestId}."
+                : "Dispatch recorded for request #{$requestId}.") . $obStampNote
         );
         break;
         
@@ -275,6 +297,24 @@ switch ($action) {
 
         db()->update('requests', $updateData, 'id = ?', [$requestId]);
 
+        // Belt-and-suspenders: cancel any leftover pending confirmation after complete
+        if (function_exists('cancelPendingTripConfirmations')) {
+            cancelPendingTripConfirmations((int) $requestId, 'trip completed');
+        }
+
+        // Bound OB Pass Slip (Plan #24): arrival writes the slip's arrival time
+        // (time only — the departure was stamped at dispatch). Never overwrites.
+        $obBound = obBoundObForRequest((int) $requestId);
+        $obStampNote = '';
+        if ($obBound !== null) {
+            $stamp = obStampGuardArrival($obBound, $formattedArrivalTime, (int) userId());
+            if ($stamp['ok'] && !$stamp['skipped']) {
+                $obStampNote = ' Pass Slip ' . $obBound->pass_slip_no . ' arrival recorded.';
+            } elseif (!$stamp['ok']) {
+                error_log('OB arrival stamp skipped for request #' . $requestId . ': ' . $stamp['error']);
+            }
+        }
+
         // Update vehicle and driver status back to available
         if ($request->vehicle_id) {
             $vehicleUpdateData = ['status' => 'available', 'updated_at' => $now];
@@ -349,9 +389,9 @@ switch ($action) {
         }
         
         redirectWith(
-            '/?page=trip-tickets&action=create_form&request_id=' . $requestId,
+            '/?page=guard',
             'success',
-            "Arrival recorded for request #{$requestId}. Trip marked as completed. Please create a trip ticket to document details."
+            "Arrival recorded for request #{$requestId}. Trip marked as completed." . $obStampNote
         );
         break;
         

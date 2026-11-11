@@ -47,15 +47,9 @@ if ($request->actual_dispatch_datetime !== null) {
         'Passengers can no longer be changed — the vehicle has already been dispatched.');
 }
 
-// Authorization
-if (isAdmin() || isAllFather()) {
+// Authorization: any Motorpool Head (or Admin / All Father) — same as vehicle/driver override
+if (isAdmin() || isAllFather() || isMotorpool()) {
     $canManage = true;
-} elseif (isMotorpool()) {
-    if ($request->motorpool_head_id && $request->motorpool_head_id == userId()) {
-        $canManage = true;
-    } elseif (!$request->motorpool_head_id) {
-        $canManage = true;
-    }
 }
 
 if (!$canManage) {

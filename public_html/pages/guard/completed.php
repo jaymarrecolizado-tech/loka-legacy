@@ -5,7 +5,7 @@
  * Dedicated page for guards to view completed trips for reference and audit
  */
 
-requireRole(ROLE_GUARD);
+requireGuardDashboardAccess();
 
 $pageTitle = 'Completed Trips';
 

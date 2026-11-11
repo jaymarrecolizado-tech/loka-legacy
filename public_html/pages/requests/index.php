@@ -3,7 +3,11 @@
  * LOKA - Requests List Page
  */
 
-$pageTitle = 'My Requests';
+// Plan #30: Approver+ sees every department's requests (visibility only —
+// row actions stay owner/admin scoped below). Everyone else sees their own.
+$canViewAll = canViewAllTripRequests();
+
+$pageTitle = $canViewAll ? 'All Trip Requests' : 'My Requests';
 
 // Get filter parameters
 $statusFilter = get('status', '');
@@ -13,7 +17,7 @@ $searchFilter = get('search', '');
 $params = [];
 $whereClause = 'r.deleted_at IS NULL';
 
-if (!isAdmin()) {
+if (!$canViewAll) {
     $whereClause .= ' AND r.user_id = ?';
     $params[] = userId();
 }
@@ -49,43 +53,48 @@ $requests = db()->fetchAll(
     $params
 );
 
-// Fetch notification counts separately (eliminates N+1 query)
-$notificationCounts = [];
-if (!empty($requests) && !isAdmin()) {
-    $requestIds = array_map(fn($r) => $r->id, $requests);
-    if (!empty($requestIds)) {
-        $placeholders = implode(',', array_fill(0, count($requestIds), '?'));
-        $linkConditions = array_map(fn($id) => "n.link LIKE ?", $requestIds);
-        $notifications = db()->fetchAll(
-            "SELECT n.link, COUNT(*) as count
-             FROM notifications n
-             WHERE n.user_id = ?
-             AND n.is_read = 0
-             AND n.deleted_at IS NULL
-             AND n.link LIKE '%page=requests%action=view%'
-             AND (" . implode(' OR ', $linkConditions) . ")
-             GROUP BY n.link",
-            array_merge([userId()], array_map(fn($id) => "%id={$id}%", $requestIds)),
-            'link'
-        );
+// Fetch notification counts separately (eliminates N+1 query).
+// Badges are personal: they reflect the logged-in user's own unread
+// notifications, never another requester's alerts (Plan #30).
+foreach ($requests as $request) {
+    $request->unread_notifications = 0;
+}
 
-        // Match notification counts to requests
-        foreach ($requests as $request) {
-            $linkPattern = "id={$request->id}";
-            $count = 0;
-            foreach ($notifications as $link => $data) {
-                if (strpos($link, $linkPattern) !== false) {
-                    $count = $data['count'];
-                    break;
-                }
-            }
-            $request->unread_notifications = $count;
+if (!empty($requests)) {
+    $requestIds = array_map(static fn($request) => (int) $request->id, $requests);
+    $requestIdSet = array_fill_keys($requestIds, true);
+    $notificationCounts = [];
+    $notifications = db()->fetchAll(
+        "SELECT n.link, COUNT(*) AS notification_count
+         FROM notifications n
+         WHERE n.user_id = ?
+         AND n.is_read = 0
+         AND n.deleted_at IS NULL
+         AND n.link LIKE '%page=requests%action=view%'
+         GROUP BY n.link",
+        [userId()]
+    );
+
+    foreach ($notifications as $notification) {
+        $queryString = parse_url((string) $notification->link, PHP_URL_QUERY);
+        if (!is_string($queryString)) {
+            continue;
         }
+
+        parse_str($queryString, $linkParams);
+        $requestId = isset($linkParams['id']) ? (int) $linkParams['id'] : 0;
+        if (($linkParams['page'] ?? '') !== 'requests'
+            || ($linkParams['action'] ?? '') !== 'view'
+            || !isset($requestIdSet[$requestId])) {
+            continue;
+        }
+
+        $notificationCounts[$requestId] = ($notificationCounts[$requestId] ?? 0)
+            + (int) $notification->notification_count;
     }
-} else {
-    // Admin doesn't have unread notifications on requests
+
     foreach ($requests as $request) {
-        $request->unread_notifications = 0;
+        $request->unread_notifications = $notificationCounts[(int) $request->id] ?? 0;
     }
 }
 
@@ -94,17 +103,15 @@ require_once INCLUDES_PATH . '/header.php';
 
 <div class="container-fluid py-4">
     <?php 
-    // Check for revision requests that need attention
-    $revisionRequests = [];
-    if (!isAdmin()) {
-        $revisionRequests = db()->fetchAll(
-            "SELECT id, purpose, destination, start_datetime 
-             FROM requests 
-             WHERE user_id = ? AND status = ? AND deleted_at IS NULL 
-             ORDER BY updated_at DESC",
-            [userId(), STATUS_REVISION]
-        );
-    }
+    // Check for the logged-in user's OWN requests that need revision —
+    // personal alert, never another requester's work (Plan #30).
+    $revisionRequests = db()->fetchAll(
+        "SELECT id, purpose, destination, start_datetime
+         FROM requests
+         WHERE user_id = ? AND status = ? AND deleted_at IS NULL
+         ORDER BY updated_at DESC",
+        [userId(), STATUS_REVISION]
+    );
     
     if (!empty($revisionRequests)): 
     ?>
@@ -136,7 +143,7 @@ require_once INCLUDES_PATH . '/header.php';
     <!-- Page Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h4 class="mb-1">My Requests</h4>
+            <h4 class="mb-1"><?= $canViewAll ? 'All Trip Requests' : 'My Requests' ?></h4>
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0">
                     <li class="breadcrumb-item"><a href="<?= APP_URL ?>">Dashboard</a></li>
@@ -191,7 +198,11 @@ require_once INCLUDES_PATH . '/header.php';
             <div class="empty-state">
                 <i class="bi bi-file-earmark-x"></i>
                 <h5>No requests found</h5>
-                <p class="text-muted">Create your first vehicle request to get started.</p>
+                <p class="text-muted">
+                    <?= $canViewAll
+                        ? 'No vehicle trip requests match the current filters.'
+                        : 'Create your first vehicle request to get started.' ?>
+                </p>
             </div>
             <?php else: ?>
             <div class="table-responsive">
@@ -200,6 +211,9 @@ require_once INCLUDES_PATH . '/header.php';
                         <tr>
                             <th>ID</th>
                             <th>Date/Time</th>
+                            <?php if ($canViewAll): ?>
+                            <th>Requester</th>
+                            <?php endif; ?>
                             <th>Purpose</th>
                             <th>Destination</th>
                             <th>Vehicle</th>
@@ -211,12 +225,19 @@ require_once INCLUDES_PATH . '/header.php';
                     </thead>
                     <tbody>
                         <?php foreach ($requests as $request): ?>
+                        <?php $isOwner = (int) $request->user_id === (int) userId(); ?>
                         <tr>
                             <td><strong>#<?= $request->id ?></strong></td>
                             <td>
                                 <div><?= formatDateTime($request->start_datetime) ?></div>
                                 <small class="text-muted">to <?= formatDateTime($request->end_datetime) ?></small>
                             </td>
+                            <?php if ($canViewAll): ?>
+                            <td>
+                                <div><?= e($request->requester_name) ?></div>
+                                <small class="text-muted"><?= e($request->department_name) ?></small>
+                            </td>
+                            <?php endif; ?>
                             <td><?= truncate($request->purpose, 30) ?></td>
                             <td><?= truncate($request->destination, 25) ?></td>
                             <td>
@@ -261,7 +282,13 @@ require_once INCLUDES_PATH . '/header.php';
                                        class="btn btn-sm btn-outline-primary" title="View">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    <?php if (in_array($request->status, [STATUS_PENDING, STATUS_DRAFT, STATUS_REVISION])): ?>
+                                    <?php
+                                    // Unrelated rows expose View only. Owner actions stay
+                                    // owner-scoped; Administrator/All Father keep their existing
+                                    // server-side edit/cancel reach (Plan #30 decision 6).
+                                    $canManageRow = $isOwner || isAdmin();
+                                    ?>
+                                    <?php if ($canManageRow && in_array($request->status, [STATUS_PENDING, STATUS_DRAFT, STATUS_REVISION])): ?>
                                     <a href="<?= APP_URL ?>/?page=requests&action=edit&id=<?= $request->id ?>" 
                                        class="btn btn-sm btn-outline-secondary" title="Edit">
                                         <i class="bi bi-pencil"></i>

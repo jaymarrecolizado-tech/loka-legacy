@@ -48,6 +48,30 @@ body {
     overflow-y: auto;
 }
 
+/* Phones: turn the notifications dropdown into a near-full-width sheet
+   pinned under the navbar — 320px absolute is cramped on small screens.
+   !important is required to beat the inline position/transform that
+   Bootstrap's Popper writes onto .show elements. */
+@media (max-width: 575.98px) {
+    .notification-dropdown {
+        position: fixed !important;
+        top: calc(var(--navbar-height) + 0.25rem) !important;
+        left: 0.5rem !important;
+        right: 0.5rem !important;
+        width: auto !important;
+        max-width: none !important;
+        max-height: 70vh;
+        max-height: 70dvh;
+        transform: none !important;
+        margin: 0;
+    }
+
+    .notification-dropdown .dropdown-item {
+        padding: 0.6rem 0.9rem;
+        white-space: normal;
+    }
+}
+
 @media (max-width: 575.98px) {
     .notification-dropdown {
         width: calc(100vw - 1.5rem);
@@ -310,6 +334,21 @@ a.stat-card-link:focus .stat-hint {
     padding: 0.4em 0.65em;
 }
 
+/* Navbar notification count badge — compact pill that hugs the bell's
+   corner and stays inside the 56px navbar instead of poking above it. */
+.navbar .notification-badge {
+    font-size: 0.6rem;
+    font-weight: 600;
+    line-height: 1;
+    padding: 0.22em 0.34em;
+    min-width: 1.4em;
+    text-align: center;
+    top: 0.25rem;
+    left: auto;
+    right: 0.15rem;
+    transform: none;
+}
+
 /* ===== ACTIVITY FEED ===== */
 .activity-feed {
     list-style: none;
@@ -363,6 +402,22 @@ a.stat-card-link:focus .stat-hint {
     text-align: center;
     padding: 3rem 1rem;
     color: #6c757d;
+}
+
+.chart-container {
+    position: relative;
+    height: 280px;
+    width: 100%;
+}
+
+.chart-container-sm {
+    position: relative;
+    height: 220px;
+    width: 100%;
+}
+
+.dash-chart-empty {
+    min-height: 180px;
 }
 
 .empty-state i {
@@ -651,10 +706,9 @@ a.stat-card-link:focus .stat-hint {
         width: 100%;
     }
 
-    /* Charts full width on mobile */
+    /* Charts full width on mobile; keep Chart.js container height */
     .card-body canvas {
         max-width: 100% !important;
-        height: auto !important;
     }
 
     /* Chart cards stack vertically on mobile */

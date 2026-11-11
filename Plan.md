@@ -14,7 +14,43 @@
 | #8 | Validation Hardening | DONE (2026-09-03) |
 | #9 | Production Deployment & Cron Handover | DONE (code ready; VPS cutover when scheduled) |
 | #10 | Manual QA & Backlog | DONE (documented 2026-09-03) |
-| #11 | Reports Follow-up Gaps | OPEN |
+| #11 | Reports Follow-up Gaps | DONE (2026-10-06; localhost QA — staging deploy 2026-10-06) |
+| #12 | Hostinger KVM 2 Staging Migration (`lokastage`) | DONE (deployed 2026-09-03; rotate secrets + manual QA left) |
+| #13 | Trip Email One-Thread (by Control No.) | DONE (2026-09-04) |
+| #14 | Driver Evaluation Access, Anonymity, Reports & PDF | DONE (2026-09-04; SMTP send + full browser click-through manual) |
+| #15 | Skip Trip Confirmation After Dispatch/Complete | DONE (2026-09-04) |
+| #16 | Overdue PDF + Daily Motorpool Report (All Father) | OPEN (2026-09-04; not next build) |
+| #17 | Live Trip Board | DONE (2026-09-04) |
+| #18 | Gas Voucher QR Public Verify | DONE (2026-09-09) |
+| #19 | Leftover UX Fixes, then VAPT, then Optional Features | A–C DONE (2026-10-06, localhost + staging; NOT prod); Phase D VAPT open |
+| #20 | Useful Role Dashboard | DONE (2026-09-10) |
+| #21 | Fair Driver Ranking + Trip Extract | DONE (2026-09-13; live `lokafleet.dictr2.cloud`) |
+| #22 | Official Business Pass Slip | DONE (2026-09-15; localhost QA done on `ob_integration` — NOT deployed) |
+| #23 | OB Saved E-sign (staff specimen) | DONE (2026-09-15; localhost QA on `ob_integration` — NOT deployed) |
+| #24 | OB Private vs Official Vehicle + Guard Bind | DONE (2026-09-17; localhost QA on `ob_integration` — NOT deployed) |
+| #25 | CoA Mobile Canvas + Signing Kiosk (no login kick) | DONE (2026-09-18 incl. A4 print; `ob_integration` — NOT deployed) |
+| #26 | OB Print: Full Personnel Names + Initialled CoA | DONE (2026-09-19; `main`, localhost QA — NOT deployed) |
+| #27 | Guard Nav Badges + Separate OB Stamp Queue | DONE (2026-09-19; `main`, localhost QA — NOT deployed) |
+| #28 | Soft Nag + 3-Pending Trip-Create Gate | DONE (2026-09-19; run migrations 052+053 on each env) |
+| #29 | Vehicle Trip Ticket — Full Purpose + No PDF Scrollbars | DONE (2026-09-26; live `lokafleet.dictr2.cloud`) |
+| #30 | All-Trip Visibility for Motorpool Head + Department Approver | DONE (2026-09-27; live `lokafleet.dictr2.cloud`) |
+| #31 | Gas Voucher Budget Officer Step (hybrid C) | DONE (2026-09-28; live `lokafleet.dictr2.cloud`; run migration 054) |
+| #32 | Distinct email/SMS themes for Vehicle, Gas Voucher, OB | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
+| #33 | OB Apply form — sectioned steps UX | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
+| #34 | Gas Voucher UI — Plan #33 styling / fill uniformity | DONE (2026-09-28; live `lokafleet.dictr2.cloud`) |
+| #35 | Telegram + Viber notifications (phased) | DONE Phase A+B (2026-09-29; branch `vberandtelegramnotif`, localhost QA — NOT deployed; tokens pending) |
+| #36 | OB Pass Slip workflow revision (button approvals, CoA acknowledgment + QR) | DONE (2026-10-01; branch `ob-slip-revision`, localhost QA + staging deploy — no prod) |
+| #37 | OB approval badge for Immediate Supervisor | DONE (2026-10-01; badge + kiosk checkbox fix, localhost lint + staging deploy — no prod) |
+| #38 | Vehicle Repair History + costing + escalated maintenance alerts (experimental) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
+| #39 | Rollback shows full workflow stages (Trips + OB + Gas) | DONE + minor polish optional (2026-10-04; checker PASS — NOT deployed) |
+| #40 | AI assistant chatbot (experimental, role-scoped actions) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
+| #41 | Driver-phone GPS trip tracking (experimental) | DONE (2026-10-04; checker PASS re-verified - NOT deployed) |
+| #42 | Full-system regression QA (all features / nothing broken) | DONE (2026-10-06; A–D pass; gaps closed — click-through, live AI/GPS, flags OFF) |
+| #43 | Central SSO for LOKA + Travel Order (OIDC, Python service) | LIVE ON STAGING (2026-10-10; portal UI live on `sso.dictr2.cloud`; TO **prod SSO turned OFF 2026-10-13** — logout was broken; classic TO login restored; LOKA prod still pending) |
+| #44 | TO/OB → LOKA vehicle-request link (remove double entry) | DONE ON STAGING (2026-10-10; phases 1–3 live + E2E verified; TO UI catalog replacement still 'later') |
+| #45 | Show / attach TO / OB on vehicle requests (approvals + request view) | LIVE prod + staging + local (2026-10-13; FileUpload fix; health 200) |
+
+**What's next:** see [Post–Plan #44 next steps](#postplan-44-next-steps-2026-10-10) (current). Older backlog still in [Post–Plan #42 next steps](#postplan-42-next-steps).
 
 **Working rules:** one plan file only; no backend/frontend plan split for this PHP app; every phase ends with `php -l` + checklist update before the next.
 
@@ -728,18 +764,24 @@ Cut over `pred-loka-old-boots` to Hostinger KVM 2 (`prod/public_html` package) w
 
 ---
 
-# LOKA Plan #11: Reports Follow-up Gaps — OPEN (2026-09-03)
+# LOKA Plan #11: Reports Follow-up Gaps — ✅ DONE (2026-10-06, branch `plans-38-41-experimental`, localhost QA)
 
 ## Goal
 Finish leftover gaps from the Better LOKA Reports work. Core enrichment (mileage/fuel/dispatch, admin export fixes, `driver_history` / `vehicle_history` / `department_usage`) is already DONE. This plan is UI/export parity only.
 
-## Open checklist
-- [ ] Travel order on Vehicle History UI — add `has_travel_order` / `travel_order_number` to query + table ([vehicle-history.php](public_html/pages/reports/vehicle-history.php); already in CSV)
-- [ ] Travel order + OB slip on Trip Requests — add `has_travel_order`, `has_official_business_slip` to [trips.php](public_html/pages/reports/trips.php) UI; include OB in CSV/PDF exports
-- [ ] Revision stats card on Trip Requests — show `$stats->revision` (SQL already counts it)
-- [ ] Date-filter note — Trip Requests use `created_at`; Vehicle/Driver use `start_datetime`
-- [ ] Admin `department_usage` top vehicles column — [csv.php](public_html/pages/admin/exports/csv.php) + [pdf.php](public_html/pages/admin/exports/pdf.php)
-- [ ] Trip Requests pagination or clearer 500-row cap messaging (export limits unchanged)
+## Open checklist — ✅ DONE (2026-10-06)
+- [x] Travel order on Vehicle History UI — `has_travel_order` / `travel_order_number` added to the query + a **Travel Order** column (info badge with the number, "Yes" when unnumbered) ([vehicle-history.php](public_html/pages/reports/vehicle-history.php); already in CSV)
+- [x] Travel order + OB slip on Trip Requests — `has_travel_order`, `travel_order_number`, `has_official_business_slip` added to the [trips.php](public_html/pages/reports/trips.php) query + a **Docs** column (`TO` / `OB` badges); **OB** added to the trips CSV ([export.php](public_html/pages/reports/export.php) — aliased `official_business` to match the header→key writer; caught + fixed a real bug where the raw column name hit the writer's `$rowArray` lookup) and the trips PDF ([export-pdf.php](public_html/pages/reports/export-pdf.php) — 9 mm OB column after Status, Destination/Purpose trimmed to keep the landscape width)
+- [x] Revision stats card on Trip Requests — orange card (`#fd7e14`, matching the status-donut color) after Rejected, reading the existing `$stats->revision`
+- [x] Date-filter note — note under the Trip Requests filters: this report filters by the date the request was filed (created_at); Vehicle/Driver History filter by trip start date
+- [x] Admin `department_usage` top vehicles column — **Top Vehicle** (`plate (N trips)` via a `ROW_NUMBER()`-ranked per-department subquery) added to [csv.php](public_html/pages/admin/exports/csv.php) + [pdf.php](public_html/pages/admin/exports/pdf.php)
+- [x] Trip Requests 500-row cap messaging — the report page itself was already paginated (50/page); added export-cap note + button tooltips: **CSV up to 10,000 · PDF up to 500** most recent matching rows (export limits unchanged)
+
+## QA — verified 2026-10-06 (localhost, `fleetdb`)
+- [x] `php -l` clean on all six touched files; login page 200.
+- [x] Render: Trip Requests shows the Revision card, Docs column, date-filter note and export-cap note; Vehicle History shows the Travel Order column.
+- [x] Trips CSV: `Official Business` header + Yes/No values, **0 warnings**; `department_usage` CSV: `Top Vehicle` + `plate (N trips)`, no warnings.
+- [x] `department_usage` PDF: valid `%PDF`, `Top Vehicle` + `(N)` confirmed in decompressed content streams; trips PDF still generates.
 
 ## Out of scope
 - New report types
@@ -751,3 +793,3429 @@ Finish leftover gaps from the Better LOKA Reports work. Core enrichment (mileage
 - Mileage/fuel/dispatch enrichment on Vehicle History + Driver Report
 - Trip Requests dept/vehicle/driver filters, cancelled + km stats, PDF filter pass-through
 - Hub badges "CSV & PDF Export" + tooltips + populated `total_km`
+
+---
+
+# LOKA Plan #12: Hostinger KVM 2 Staging Migration — DONE (2026-09-03)
+
+## Goal
+Deploy this app (`cleancopy`) to Hostinger KVM 2 **staging** at `https://lokastage.dictr2.cloud`, using `prod/public_html/` and [prod/PRODUCTION_GUIDE.md](prod/PRODUCTION_GUIDE.md). Live prod domain `lokafleet.dictr2.cloud` is a later cutover if needed.
+
+## Security rules (mandatory)
+- **Never** commit SSH/FTP passwords, DB passwords, SMTP secrets, or staging `.env` to git.
+- Credentials are used only at execution time — not written into `Plan.md` or scripts.
+- After first successful login: prefer SSH key auth; **rotate** any password shared in chat.
+- Server `.env` must be `chmod 600` and **outside nginx docroot** on this host (`/home/lokaloka/htdocs/.env.lokastage`) — Apache `.htaccess` does **not** block static files under nginx.
+- **2026-09-03:** staging `.env` was briefly publicly readable via nginx before move-out; **rotate** DB password, Gmail app password, and SSH password.
+
+## Target (confirmed 2026-09-03)
+| Item | Value |
+|------|--------|
+| Provider | Hostinger KVM 2 |
+| Domain | `lokastage.dictr2.cloud` |
+| Site URL | `https://lokastage.dictr2.cloud` |
+| IP | `187.77.150.203` |
+| Site user | `lokaloka` |
+| SSH user | `lokacloud-ssh` |
+| Web root (confirmed) | `/home/lokaloka/htdocs/lokastage.dictr2.cloud/` |
+| Secrets file | `/home/lokaloka/htdocs/.env.lokastage` (not in webroot) |
+| Package | `prod/public_html/` |
+| Localhost | remains `APP_ENV=development` / immediate mail — do not break XAMPP |
+| Pre-deploy backup | `/home/lokaloka/backups/pre_migrate_20260903_132720/` |
+
+### Staging MySQL (confirmed 2026-09-03 — password offline only)
+| Item | Value |
+|------|--------|
+| `DB_HOST` | `localhost` (on VPS) |
+| `DB_PORT` | `3306` |
+| `DB_NAME` | `dbfleet3` |
+| `DB_USER` | `dbfleet3user` |
+| `DB_CHARSET` | `utf8mb4` |
+| `DB_PASSWORD` | **not in git** — set only in server env file (rotate if chat-exposed) |
+
+### Staging SMTP — Gmail (same as local `.env`, 2026-09-03)
+| Item | Value |
+|------|--------|
+| Provider | Gmail SMTP |
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `587` |
+| `SMTP_ENCRYPTION` | `tls` |
+| `SMTP_USER` / `SMTP_FROM_EMAIL` | `jelite.demo@gmail.com` (same as local) |
+| `SMTP_FROM_NAME` | `LOKA Fleet Management` |
+| `SMTP_PASSWORD` | **not in git** — Gmail App Password in server env only (rotate after nginx leak) |
+| Staging mail mode | `MAIL_ENABLED=true`, `EMAIL_DELIVERY_MODE=queued`, `MAIL_SYNC_SEND=false` |
+
+## Phase 0 — Pre-flight (local)
+- [x] On `cleancopy`: rebuild `prod/public_html` from `public_html` (exclude `.env`, runtime logs/cache)
+- [x] Prepare DB dump for import (local `old_loka_db`); keep SQL in `_deploy_tmp/` (gitignored)
+- [x] Staging DB name/user collected (`dbfleet3` / `dbfleet3user`); password kept offline
+- [x] SMTP = Gmail, same local account (`jelite.demo@gmail.com`); app password offline only
+- [x] Confirm DNS `lokastage.dictr2.cloud` → `187.77.150.203`
+
+## Phase 1 — Access & backup
+- [x] `ssh lokacloud-ssh@187.77.150.203` — PHP 8.4+, MySQL 8.4, site user `lokaloka`
+- [x] Confirm document root `/home/lokaloka/htdocs/lokastage.dictr2.cloud`
+- [x] Tar backup + mysqldump under `/home/lokaloka/backups/pre_migrate_20260903_132720/`
+
+## Phase 2 — Upload
+- [x] Upload `prod/public_html/` tarball → staging web root
+
+## Phase 3 — Staging `.env`
+- [x] Staging env written (then moved outside docroot for nginx)
+- [x] `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://lokastage.dictr2.cloud`
+- [x] Set `DB_*`, Gmail `SMTP_*`, `EMAIL_DELIVERY_MODE=queued`, `MAIL_ENABLED=true`, `CRON_SECRET`
+- [x] `chmod 600` on secrets file
+- [x] HTTPS force in packaged `.htaccess`; TLS already terminating at nginx
+
+## Phase 4 — Database
+- [x] Use Hostinger DB `dbfleet3` as `dbfleet3user` (utf8mb4)
+- [x] Import local dump into `dbfleet3` (36 tables)
+- [x] `php migrate.php`
+- [x] `https://lokastage.dictr2.cloud/health.php` → healthy
+
+## Phase 5 — Cron, SSL, perms
+- [x] Dirs/files perms set; logs/cache writable
+- [x] Cron for `lokaloka`: `process_queue.php` */2, `process_trip_confirmations.php` */5
+- [x] TLS + login page OK; `/.env` no longer serves secrets
+
+## Phase 6 — Post-deploy QA
+- [x] Login page loads on `https://lokastage.dictr2.cloud`
+- [x] Queue cron sends mail (manual run: Sent>0)
+- [ ] New request redirects fast; email within ~2 min via cron (manual user test)
+- [ ] No duplicate on double-submit
+- [ ] Reports CSV/PDF
+- [ ] Admin rollback smoke
+- [ ] Gas stations toggle
+- [x] `/config/` → 403; `/.env` leak fixed (302 empty, secrets outside webroot)
+
+## Rollback
+Restore `/home/lokaloka/backups/pre_migrate_20260903_132720/` site tarball + `dbfleet3.sql`; leave localhost XAMPP unchanged.
+
+## Follow-ups
+- [ ] Rotate DB + Gmail app + SSH passwords after chat + brief nginx leak
+- [ ] Prefer SSH key auth for `lokacloud-ssh`
+- [ ] Optional: nginx `location` deny for `/\.env` as defense-in-depth
+- [ ] User manual QA checklist above
+
+## Execution gate
+Deployed 2026-09-03. Remaining: rotate secrets + manual QA in browser.
+
+---
+
+# LOKA Plan #13: Trip Email One-Thread (by Control No.) — DONE (2026-09-04)
+
+## Goal
+All notification emails for the same Control No. (`request_id`) land in **one mailbox thread** (Gmail/Outlook) via a stable subject + RFC `Message-ID` / `In-Reply-To` / `References`.
+
+## Done
+- [x] Stable subject: `Control No. {id}: LOKA Fleet Request` when `request_id` is set (`EmailQueue::requestThreadSubject`, applied in `queue()` + `queueTemplate()`)
+- [x] Template event title shown as body heading (status stays in body, not subject)
+- [x] `Mailer::buildHeaders` sets `Message-ID`; with `request_id` also sets `In-Reply-To` + `References` to `<loka-request-{id}@{from-domain}>`
+- [x] Sync + cron `process()` pass `request_id` and `email_queue.id` into `Mailer::send`
+- [x] Direct queue callers updated: trip confirmations, driver eval invite/reminder
+- [x] Password-reset / non-request mail unchanged (no shared thread)
+
+## QA
+- [x] Local header invariant script (`php -l` + reflection headers check)
+- [ ] Staging Gmail: submit → approve → assign → complete → one thread for same Control No. (manual)
+
+## Files
+- `public_html/classes/Mailer.php`
+- `public_html/classes/EmailQueue.php`
+- `public_html/cron/process_trip_confirmations.php`
+- `public_html/includes/trip-enhancements.php`
+
+---
+
+# LOKA Plan #14: Driver Evaluation Access, Anonymity, Reports & PDF — ✅ DONE (2026-09-04)
+
+## Goal
+After a completed trip, **only the real riders** can rate the driver (token-gated, one invite each). Reports and the PDF stay **anonymous** (no rater name/email/user id). The form keeps **4 required star categories** plus **optional comments**. Logged-in riders are **nagged** until they submit (banner + email); booking is **not** blocked. Staff get usable filters and a professional ranking PDF with analytics and optional comments.
+
+Extends Plan #7 (4-category rubric, already DONE). Does not reopen Plan #11 (other report UI gaps).
+
+## Current model (trip #555 with 4 participants)
+
+Participants = **requester + `request_passengers` companions**. The UI already counts that way (`countRequestPassengers()` in `public_html/includes/functions.php` = companions + 1). The assigned driver is not an evaluator.
+
+Each allowed person gets **one** `driver_evaluations` row with a 64-hex token stored only as SHA-256. The email link is the capability. DB guard: `UNIQUE (request_id, evaluator_user_id)` (`migrations/044_driver_evaluations.php`). Submit is single-use (`submitted_at`) and expires after `driver_evaluation_expiry_days` (default 30).
+
+```mermaid
+flowchart TD
+  tripDone[Trip 555 completed]
+  invite[One invite per real rider]
+  email[Email unique token link]
+  form[Public form 4 stars required]
+  nag[Banner plus email until submitted]
+  store[Store ratings without showing name]
+  report[Reports: averages, filters, PDF]
+
+  tripDone --> invite
+  invite --> email
+  invite --> nag
+  email --> form
+  nag --> form
+  form --> store
+  store --> report
+```
+
+## Gaps vs that model
+
+- Invites are built only from `request_passengers`, so the **requester is skipped**. If #555 is requester + 3 companions, only 3 invites (or fewer) are created. Requester cannot be added as a companion (`pages/requests/manage-passengers.php` blocks it).
+- Submit is documented as public but `index.php` `$publicPages` omits `evaluations`, so `requireAuth()` runs first and login does not return to the token URL.
+- Guest tokens are created then discarded (never emailed or shown). Re-running create on guests can insert extra guest rows.
+- Invites use `EmailQueue::queue()` which does **not** sync-send; they wait on `process_queue.php`.
+- If the passenger must log in, `auditLog()` on submit writes session `user_id` into `audit_logs` (deanonymizes the rater).
+- Rankings/CSV still average the **old 5 columns** (punctuality/courtesy/…) while new submits fill the **4 new columns**.
+- Tagged drivers cannot open Rankings (`$driverAllowed` omits those actions) even though the page already self-scopes.
+
+Residual (accept): a trip with one submitter can still be inferred by staff who know the passenger list. Email-queue admins can see who was invited. That is operational, not the public report.
+
+## Form (no rubric change)
+
+- **Stars (required, 1–5 each):** Cleanliness of the Vehicle; Behavior of the Driver; Appearance and Hygiene; Road Safety and Driving Skills. Overall = average of those 4.
+- **Comments (optional, max 2000):** stored in `remarks`, shown as “Anonymous passenger”.
+
+## Mandatory evaluation (nag, do not block booking)
+
+**Thoughts:** Require all 4 stars on the form (already does). Keep comments **optional** — forcing a comment produces “n/a” noise. Do not hard-lock the app: motorpool heads and approvers also ride, and blocking new requests would stall operations. True 100% compliance is impossible for guests and anyone who ignores email. Accountability is the **response-rate** column on reports.
+
+**Enforcement (nag only):** logged-in riders are pushed until they submit; they can still create trips.
+
+- Form: 4 stars required (JS + PHP). Comments optional.
+- Email: invite on trip complete + existing 48-hour reminder (`cron/process_trip_confirmations.php`).
+- In-app: persistent header/dashboard banner when the current user has unsubmitted, non-expired invites. “You have N driver evaluation(s) to complete.” **Rate now** re-issues a token and opens the public submit page. Hide banner on login/public/submit pages and after expiry or submit.
+- Do **not** block `requests/create` or other modules.
+- Guests: email/reminder only (no login, no banner).
+- Driver: never nagged to rate their own trip.
+
+## Reports and filters (anonymous)
+
+Never SELECT `evaluator_user_id`, `guest_label`, or passenger names in UI/CSV/PDF. Never add a passenger/evaluator filter.
+
+**1. Evaluations** — `/?page=evaluations` (`pages/evaluations/index.php`)
+
+- Per-driver averages for the 4 star areas, eval count, overall.
+- Response rate per trip (invites vs submitted vs average).
+- Anonymous remarks: trip #, destination, driver, plate, overall, quote — “Anonymous passenger”.
+- Access: `requireReportsAccess()`. Self-scoped tagged drivers see **their own** `driver_id` only.
+
+**2. Driver Rankings** — `/?page=reports&action=driver-rankings` plus CSV. Must use the **same 4 columns** as the form.
+
+**Filter bar (both reports, GET, Clear/Reset):**
+
+- From / To — trip `start_datetime` (Rankings default current month; Evaluations blank = all time).
+- Driver — dropdown (approver+). Self-scoped drivers: no picker, locked to self.
+- Vehicle — plate dropdown (approver+), same pattern as `pages/reports/trips.php`.
+- Trip no. — optional request id (e.g. 555).
+- Min evaluations — Rankings only (default 2). CSV gets the same query string (`from`, `to`, `min_eval`, `driver_id`, `vehicle_id`, `request_id`).
+
+**Access:** add `driver-rankings`, `export-driver-rankings-csv`, and `export-driver-evaluations-pdf` to `$driverAllowed` in `index.php`. Keep `de.driver_id = currentDriverId()` lock for tagged drivers.
+
+## Professional PDF
+
+Landscape TCPDF, same DICT style as `pages/reports/export-driver.php` / `export-gas-vouchers-pdf.php`. Header “DICT - Driver Evaluation Report”, period, generated time, page numbers. Confidentiality line: passenger identities never included. Reuse `reportPdfWriteMeta()`. Shared queries in a small helper (gas-voucher pattern) so Rankings / CSV / PDF do not copy SQL. PDF file under ~250 lines.
+
+**Entry:** Export PDF on Rankings and Evaluations. Checkbox **Include anonymous comments** (`include_remarks=1`). Same filters as the screen. PDF lists **every driver with ≥1 submitted evaluation** in the filter set (do not apply Min evaluations). Self-scoped drivers: own analytics only.
+
+**Page 1 — analytics + full ranking**
+
+- Title, period, filters, generated-by (exporter staff name is fine).
+- KPIs: fleet overall average, total submitted evals, invite response rate, drivers ranked.
+- Category analytics: fleet averages for the 4 stars + simple filled-cell bars (no Chart.js).
+- Full ranking table best → worst: Rank, Driver, Eval count, Overall, four category averages. Highlight ranks 1–3. Empty state if none submitted.
+
+**Following pages — comments (optional)**
+
+- Only if checkbox on. Group by driver. Each block: overall stars, trip #, destination, date, quoted remark, “Anonymous passenger”. Cap ~200 newest remarks. Omit section if checkbox off.
+
+Audit export as `data_export` / `driver_evaluations` with format pdf + filter keys, not rater ids.
+
+## Implementation — ✅ DONE (2026-09-04)
+
+- [x] Invite requester + companions in `createDriverEvaluations()` (`includes/trip-enhancements.php`); skip driver; skip already-invited users; guest rows idempotent (top-up to current guest count, `Guest N` ordinals stable — no extras on second complete/arrival); queue+sync-send email for every user with an address.
+- [x] Allow `page=evaluations&action=submit` without login (`evaluations` in `$publicPages` in `index.php`; submit case stays public, index re-gated by `requireReportsAccess()` → anonymous hits 302 to login, HTTP-verified).
+- [x] Do not record the rater on submit — `pages/evaluations/submit.php` writes the `evaluation_submitted` audit row directly with `user_id NULL` (auditLog() would stamp the session id).
+- [x] After `queue()`, sync-send in `immediate` mode — new `queueDriverEvaluationEmail()` (`includes/trip-enhancements.php`) queues then `Mailer::send()` + `markSent()` when `emailDeliveryMode()='immediate'`; failures stay queued for cron. Reminders stay queued (`cron/process_trip_confirmations.php` unchanged).
+- [x] `pendingDriverEvaluationsForUser()` + persistent header banner (`includes/header.php`, hidden under View-as) + `Rate now` → new `pages/evaluations/rate.php` re-issues the token (old emailed link dies) and forwards to the public form. In-app notification inserted on invite create (own inbox only, no duplicate email). Booking never blocked.
+- [x] Rankings + CSV now average `rating_cleanliness / behavior / appearance / safety` (old 5 columns dropped).
+- [x] Shared filters on Evaluations + Rankings + CSV (From/To, Driver, Vehicle, Trip no.; Rankings min evals) via `includes/eval_report.php` `evalReportFilterBarHtml()` / `evalReportParseFilters()`; Clear/Reset links.
+- [x] `driver-rankings`, `export-driver-rankings-csv`, `export-driver-evaluations-pdf` added to `$driverAllowed` in `index.php` (tagged drivers keep the `de.driver_id` self-scope lock; unresolvable scope locks to empty set).
+- [x] Professional PDF: `includes/eval_report.php` helper + `pages/reports/export-driver-evaluations-pdf.php` (landscape TCPDF, DICT header, `reportPdfWriteMeta()` filters, confidentiality line, KPIs, 4-category analytics with filled-cell bars, full ranking best→worst w/ ranks 1–3 highlighted, ignores Min-evaluations, optional anonymous-comments pages grouped by driver, cap 200). Export buttons with **Include comments** checkbox on both Evaluations and Rankings; exports audited as `data_export`/`driver_evaluations` with filter keys only.
+- [x] Guests: one token row each, tokens never displayed or shared (created then discarded).
+
+## QA — verified 2026-09-04 (`_deploy_tmp/verify_plan14_*.php`, rolled-back transactions, mail disabled — nothing persisted, nobody emailed)
+
+- [x] Complete a trip with requester + 3 companions (+1 guest) → 4 user invite rows + 1 guest row, 4 emails queued, driver not invited, requester invited (was skipped before); re-run → 0 extra rows, guest stays `Guest 1` (verify_plan14_evals).
+- [x] Email link logged out → form renders (`?page=evaluations&action=submit` → 200, no auth); second submit blocked (single-use `submitted_at IS NULL` guard re-verified); random/empty token → "Link Not Usable" (HTTP-verified).
+- [x] Evaluations + rankings + CSV show 4-category averages and anonymous comments; remarks rows never expose `evaluator_user_id`/name/email; audit row on submit has `user_id NULL` (verify_plan14_evals + page renders).
+- [x] Filter Trip no. (and From/To/Driver/Vehicle) applies to rankings, response-rate table, remarks and KPIs; response rate 1/5 = 20% on seeded trip; Clear links restore defaults; CSV uses the same parse+rankings path as the screen (verify_plan14_pages).
+- [x] Tagged driver: actions allowed in `$driverAllowed`; `evalReportParseFilters()` forces own `driver_id` and locks unresolvable scope to empty set. Approver sees driver/vehicle pickers.
+- [x] PDF renders both variants: comments off = no comments section; comments on = grouped anonymous remarks (DICT header, KPIs, 4-category bars, ranking table, confidentiality line) (verify_plan14_pdf → valid `%PDF-1.7`, content text-checked).
+- [x] Banner: pending invite → "You have N driver evaluation(s) to complete." + per-trip **Rate now** links; Rate now re-issues token and lands on the public form; banner hidden under View-as; guests get email only, drivers never invited (verify_plan14_banner).
+- [x] `php -l` clean on all 10 touched files + full public_html sweep 0 errors; `?page=evaluations` still 302→login for anonymous; rankings 302→login.
+- [ ] Manual (browser, when DICT schedules): real SMTP delivery of invite + reminder, tagged-driver self-scoped click-through, View-as sanity.
+
+## Files
+
+- `public_html/index.php` — `evaluations` public (submit), `rate` route, PDF route, `$driverAllowed` +3
+- `public_html/includes/trip-enhancements.php` — `createDriverEvaluations()` rewrite, `queueDriverEvaluationEmail()`, `pendingDriverEvaluationsForUser()`
+- `public_html/includes/header.php` — pending-evaluation nag banner
+- `public_html/includes/eval_report.php` (new) — shared filters/queries/KPIs/remarks/filter-bar/PDF-export HTML
+- `public_html/pages/evaluations/submit.php` — anonymous audit insert
+- `public_html/pages/evaluations/rate.php` (new) — Rate now token re-issue
+- `public_html/pages/evaluations/index.php` — shared filters + PDF export button
+- `public_html/pages/reports/driver-rankings.php` — 4 columns + shared filters + PDF export
+- `public_html/pages/reports/export-driver-rankings-csv.php` — 4 columns + filters + export audit
+- `public_html/pages/reports/export-driver-evaluations-pdf.php` (new) — anonymous DICT PDF
+- `public_html/cron/process_trip_confirmations.php` — unchanged (reminder path stays queue-only)
+
+---
+
+# LOKA Plan #15: Skip Trip Confirmation After Dispatch/Complete — DONE (2026-09-04)
+
+## Goal
+Pre-trip “Will you proceed?” emails must only go out for **future approved** trips that are **not** yet dispatched / on trip / completed (fix for #570 false send).
+
+## Done
+- [x] `tripConfirmationStillEligible()` — approved + no `actual_dispatch_datetime` + `start_datetime` still in the future
+- [x] `cancelPendingTripConfirmations()` helper
+- [x] Cron SEND skips + cancels ineligible pending rows (no email)
+- [x] Cron EXPIRE cancels quietly when ineligible (no “trip proceeding” noise)
+- [x] Guard dispatch + complete cancel pending confirmations
+- [x] `confirm.php` blocks Proceed/Don’t Proceed when trip no longer eligible
+- [x] `php -l` clean on touched files
+
+## Files
+- `public_html/includes/trip-enhancements.php`
+- `public_html/cron/process_trip_confirmations.php`
+- `public_html/pages/guard/actions.php`
+- `public_html/pages/requests/confirm.php`
+
+---
+
+# LOKA Plan #16: Overdue PDF + Daily Motorpool Report — OPEN (2026-09-04)
+
+## Goal
+Motorpool Head (and anyone All Father adds) can get a **PDF of overdue trips** by email, **in addition to** the existing short overdue text alert. Separately, All Father can turn on a **daily digest PDF** (summary + analytics) and **choose which users** receive it and **what time** it is sent (default **8:00 PM** Asia/Manila).
+
+Does not reopen Plan #11 (other report UI). Does not change the existing overdue *text* notification.
+
+## Current behavior
+- Cron every 5 minutes (`public_html/cron/process_trip_confirmations.php`) emails Motorpool Head `trip_overdue_alert` when an approved trip is past `end_datetime` with no arrival. Re-alert: Settings `trip_overdue_renotify_hours` (default 24). **No PDF. No on/off toggle.**
+- No daily trip digest. Vehicle-care cron is unrelated.
+- TCPDF exists (e.g. `public_html/pages/reports/export-driver-evaluations-pdf.php`). `Mailer` / `EmailQueue` have **no attachment** support yet.
+
+## All Father controls (System Control only)
+Gate with `canAccessSystemControl()` (real All Father, not View-as). New System Control card/page under `public_html/pages/security/` — not the admin Settings page.
+
+| Control | Setting key | Default |
+|---------|-------------|---------|
+| Overdue PDF emails on/off | `overdue_pdf_email_enabled` | off |
+| Daily report emails on/off | `mh_daily_report_enabled` | off |
+| Daily report recipients (any active users, multi-select) | `mh_daily_report_user_ids` (JSON ids) | `[]` (send to nobody) |
+| Daily report send time (Asia/Manila, `HH:MM`) | `mh_daily_report_send_time` | `20:00` (8:00 PM) |
+| Last daily send date (idempotency) | `mh_daily_report_last_sent` | empty |
+
+Empty recipient list = no daily mail even if the daily toggle is on.
+
+## Overdue PDF
+When the overdue-PDF toggle is **on** and the existing overdue job fires: keep `notifyMotorpoolHeads` text as today, **and** queue an email with a TCPDF attachment (DICT header, generated timestamp, table of **all currently overdue** approved trips: id, destination, end time, hours overdue, driver, plate, assigned MH).
+
+Default recipients = Motorpool Head(s) (same as the text alert). All Father may **add other users** for the overdue PDF.
+
+## Daily report PDF
+If daily toggle is off or no recipients: do nothing. Otherwise, after the chosen Manila clock time that calendar day, generate **one** PDF and email each selected user who has an email.
+
+**Summary** (yesterday Asia/Manila + “right now” overdue): completed / cancelled / still pending or approved; currently overdue; dispatched-not-arrived; upcoming next 24h.
+
+**Analytics:** Motorpool-dashboard style KPIs (`public_html/includes/dashboard_stats.php`) — available vs assigned vehicles/drivers, top destinations, trip volume by status, average planned duration. Simple TCPDF bars/tables (same idea as eval PDF). No new JS chart library.
+
+Subject is a daily digest (not Control-No. threading). One send per Manila day (`mh_daily_report_last_sent` = `Y-m-d`).
+
+```mermaid
+flowchart TD
+  af[All Father System Control]
+  togOverdue[Overdue PDF on or off]
+  togDaily[Daily report on or off]
+  recip[Pick users]
+  clock[Send time default 20:00]
+  cron5[Cron every 5 min]
+  overdueText[Existing overdue text email]
+  overduePdf[Overdue trips PDF]
+  dailyPdf[Daily summary plus analytics PDF]
+
+  af --> togOverdue
+  af --> togDaily
+  af --> recip
+  af --> clock
+  cron5 --> overdueText
+  togOverdue -->|on| overduePdf
+  cron5 --> overduePdf
+  togDaily -->|on and after send time| dailyPdf
+  recip --> dailyPdf
+```
+
+## Implementation notes
+- Attachments: optional files on `Mailer` + nullable `email_queue.attachments` JSON (paths under `logs/reports/`, not web-served).
+- Helper `public_html/includes/mh_reports.php` (keep under ~200–300 lines) for queries + TCPDF HTML.
+- Overdue PDF hook: overdue loop in `process_trip_confirmations.php`.
+- Daily job: `process_mh_daily_report.php` every 5 minutes (same cadence as trip confirmations). Send when Manila `now >= send_time` and `last_sent !== today`. **Do not** hard-code 8:00 PM (or 07:15) in VPS crontab — All Father changing the time must not require a server crontab edit.
+- Migration: settings defaults + `email_queue.attachments`; env via `_load_env.php`.
+
+## Out of scope
+Importing local trip data; changing overdue *text* alerts; Plan #11 report UI; SMS.
+
+## QA
+- [ ] Toggles off: no extra PDFs; existing overdue text still works
+- [ ] Daily on, no recipients: no daily mail
+- [ ] Daily on + selected users: one PDF/day after chosen time (default 8:00 PM); changing time in UI needs no crontab change
+- [ ] Overdue PDF on: text + PDF; extra overdue recipients if All Father added them
+- [ ] `php -l` on touched files
+- [ ] Do not commit `_deploy_tmp` or `.env`
+
+## Files (expected)
+- `Plan.md` (this section)
+- `public_html/pages/security/` (All Father UI)
+- `public_html/includes/mh_reports.php`
+- `public_html/classes/Mailer.php` / `public_html/classes/EmailQueue.php`
+- `public_html/cron/process_trip_confirmations.php`
+- `public_html/cron/process_mh_daily_report.php`
+- `public_html/migrations/` (settings + attachments column)
+
+---
+
+# LOKA Plan #17: Live Trip Board — DONE (2026-09-04)
+
+Leave Plan #16 OPEN but **not** in the next build queue. Do not reopen Plan #11.
+
+## Goal
+A Motorpool/Guard **wall board**: who is out, which plate, where, when they should be back, and who is overdue — without opening the full request list. Matches the agreed mockup (KPI row + status table + filters). **No GPS / no map.** Guard dispatch/arrival in `public_html/pages/guard/` stays the source of truth; the board only **reads** it.
+
+## Who can see it
+**Motorpool Head, Guard, Admin, All Father.** Requesters/approvers do not get the nav link (they use their own request list). Optional later: kiosk/TV full-width; not in v1.
+
+Sidebar: near Guard — `public_html/includes/sidebar.php` (`?page=guard`). Route: `?page=live-board` in `public_html/index.php`.
+
+## What is on screen
+**Header:** Live Trip Board, Manila clock, auto-refresh ~30s (`meta refresh` or light JS fetch of the same page/partial).
+
+**Filters:** Today | On trip | Overdue | Due within 1 hour | search plate / driver / Control No.
+
+**KPIs (counts for the active filter/day):**
+- On trip — approved, `actual_dispatch_datetime` set, `actual_arrival_datetime` null
+- Overdue — same, plus `end_datetime` < now
+- Due within 1 hour — on trip, `end_datetime` in the next 60 minutes, not overdue
+- Available vehicles — `vehicles.status = available` and not currently on-trip (same idea as dashboard)
+
+**Table columns:** Status chip (Overdue / On trip / Due soon / Approved not dispatched) | Control No. (link to request view) | Plate | Driver | Destination | Passengers | Dispatched | Expected return | Late by / time left.
+
+**Rows included (v1):** today’s operational set — approved trips that are (a) not yet dispatched with end still today/future, or (b) dispatched and not arrived. **Drop** completed and cancelled. Sort: overdue first, then due soon, then on trip, then not dispatched.
+
+```mermaid
+flowchart LR
+  guard[Guard dispatch or arrival]
+  req[requests table]
+  board[Live Trip Board]
+  guard --> req
+  req --> board
+```
+
+## Implementation notes
+- New page `public_html/pages/live-board/index.php` (keep lean; extract query helper if the file grows).
+- Query `requests` + vehicle + driver + passenger count; reuse overdue logic already used on `public_html/pages/requests/index.php` (`status = approved`, no arrival, `end_datetime` past).
+- No new tables. No cron. No PDF. `php -l` on touched files.
+- Do not commit `_deploy_tmp` or `.env`.
+
+## QA
+- [ ] Guard dispatch appears on the board; arrival removes the row. (manual)
+- [ ] Overdue row is red and stays until arrival. (manual)
+- [x] Requester login: no Live Board menu (`canAccessLiveBoard()` = Guard / Motorpool / Admin / All Father only)
+- [x] MH/Guard: KPIs counted from the same Today operational set as the table
+- [x] `php -l` on touched files
+- [x] Do not commit `_deploy_tmp` or `.env`
+
+## Out of scope
+GPS, SMS, Plan #16 PDFs, cloning trips, fuel-vs-km, public QR.
+
+## Files (expected)
+- `Plan.md` (this section)
+- `public_html/pages/live-board/index.php`
+- `public_html/includes/live_board.php`
+- `public_html/includes/sidebar.php`
+- `public_html/includes/nav_search.php`
+- `public_html/index.php`
+- `public_html/includes/functions.php` (`canAccessLiveBoard`)
+- `public_html/pages/requests/view.php` (Guard can open Control No. via `canGuardViewActiveTrip`)
+
+---
+
+# LOKA Plan #18: Gas Voucher QR Public Verify — ✅ DONE (2026-09-09)
+
+Leave Plan #16 OPEN. Do not reopen Plan #11. Do not add a login wall on the scan page.
+
+## Goal
+
+When a gasoline station scans the QR on a printed gas voucher, they get a **reliable public authenticity check** (no login): HMAC already proves the link is ours; the page must render clearly on a phone and tell them if the voucher is approved and whether fuel was already paid.
+
+Stations already open `?page=verify-voucher&id=&hash=` with **no login** (`$publicPages` in `public_html/index.php`). That is correct. The HMAC is already checked (`gasVoucherVerifyHashValid`). The scan page is the weak part: `public_html/pages/public/verify-voucher.php` mixes Tailwind CDN with Bootstrap classes (same class of layout failure as the voucher view), has mojibake, and does not tell the station if fuel was already paid.
+
+Do **not** add a login wall. Printed QRs must keep working: hash stays `HMAC-SHA256(id-voucher_no)` truncated to 16 chars (`public_html/includes/functions.php` ~1630).
+
+```mermaid
+flowchart LR
+  print[Print voucher QR] --> scan[Station scans]
+  scan --> public["verify-voucher no login"]
+  public --> hmac[HMAC hash]
+  hmac --> status{approved?}
+  status -->|no| invalid[Not Valid]
+  status -->|yes| show[Authentic plus plate qty station paid]
+```
+
+## What the station should see
+
+**Not Valid (red)** if: missing id/hash, bad HMAC (hide all details), not approved, deleted.
+
+**Authentic (green)** only if approved. Then show voucher no., date, gas station, driver, plate, fuel + qty, reviewed by, approved by, **payment status**.
+
+If `payment_status` is `paid` / `processed` / `cancelled`: still authentic, but a **yellow/red warning** — do not release fuel again.
+
+## Code
+
+Rebuild `public_html/pages/public/verify-voucher.php` like `public_html/pages/public/verify-ticket.php`: Bootstrap 5 + Bootstrap Icons, mobile card, UTF-8, no Tailwind.
+
+Keep `$publicPages` entry in `public_html/index.php` (`verify-voucher`).
+
+No schema. No change to `public_html/pages/gas-vouchers/print.php` QR payload unless SITE_URL is wrong (QR must be `https://lokafleet.dictr2.cloud/...`, not localhost). Confirm that on print before a new voucher is issued.
+
+## Out of scope
+
+Gas-station login / PIN to redeem. Changing HMAC fields (would void already-printed QRs). Open `qr.php` generator.
+
+## Implementation — ✅ DONE (2026-09-09)
+
+- [x] Rebuilt `public_html/pages/public/verify-voucher.php` in the `verify-ticket.php` pattern: Bootstrap 5.3.2 + Bootstrap Icons, 480px mobile card, `#0b3d6e` DICT header, UTF-8 (proper `—`/`·`, BOM and mojibake removed), **zero Tailwind**.
+- [x] Not Valid (red) branch: missing id/hash, bad HMAC (voucher details nulled out — nothing leaks), non-approved status (shows current label), deleted/not found.
+- [x] AUTHENTIC (green) only when `status='approved'`; shows voucher no., date, gas station, driver, plate, fuel + qty (FULL TANK handling kept), reviewed by, approved by, **payment status badge**.
+- [x] Payment warnings: `paid` → yellow "Already Paid — do not release fuel again"; `processed` → yellow "Already Processed — do not release fuel again"; `cancelled` → red "Payment Cancelled — do not release fuel"; `unpaid` → neutral "Fuel not yet released" (badge only, no warning box). Still authentic in all cases — no login wall added.
+- [x] HMAC untouched: `gasVoucherVerifyHashValid()` / `gasVoucherVerifyHash()` / `gasVoucherVerifyUrl()` unchanged (`HMAC-SHA256(id-voucher_no)` truncated 16) — already-printed QRs keep working. `$publicPages` entry `verify-voucher` kept.
+- [x] QR payload check: `gasVoucherVerifyUrl()` builds from `SITE_URL`; `config/constants.php:20-24` refuses to boot production without HTTPS `SITE_URL`; `pages/gas-vouchers/print.php:47,397-399` prints the verify link + explicit "Still using localhost — phones cannot open this" warning. No code change needed.
+
+## QA — verified 2026-09-09 (local XAMPP; seeded `SMOKE-18-*` vouchers, deleted after)
+
+- [x] Approved + unpaid voucher scanned → green AUTHENTIC, all details readable at 390px phone viewport (browser screenshot; Bootstrap card stacks cleanly).
+- [x] Approved + `paid` → AUTHENTIC + yellow "Already Paid — Do not release fuel again" warning box + `Paid` badge (screenshot verified); `cancelled` → AUTHENTIC + red "Payment Cancelled" (HTTP-verified).
+- [x] `pending_review` voucher + valid hash → Not Valid, "not valid for fuel release", no plate/fuel details (HTTP-verified).
+- [x] Missing hash and bad hash → Not Valid, no voucher details leaked (HTTP-verified); non-existent id → "not found or has been deleted".
+- [x] 0 Tailwind refs, Bootstrap 5.3.2 present, 0 mojibake lines in served HTML.
+- [x] Printed-QR URL: production enforced HTTPS by `constants.php` + localhost warning on `print.php`; local URL is localhost only because dev `.env` has no `SITE_URL` (expected).
+- [x] `php -l` clean on `verify-voucher.php`. `_deploy_tmp` fixtures deleted; `.env` untouched.
+
+## Files
+
+- `public_html/pages/public/verify-voucher.php` (rebuilt)
+- `public_html/index.php` — unchanged (`verify-voucher` stays in `$publicPages`)
+- `public_html/includes/functions.php` — unchanged (hash helpers intact)
+
+---
+
+# LOKA Plan #19: Leftover UX Fixes, then VAPT, then Optional Features — OPEN (Phases A–C DONE 2026-10-06; Phase D VAPT open)
+
+## Goal
+
+Fix leftover trip-ticket, voucher, and report UX first. Document VAPT findings as a follow-up hardening sprint. Extra features stay a pick-list, not auto-build.
+
+Priority confirmed 2026-09-10: **bugs/UX first, then VAPT**.
+
+```mermaid
+flowchart LR
+  phaseA[Phase A Trip tickets]
+  phaseB[Phase B Gas vouchers]
+  phaseC[Phase C Reports Plan 11]
+  phaseD[Phase D VAPT]
+  pick[Pick extra features]
+  phaseA --> phaseB --> phaseC --> phaseD
+  phaseC --> pick
+```
+
+## Phase A — Trip tickets (do first) — ✅ DONE (2026-10-06, localhost `fleetdb` QA)
+
+These are live bugs, not polish.
+
+1. **Tickets stay `draft` forever** — ✅ [create.php](public_html/pages/trip-tickets/create.php) now inserts `status => 'submitted'` (flash: "created and submitted for Motorpool review"), so Motorpool Review + badges see what drivers filed. QA: driver-3 render shows the form; new inserts land in the `submitted` queue.
+2. **Approve / Return is broken** — ✅ two-part fix: [index.php](public_html/pages/trip-tickets/index.php) now accepts the POSTed body id (`post('id') ?: post('ticket_id')`; GET `id` stays for view links) and the JS CSRF field is `csrfToken()` (staging fix from Plan #42, kept). QA: motorpool POST `?action=approve` with `ticket_id` + CSRF → ticket `submitted → approved`, `reviewed_by` recorded, driver notified, 0 warnings.
+3. **Filter drops the page** — ✅ hidden `page=trip-tickets` added to the filter form; Filter stays on the list.
+4. **Combined dest/purpose caps clip multi-stop trips** — ✅ ticket create destination `maxlength` 100 → **500** (client + `postSafe`), matching the request chain (` -> ` joined hops; purpose writer was already 500). QA: create form renders `maxlength="500"`, old 100 gone.
+5. **Label `TT-{request_id}`** — skipped (cosmetic; keep as-is per plan).
+
+## Phase B — Gas vouchers — ✅ DONE (2026-10-06)
+
+- **Edit is a dead link** — ✅ `action=edit` routed to `pages/gas-vouchers/create.php` (`$isEdit` mode; draft/`pending_review`/`pending_approval` edit rules already enforced server-side). QA: motorpool opening `?page=gas-vouchers&action=edit&id=7` renders "Edit Gas Voucher" (was: silently falling through to the list).
+- Remove leftover Tailwind / mojibake — ✅ the `w-100 px-4 sm:px-6 lg:px-8` / `xl:col-span-7` Tailwind wrapper on [approve.php](public_html/pages/gas-vouchers/approve.php) is now a Bootstrap `container-fluid px-4 py-4` + `col-lg-8` (print.php mojibake already fixed 2026-09-28). QR public verify (Plan #18) untouched.
+
+## Phase C — Reports (Plan #11) — ✅ DONE (2026-10-06, see the Plan #11 section above)
+
+- [x] Travel order + number on Vehicle History table (CSV already had it)
+- [x] TO + OB slip on Trip Requests UI + CSV + PDF
+- [x] Revision stats card (`$stats->revision` was already counted)
+- [x] Note: Trip Requests date filter uses `created_at` vs Vehicle/Driver `start_datetime`
+- [x] `department_usage` top-vehicles column
+
+**Defer Plan #16** (overdue PDF + daily digest): needs Mailer attachments + System Control toggles. Not a leftover bug.
+
+## Phase D — VAPT (after A–C, unless pulled forward)
+
+Code review only (no exploit steps). Highest real issues:
+
+| Severity | Where | Finding | Defensive fix |
+|----------|--------|---------|----------------|
+| High | [`functions.php`](public_html/includes/functions.php) `gasVoucherVerifySecret()` | Empty `APP_KEY` falls back to `LOKA_SECRET` | Require a real `APP_KEY`; **keep 16-char HMAC** so already-printed QRs still scan |
+| High | `uploads/` + [`.htaccess`](public_html/.htaccess) | Files under webroot; guessed URL skips login | Deny static access; serve via auth + ACL (`file-view` today has **no** owner check) |
+| High | [`trip-tickets/view.php`](public_html/pages/trip-tickets/view.php), [`export-excel.php`](public_html/pages/trip-tickets/export-excel.php) | Any logged-in user can open another ticket by `id` | Same owner-or-motorpool/admin gate as PDF export |
+| High | [`users/toggle.php`](public_html/pages/users/toggle.php) | Deactivate user is CSRF-able GET | POST + `requireCsrf()` |
+| High | [`cancel.php`](public_html/pages/requests/cancel.php), [`rollback.php`](public_html/pages/requests/rollback.php) | State change with no CSRF | `requireCsrf()` on POST |
+| High | [`Security.php`](public_html/classes/Security.php) `getClientIp()` | Trusts `X-Forwarded-For` | `REMOTE_ADDR` or trusted-proxy CIDR only |
+| High | [`index.php`](public_html/index.php) | `Host: localhost` or non-prod `APP_ENV` shows errors / skips rate limit | Gate on server `APP_ENV`, never `HTTP_HOST` |
+| High | [`Auth.php`](public_html/classes/Auth.php) | Password reset does not kill remember-me / extra tokens | Delete all reset + remember rows; regenerate session |
+| Medium | [`verify-voucher.php`](public_html/pages/public/verify-voucher.php) | Distinct messages leak voucher existence/status | One generic fail for anonymous clients |
+| Medium | [`export-excel.php`](public_html/pages/trip-tickets/export-excel.php) | Unescaped spreadsheet XML | `e()` + neutralize `= + - @` |
+| Medium | [`requests/print.php`](public_html/pages/requests/print.php) | Any Guard can print any request | Same ACL as request view |
+
+**Ops (Plan #12 leftover):** rotate DB / Gmail app / SSH passwords if they were ever chat-exposed; prefer SSH keys. Confirm live `APP_KEY` is not empty and not the `.env.example` placeholder. Do not commit secrets.
+
+SQLi on allowlisted sorts looked clean. Cron requires `CRON_SECRET`. `health.php` does not dump passwords.
+
+## Recommended features (discuss — do not build unless picked)
+
+1. **Override actually reassigns** the displaced trip (today [`approvals/process.php`](public_html/pages/approvals/process.php) only notifies; vehicle stays double-booked).
+2. **Fuel vs km / voucher reconciliation** by plate and date (Plan #10).
+3. **Weekly Vehicle Trip Ticket fuel lines** filled from approved vouchers for that plate ([`generate-summary.php`](public_html/pages/my-trip-tickets/generate-summary.php) fuel cells are still empty).
+4. **Duplicate-request admin report** (same user + dest + start + purpose within 5 min) for historical rows Plan #2 no longer prevents.
+5. **Plan #16** overdue PDF + All Father daily digest — useful, larger than A–C.
+
+## What we should do next
+
+Default after confirm: **Phase A on live + GitHub**, then B, then C. Pause before D so we can decide whether QR HMAC fallback and upload ACL are in the same week.
+
+## Out of scope
+
+New modules. Plan #16. Changing printed QR hash length. Rewriting reports.
+
+## Files (when implemented)
+
+- `public_html/pages/trip-tickets/create.php`
+- `public_html/pages/trip-tickets/index.php`
+- `public_html/pages/gas-vouchers/edit.php` (new)
+- `public_html/index.php` (gas-vouchers `edit` route)
+- Reports pages listed in Phase C
+- VAPT files listed in Phase D
+
+---
+
+# LOKA Plan #20: Useful Role Dashboard — DONE (2026-09-10)
+
+## Goal
+
+Make Dashboard a role-aware ops home. Wire the unused `dashboardStatsForUser()` helper, fix blank Chart.js canvases, and put today's work one click away.
+
+## What shipped
+
+- [`pages/dashboard/index.php`](public_html/pages/dashboard/index.php) calls `$dash = dashboardStatsForUser()` and renders short partials (`kpis`, `actions`, `charts`, `queue`).
+- Admin / Motorpool Head: pending approvals (all waiting, not “my requests”), trips today, on trip now → Live Board, overdue (`end_datetime < NOW()`, no arrival) → Live Board, available vehicles, gas pending, submitted tickets. Needs-attention strip and approval queue with destination, requester, age, Open.
+- Approver: department-scoped charts and pending/unviewed queue.
+- CAF / OIC CAF: voucher KPIs + voucher queue only (no trip charts).
+- Requester: my pending / revision / upcoming; New Request stays.
+- Driver (stacked): next-trip overlay, My Trips, create ticket for completed trips without a ticket.
+- Guard-only: redirect to Guard.
+- Charts: JS uses `s.status` (not PHP `s->status`); empty window shows “No trips in this window” + Reports link; removed `canvas { height: auto !important }` so Chart.js keeps container height.
+
+## QA
+
+- `php -l` clean on dashboard PHP.
+- Analytics JSON rows have `status` / `count` keys.
+- Browser pass: admin, MH, approver, CAF, requester, driver — charts plot or show empty copy, never a collapsed blank card. Guard-only redirects.
+
+## Out of scope
+
+New Chart library. GPS. Plan #16 PDF digest. Sidebar/theme rewrite. Fake demo data.
+
+## Files
+
+- `public_html/includes/dashboard_stats.php`
+- `public_html/pages/dashboard/index.php`
+- `public_html/pages/dashboard/partials/kpis.php`
+- `public_html/pages/dashboard/partials/actions.php`
+- `public_html/pages/dashboard/partials/charts.php`
+- `public_html/pages/dashboard/partials/queue.php`
+- `public_html/assets/css/style.css`
+- `public_html/config/constants.php` (2.7.3 cache-bust)
+
+---
+
+# LOKA Plan #21: Fair Driver Ranking + Trip Extract — ✅ DONE (2026-09-13, live)
+
+## Goal
+
+Make Driver Rankings and Evaluations show a real per-driver score breakdown, rank fairly when drivers have different numbers of ratings, and add a date-range **extract of every driver who went on a trip**. Display/query only. No schema. No rating-form change. **Build and QA on localhost; do not deploy to live until signed off.**
+
+## What the reports already do
+
+Both pages already average the 4 form categories (Cleanliness, Behavior, Appearance, Safety). Overall is `AVG` of those 4 (`evalReportRankings()` in [`eval_report.php`](public_html/includes/eval_report.php)).
+
+- **Driver Rankings** — 4 category columns exist; the **chart is overall only**. Default Min evaluations = 2. Sort is **raw average**.
+- **Evaluations** — same 4 averages, **no rank #**. Per-trip table has invite rate + overall, not the 4 stars per trip.
+- Ranking unit is **submitted evaluations** (one trip can have several passengers), not trip count.
+
+## Why raw average is not a fair rank
+
+- Driver A: 5.00 from 1 eval → rank 1
+- Driver B: 4.60 from 20 evals → rank 2
+
+Min-evals = 2 only hides 1-eval drivers; 3 evals and 40 evals still count the same.
+
+**Rank score (IMDb / Bayesian shrinkage toward the fleet mean):**
+
+`score = (v / (v + m)) * R + (m / (v + m)) * C`
+
+- `R` = driver’s raw overall average
+- `v` = evaluation count
+- `C` = fleet mean for the same filters/period
+- `m` = 5 (prior strength)
+
+Example, `C = 4.20`, `m = 5`: A → 4.33, B → 4.52 (B ranks higher).
+
+Show raw average and eval count. Rank # uses **score**, then more evals as tie-break. Below Min evaluations (default 2): second table **Not ranked (too few evaluations)** — no trophy number. One footnote under the table.
+
+```mermaid
+flowchart LR
+  evals[Submitted evals]
+  raw[Raw avg R plus count v]
+  fleet[Fleet mean C]
+  score[Rank score]
+  table[Ranked table]
+  unranked[Not ranked too few]
+  evals --> raw
+  evals --> fleet
+  raw --> score
+  fleet --> score
+  score --> table
+  raw --> unranked
+```
+
+## Score breakdown on Rankings + Evaluations
+
+- Columns: Rank, Driver, Evals, Rank score, Raw avg, 4 category averages
+- Compact 4-segment bars; grouped chart for top 10 (overall + 4 categories)
+- Expand a driver: each submitted eval (trip #, date, destination, overall, 4 scores, optional remark)
+- **Never** rater name / email / `evaluator_user_id` (Plan #14)
+
+Helper: `evalReportDriverEvalRows()` in `eval_report.php`. CSV + existing evaluation PDF get Rank score + one-line formula footnote.
+
+## Driver trip extract (new)
+
+**Layout (confirmed 2026-09-13):** one row per trip, plus a short driver summary on top.
+
+Not the ranking table. **Every assigned driver** in From/To, including **no ratings yet** (scores show —).
+
+**Trip set:** `driver_id` set, `deleted_at IS NULL`, `status IN ('approved','completed')`, `start_datetime` in From/To. Cancelled/rejected out. Same Driver / Vehicle / Trip no. filters.
+
+**Page:** `/?page=reports&action=driver-trip-extract`
+
+```mermaid
+flowchart TB
+  range[From To date range]
+  trips[Assigned trips in range]
+  summary[Driver summary trip count evals rank score]
+  detail[One row per trip]
+  range --> trips
+  trips --> summary
+  trips --> detail
+  detail --> cols[Columns you tick]
+```
+
+**Checkboxes (GET flags; CSV/PDF match the screen)**
+
+Driver summary: name, trip count, evals — always on; rank score + raw avg on by default.
+
+Trip rows default **on:** date, trip #, driver, destination, overall, 4-category breakdown, anonymous comments.
+
+Trip rows default **off:** plate, invite/submitted counts, rank score repeated on each row.
+
+## Implementation — ✅ DONE (2026-09-13, localhost)
+
+- [x] **Fair rank score** — `evalReportRankings()` rewritten (`includes/eval_report.php`): `score = (v/(v+m))·R + (m/(v+m))·C` with `EVAL_RANK_PRIOR_STRENGTH = 5`, C = fleet mean over the SAME filters/period (separate AVG query, no Min-eval HAVING). Returns `['ranked', 'unranked', 'fleet_mean']`; rank order = score desc, evals desc tie-break; drivers with `eval_count < min_eval` land in `unranked` (no rank number). All four former callers migrated (Rankings, Evaluations, CSV, PDF).
+- [x] **Score breakdown tables** — shared `evalReportRankTableHtml()` renders Rank (trophy 1–3 incl. bronze), Driver (expand caret), Evals, **Rank score** badge, **Raw avg**, 4 category averages each with a compact green bar — identical on Rankings + Evaluations. Second **"Not ranked (too few evaluations)"** table under the ranked one. One formula footnote under the tables (`evalReportScoreFootnote()` prints R, v, C with the actual fleet mean, m = 5, threshold).
+- [x] **Expand a driver** — new `evalReportDriverEvalRows()` (never selects rater identity); each ranked/unranked row expands (Bootstrap collapse) to its submitted evals: trip #, date, destination, overall, 4 category scores, optional remark as "Anonymous passenger".
+- [x] **Grouped chart** — Rankings top-10 chart now plots Overall + the 4 categories (5 datasets, Chart.js).
+- [x] **CSV + evaluation PDF** — rankings CSV gains Rank Score column + formula/period comment rows; evaluation PDF gains a Score column (ranking = ranked ∪ unranked sorted by score; Min evaluations still not applied) + footnote.
+- [x] **Driver Trip Extract** — new `/?page=reports&action=driver-trip-extract` (`driver-trip-extract.php`): every assigned driver/trip with `driver_id` set, `deleted_at IS NULL`, `status IN ('approved','completed')`, `start_datetime` in From/To (cancelled/rejected out; same Driver/Vehicle/Trip-no. filters; self-scoped lock kept). Short driver summary on top (name/trips/evals always; rank score + raw avg default on), then one row per trip. Column checkboxes via GET flags (`evalTripExtractColumns()`; hidden-input pattern preserves defaults): ON by default — date, trip #, driver, destination, overall, 4-category breakdown, anonymous comments; OFF by default — plate, invite/submitted counts, rank score per row. Drivers/trips with no ratings show —.
+- [x] **Extract exports** — `export-driver-trip-extract-csv.php` (summary + trips sections honouring the same flags) and `export-driver-trip-extract-pdf.php` (landscape TCPDF, DICT header, `reportPdfWriteMeta()`, per-column width scaling, MultiCell wrapped rows, footnote); both audited as `data_export`/`driver_evaluations` with filter + column flags, no rater ids.
+- [x] **Routing/nav** — `index.php`: 3 new report actions + `$driverAllowed` extended (self-scoped drivers can open extract + exports). Sidebar "Driver Trip Extract" under Reports; nav search entry. No migration, no change to `submit.php`, no fake scores.
+
+## QA — verified 2026-09-13 (localhost; `_deploy_tmp/verify_plan21_*.php`; rolled-back seed txns + committed browser fixtures removed after)
+
+- [x] Score math exact: seeded v=5/R=4.60 → score 4.633; v=1/R=5.00 → 4.722; fleet mean C = 4.6667 — formula asserted to 3 decimals (`verify_plan21_rankings`).
+- [x] Ranked/unranked split (min 2): only the 5-eval driver ranked; 1-eval driver in "Not ranked"; order by score with evals tie-break; footnote shows C = 4.70 with real+seeded mix.
+- [x] Extract: 6 seeded trips present, cancelled excluded, driver C's approved + completed trips counted with 0 evals and — scores; summary covers every seeded driver incl. 0-eval; per-trip invite/submitted counts + per-trip overall (4.50) + 4-category avgs correct.
+- [x] Pages render clean (CLI authed harness, no PHP warnings): Rankings (chart + tables + unranked + footnote + extract link), Evaluations (same breakdown + response-rate + remarks), Trip Extract (with plate column flag on), both CSVs.
+- [x] Browser visual (Chrome, seeded then cleaned): rankings grouped top-10 chart (5 datasets), trophy rank 1, bars per category, unranked table, expand → per-eval rows w/ anonymous remarks; extract summary + trip rows incl. a real unrated trip showing —; both PDFs render (score column + footnote; summary + per-trip rows honouring column flags).
+- [x] Anonymity: `evalReportDriverEvalRows` selects no `evaluator_user_id`/guest/name/email columns; comments rendered as "Anonymous passenger" everywhere.
+- [x] `php -l` clean on all 11 touched files + full public_html sweep 0 errors. Smoke fixtures (requests/evals/session file/temp PDFs) deleted — nothing persisted.
+- [x] **Deployed to live** 2026-09-13 — report PHP files only (`eval_report.php`, rankings/evaluations pages, trip extract + CSV/PDF, `index.php`/`sidebar.php`/`nav_search.php`). No schema, `.env` untouched. Backup `pre_plan21_20260913_095131`. Login 200; rankings/extract 302 (auth). `.env` not publicly readable.
+
+## Out of scope
+
+GPS. Changing the 4-star form. Naming who rated. Separate leagues by trip volume. One-row-per-driver extract (trip rows chosen instead).
+
+---
+
+# LOKA Plan #22: Official Business Pass Slip — ✅ DONE (2026-09-15, `ob_integration`, localhost only — do not deploy until sign-off)
+
+Branch: **`ob_integration`**. Paper source: [`Reference/PASS-SLIP-OB_revised (1).pdf`](Reference/PASS-SLIP-OB_revised%20(1).pdf) (DICT RO2 Pass Slip + Certificate of Appearance).
+
+## Goal
+
+A first-class **OB Pass Slip** application, parallel to vehicle requests, bound to the employee’s account. Own routing and timeline. Optional bind to a vehicle request. Canvas signatures. Certificate of Appearance signed by the receiving client (no LOKA account). PDF matches the paper template. Same `notify()` channel with **OB titles**, not vehicle-request titles.
+
+Do **not** store OB rows in `requests`. Do not touch ranking, Live Board, or `.env`. No live deploy until sign-off.
+
+## Two apps, optional bind
+
+| | Vehicle request | OB Pass Slip |
+|---|---|---|
+| Purpose | Book a fleet vehicle | Leave on official business |
+| Vehicle | Required | Plate optional |
+| Flow | Dept → motorpool → Guard dispatch/arrival | Official: Supervisor → motorpool → Guard. Private: Supervisor → Guard (no motorpool). CoA → requester finality. Guard-on-dispatch is Plan #24. |
+
+- Employee can file **OB only**, **vehicle only**, or **both**.
+- **Default:** Attach OB on a vehicle request only if the requester already has an **approved** slip (date overlapping the trip). Otherwise block submit and link to Apply OB.
+- **All Father toggle** `allow_ob_attach_after_submit` (Settings, default **off**): when on, submit the vehicle request first and bind the OB later once approved.
+- **TO file** stays on the vehicle request. If Settings require a travel document: **approved OB or TO** — one is enough, never both.
+- **1 OB = 1 vehicle request** (`requests.ob_request_id` unique). Passengers not enforced in v1.
+
+```mermaid
+flowchart LR
+  emp[Employee]
+  obApp[OB Pass Slip]
+  vehApp[Vehicle request]
+  emp --> obApp
+  emp --> vehApp
+  obApp -->|approved owned by user| bind[Attach]
+  vehApp --> bind
+  toFile[TO file] --> vehApp
+```
+
+## Routing
+
+```mermaid
+flowchart TD
+  submit[Employee submits — printed names, no canvas]
+  sup[Supervisor approves and signs]
+  mp[Motorpool approves and signs]
+  ok[Approved printable]
+  guardOut[Guard departure plus sign]
+  visit[Client CoA name purpose canvas]
+  guardIn[Guard arrival]
+  review[Requester Submit for finality]
+  done[Completed PDF]
+  submit --> sup
+  sup -->|reject or revision| submit
+  sup --> mp
+  mp --> ok
+  ok --> guardOut
+  guardOut --> visit
+  visit --> review
+  guardIn --> review
+  review --> done
+```
+
+- **Immediate Supervisor:** users tagged `users.is_ob_approver` (admin checkbox). Requester **selects** from that list (same UX as picking a department approver).
+- **Motorpool:** same `getMotorpoolHeads()` as vehicle requests. **Plan #24:** required only when Apply chooses an official DICT vehicle; private-vehicle OBs skip this step.
+- **Guard (v1 as shipped in #22):** any signed-in Guard stamps OB departure/arrival **separately** from vehicle dispatch. Departure needs a signature (saved e-sign in Plan #23); arrival is time only. **Plan #24** binds that stamp to vehicle dispatch when a fleet trip is attached.
+- Statuses: `pending_supervisor` → `pending_motorpool` → `approved` → `departed` → `coa_received` → `completed` (+ `rejected`, `revision`, `cancelled`).
+- Approvals: table **`ob_approvals`** (do not weaken `approvals.request_id` FK to vehicle requests).
+- CoA may be filled after `approved`. **Submit for finality** requires a signed CoA. Guard times print when present; missing times **warn** but do not block finality. After client signs → `coa_received`. Only the **requester** taps Submit for finality → `completed`. No extra supervisor/motorpool step.
+
+## Certificate of Appearance
+
+Paper: receiving office writes details and signs. Client has **no LOKA account**.
+
+**Both modes:**
+
+1. **On-device:** requester opens their approved OB (logged in) and hands the phone/tablet. Client types office/establishment, representative name, purpose, from/to, and signs a canvas.
+2. **Public link** (same idea as `pages/evaluations/submit.php`): requester taps **Allow client to sign** → token URL, no login. One-time; expires after submit or after `ob_coa_token_days`. Token is the capability; rate-limit by token.
+
+After CoA save: notify requester `ob_coa_signed` — “OB Pass Slip ready to finalize”.
+
+## Canvas signatures (v1 as shipped locally)
+
+PNG files under `uploads/ob_signatures/{id}/` (paths in columns, not base64 in SQL). Shared signature-pad JS (draw, clear, POST data URL; server writes file).
+
+Apply does **not** collect an employee canvas. Participants are users on the slip; the employee line **prints** as `J.Recolizado/D.Abad` (first initial + last name, slash-separated). No extra signatures for participants. Table `ob_request_participants` (migration 049).
+
+| Who | When (v1) | Plan #23 |
+|-----|-----------|----------|
+| Employee / participants | Printed names only | Unchanged — no e-sign on that line |
+| Immediate Supervisor | Canvas on approve | Saved e-sign if on file; else canvas once + optional save |
+| Motorpool Head | Canvas on approve | Same |
+| Guard | Canvas on departure | Same |
+| Receiving client | Canvas on CoA (always) | Unchanged — always a fresh canvas; never stored on a user |
+
+## PDF
+
+TCPDF matching the paper Pass Slip (Helvetica, ASCII). Filled: Pass Slip No. (`YYMMDD-NNN`, e.g. `260915-001` — year/month/day of the OB date, monthly series resetting to 001 next month), date, purpose, employee, optional plate, supervisor/motorpool names, guard times. Embed signature images in the matching boxes. CoA block filled only after client sign. Blank until each party has signed. Print/download from OB view after approval; after finality the PDF is the complete record.
+
+## Notifications
+
+Same `notify()` (in-app + email queue + SMS). New keys in `MAIL_TEMPLATES` and `SMS_DEFAULT_ALLOWLIST`. **Do not reuse** `request_submitted` / “New Vehicle Request…”.
+
+- `ob_submitted` / `ob_submitted_motorpool`
+- `ob_supervisor_approved` / `ob_fully_approved`
+- `ob_rejected` / `ob_revision` / `ob_cancelled`
+- `ob_departed` / `ob_arrived`
+- `ob_coa_signed` — requester: ready to finalize
+- `ob_finalized` — requester (and supervisor/motorpool FYI)
+
+Do not attach OB events to a vehicle `request_id` unless bound.
+
+## Pass Slip numbering
+
+Format: **`YYMMDD-NNN`** (example `260915-001`).
+
+- `26` = year, `09` = month, `15` = day of the **OB date** on the form
+- `-001` = series for that **calendar month**; October starts again at `001`
+- Same day examples: `260915-001`, `260915-002`; next day in September: `260916-003`; 1 Oct: `261001-001`
+
+**Why this, not `OB-2026-0001`:** the paper field is a short Pass Slip No.; date+series is readable at the gate.
+
+**Why monthly series (not daily):** you asked the counter to reset each month. The day stays in the prefix so two slips on the 15th still show `260915-…` while the running number is monthly.
+
+**Not chosen:** `2609-001` (month only) — shorter, but hides the day. Daily reset (`260915-001` then `260916-001`) would make `-001` mean “first of that day,” which is also fine if you later prefer it.
+
+Generator: `obGeneratePassSlipNo()` uses `MAX` of the month serial (including cancelled slips) so numbers are not reused. Unique-key retry on insert.
+
+## Schema — migration `048_ob_pass_slips.php`
+
+(`047` already exists.)
+
+- `users.is_ob_approver` TINYINT(1) NOT NULL DEFAULT 0
+- `ob_requests`: `pass_slip_no`, `user_id`, `department_id`, `purpose`, `ob_date`, `plate_number`, `supervisor_user_id`, `motorpool_head_id`, `status`, guard datetimes + guard user ids, signature path columns, CoA text + `coa_signature_path`, `coa_token_hash`, `coa_token_expires_at`, `finalized_at`, timestamps, `deleted_at`
+- `ob_approvals`: `ob_request_id`, `approver_user_id`, `approval_type`, `action`, `comments`, timestamps
+- `requests.ob_request_id` NULL unique FK
+- settings: `allow_ob_attach_after_submit` default `0`; `ob_coa_token_days`
+
+SQL only. No JSON file storage.
+
+## UI (keep files under ~300 lines)
+
+- Sidebar + nav search: **OB Pass Slips** (`/?page=ob-requests`)
+- `public_html/index.php` route `ob-requests`
+- `public_html/pages/ob-requests/` — `index.php`, `create.php`, `view.php`, `process.php`, `print.php` / PDF, `coa.php` (logged-in canvas), `coa-sign.php` (public token)
+- Guard partial for OB time stamps (do not bloat `guard/index.php`)
+- Users create/edit: **OB Approver** checkbox
+- Vehicle create/edit/view: Attach approved OB
+- Settings: delayed-attach toggle
+- Helpers: `public_html/includes/ob_requests.php`
+
+## Implementation checklist — ✅ DONE (2026-09-15)
+
+- [x] Migration 048 + `users.is_ob_approver` + `requests.ob_request_id` unique bind + settings (`allow_ob_attach_after_submit`=0, `ob_coa_token_days`=7) — applied to `old_loka_db`; `ob_requests`/`ob_approvals` added to the `Database` table allowlist.
+- [x] OB apply / list / view / approve-reject-revision / print — `pages/ob-requests/` (`index`, `create`, `view`, `process`, `print`, `coa`, `coa-sign`); Pass Slip No. `YYMMDD-NNN` (e.g. `260915-001`) with monthly series reset and unique-key retry.
+- [x] Supervisor then motorpool (each signs a canvas on approve); Guard out/in stamps in a dedicated partial (`pages/guard/partials/ob_section.php`) — departure requires canvas sign, arrival is time-only; statuses `pending_supervisor → pending_motorpool → approved → departed → coa_received → completed` (+ rejected/revision/cancelled; requester can resubmit a revision, cancel before completion).
+- [x] CoA on-device (`coa.php`, requester's device) + public token (`coa-sign.php`, no login; one-time, expires after `ob_coa_token_days`, per-session attempt cap); requester **Submit for finality** requires signed CoA; guard times warn-but-allow (logged).
+- [x] Vehicle attach dropdown in `requests/create.php` + `edit.php` (own approved slip, trip-date match, 1-per-OB enforced in PHP **and** by `uq_requests_ob`); TO **or** OB satisfies the travel-document setting, never both; delayed attach (`vehicle_bind`) gated by the All Father toggle, offered on `requests/view.php` and from the OB view.
+- [x] TCPDF Pass Slip matching the Reference template — office header + Pass Slip No./date, PASS SLIP title, purpose, employee/supervisor signature boxes (embedded PNGs), plate + approved-by, guard times + initials, CoA block; **two copies per page** (dashed separator) like the paper; blank until each party signs.
+- [x] `MAIL_TEMPLATES` + `SMS_DEFAULT_ALLOWLIST`: all 11 `ob_*` keys with OB titles (never "Vehicle Request"); OB notifications never tagged with a vehicle request id unless bound.
+- [x] Sidebar **OB Pass Slips** + nav search; signatures stored as PNG files under `uploads/ob_signatures/{id}/` (paths, not base64); shared canvas pad `assets/js/ob-signature.js` (mouse + touch).
+
+## QA — verified 2026-09-15 (`_deploy_tmp/verify_plan22_*`; rolled-back seed txns, fixtures removed after)
+
+- [x] Approve without CoA allowed; finalize without CoA blocked; with CoA → `coa_received` → requester finalize → `completed` (asserted in workflow smoke).
+- [x] Public token resolves → saves CoA → **invalid after submit** (one-time); on-device canvas save also works; invalid/expired token shows "Link Not Usable" (HTTP-verified).
+- [x] PDF renders with signatures embedded where present, blanks where not; both copies on one page; template matches the paper (browser-verified).
+- [x] One OB cannot attach to two vehicle requests — blocked in `obValidateBind()` and by the DB unique index (`23000` asserted).
+- [x] Toggle off: no bind-after-submit; attach requires own approved slip with matching date (foreign/dated/bound slips all rejected). Toggle on: delayed attach form renders on request + OB views.
+- [x] Notifications use OB titles (`ob_submitted`, `ob_supervisor_approved`, `ob_coa_signed`, …) — verified keys exist in `MAIL_TEMPLATES`; `notify()` called with `request_id = null` for unbound slips.
+- [x] `php -l` clean on all 17 touched files + full public_html sweep 0 errors; guard dashboard renders with the OB partial; create/view/coa/coa-sign render without PHP warnings; CoA page usable at phone width.
+- [ ] **NOT deployed to live** — deploy only after DICT sign-off.
+
+## Out of scope (v1)
+
+GPS. Passenger-level OB enforcement. Live VPS. Saved staff e-sign is Plan #23 (built). Merging Guard vehicle dispatch with OB times, and skipping Motorpool for private vehicles, is Plan #24. CoA login-on-sign + mobile canvas/kiosk is Plan #25.
+
+## Files (planned)
+
+- `public_html/migrations/048_ob_pass_slips.php`
+- `public_html/includes/ob_requests.php`
+- `public_html/pages/ob-requests/*`
+- `public_html/index.php`, `includes/sidebar.php`, `includes/nav_search.php`
+- `public_html/pages/users/create.php`, `pages/users/edit.php`
+- `public_html/pages/requests/create.php`, `edit.php`, `view.php`
+- `public_html/pages/settings/index.php`
+- `public_html/pages/guard/` (partial)
+- `public_html/config/mail.php`, `config/sms.php`
+
+---
+
+# LOKA Plan #23: OB Saved E-sign (staff specimen) — ✅ DONE (2026-09-15, `ob_integration`, localhost only — do not deploy until Plan #22 + this are signed off)
+
+Branch: **`ob_integration`**. Follow-on to Plan #22. Local `old_loka_db` only. No live deploy until Plan #22 + this are signed off.
+
+## Goal
+
+Staff who stamp many OB slips (Immediate Supervisor, Motorpool Head, Guard) should not draw a canvas every time. Admin uploads a specimen e-sign on the user record. Approve / Guard departure **copies** that PNG onto the slip. The receiving client (Certificate of Appearance) is the only party who still signs on a canvas every visit — they have no LOKA account.
+
+**Decisions (2026-09-15):**
+
+- **Who uploads:** Admin only, on User create/edit.
+- **If no specimen yet:** Canvas once, with optional **Save this as my e-sign for next time** (writes `users.signature_path` so the next action skips the pad). Admin can still replace it later.
+- **Employee / participants:** still printed names (`J.Recolizado/D.Abad`). No e-sign on that line.
+- **CoA:** always a fresh canvas. Never saved onto a user.
+
+```mermaid
+flowchart TD
+  admin[Admin uploads PNG on User edit]
+  store[users.signature_path]
+  act[Approve or Guard departure]
+  has{E-sign on file?}
+  stamp[Copy PNG onto this OB slip]
+  canvas[Canvas once]
+  save{Save for next time?}
+  admin --> store
+  act --> has
+  has -->|yes| stamp
+  has -->|no| canvas
+  canvas --> save
+  save -->|yes| store
+  canvas --> stamp
+```
+
+## Storage
+
+- Migration `050_user_esign.php`: `users.signature_path` VARCHAR(255) NULL. File at `uploads/user_signatures/{userId}.png`.
+- On approve/stamp: **copy** into `uploads/ob_signatures/{obId}/{who}.png` and keep writing existing OB columns (`supervisor_signature_path`, `motorpool_signature_path`, `guard_departure_signature_path`). Replacing the specimen later must not rewrite old slips.
+- Reuse `classes/FileUpload.php` (PNG/JPG, ~1MB). Preview via `?page=file-view`.
+
+## Admin UI
+
+`pages/users/create.php` and `pages/users/edit.php` (multipart):
+
+- File input for the specimen. Not required to create a user.
+- Edit: preview, replace, optional clear.
+
+## Approve / Guard
+
+Helpers (`ob_requests.php` or small `ob_esign.php`):
+
+- `obUserEsignPath($userId)`
+- `obStampSavedEsign($obId, $who, $userId)` — copy specimen onto the slip
+- `obResolveStaffSignature(...)` — saved copy **or** canvas; if canvas + save-for-next-time and they have none yet, write `users.signature_path`
+
+Wire in `pages/ob-requests/process.php` for `approve_supervisor`, `approve_motorpool`, `guard_departure`.
+
+- `pages/ob-requests/view.php` approve modal: thumbnail + Approve when an e-sign exists; otherwise canvas + checkbox.
+- `pages/guard/partials/ob_section.php` departure: same.
+- `coa.php` / `coa-sign.php`: canvas only.
+
+## Implementation checklist — ✅ DONE (2026-09-15)
+
+- [x] Migration `050_user_esign.php` — `users.signature_path` VARCHAR(255) NULL + `uploads/user_signatures/` (created by migration, also lazily on upload). Applied to `old_loka_db`.
+- [x] Admin upload / preview / replace / clear — `pages/users/create.php` + `edit.php` now multipart: optional file input on create; edit shows a thumbnail preview (`?page=file-view`), replace input and a **Remove saved e-sign** checkbox. `obSaveUserEsignUpload()` validates PNG/JPG ≤ 1 MB by content (`getimagesize`), stores `uploads/user_signatures/{userId}.{ext}`, clears the old extension on replace; `obClearUserEsign()` unlinks + nulls.
+- [x] Copy-on-stamp + optional first-time save — `obResolveStaffSignature($obId, $who, $userId, $canvas, $saveForNextTime)` in `includes/ob_requests.php`: canvas wins when drawn; otherwise the specimen is **copied** onto the slip (`obStampSavedEsign()` → `uploads/ob_signatures/{id}/{who}.png`; JPG specimens are converted to PNG so TCPDF can embed them). A canvas with "save for next time" also writes `users.signature_path` when the user has none. Wired into `process.php` for `approve_supervisor`, `approve_motorpool`, `guard_departure`.
+- [x] Skip canvas when e-sign exists — approve modal shows a thumbnail + "Approve (saved e-sign)" with no pad; with no specimen it shows the canvas + **Save this as my e-sign for next time** checkbox. Guard departure: plain confirm button when the guard has a specimen; modal + checkbox otherwise. `coa.php` / `coa-sign.php` untouched — always a fresh canvas, never saved to a user.
+
+## QA — verified 2026-09-15 (code + local `old_loka_db`; not deployed)
+
+- [x] Admin upload + preview on User edit (render check: preview + Remove control); upload helper validates type/size and fails gracefully outside HTTP.
+- [x] Approve with a saved e-sign: no canvas in the modal, specimen **copied** onto the slip (`supervisor_signature_path` etc.) as PNG (JPG specimens converted) — PDF embeds the per-slip copy.
+- [x] First-time canvas + "save for next time" writes `users.signature_path`; a second approve then skips the pad entirely.
+- [x] Replacing the admin specimen does not change already-stamped slips (byte-compared old slip copies) and new slips use the replacement.
+- [x] CoA still requires a fresh canvas — `coa.php`/`coa-sign.php` contain no e-sign resolution or save flag; no specimen is ever written from CoA.
+- [x] Missing/deleted specimen file on disk is treated as "no specimen"; canvas without the save flag does not create one.
+- [x] `php -l` clean on all touched files + full public_html sweep 0 errors; render checks pass for all four UI states (modal with e-sign / canvas+save, guard partial, user edit preview).
+- [ ] **NOT deployed to live** — deploy only after Plan #22 + #23 sign-off.
+
+## Out of scope
+
+PKI / PAdES digital certificates. E-sign on vehicle requests, trip tickets, or gas vouchers. Employee/participant e-sign on the printed-name line. Live VPS until sign-off.
+
+---
+
+# LOKA Plan #24: OB Private vs Official Vehicle + Guard Bind — ✅ DONE (2026-09-17, `ob_integration`, localhost only — do not deploy until Plan #22 + #23 + this are signed off)
+
+Branch: **`ob_integration`**. Follow-on to Plan #22 (Pass Slip) and Plan #23 (saved e-sign). Local `old_loka_db` only. No live deploy until sign-off.
+
+## Goal
+
+Two gaps found in localhost QA of #22/#23:
+
+1. **Private vehicle.** Some Official Business trips use the employee’s own car, not a DICT fleet unit. Those slips must **not** wait for Motorpool Head approval. Motorpool only applies when the slip uses an official vehicle.
+2. **Guard stamp vs vehicle out.** When the OB **is** bound to a fleet vehicle request, Guard signing the Pass Slip must happen **when the vehicle is dispatched** — one action at the gate — not a second stamp on a separate OB card. Private-vehicle OBs still have Guard stamp the Pass Slip itself at the gate (no fleet dispatch).
+
+Do **not** store OB rows in `requests`. Do not touch ranking, Live Board, or `.env`.
+
+## Decisions (2026-09-17)
+
+- **Apply** asks **Official DICT vehicle** or **Private vehicle** (required). Do not infer private from a blank plate.
+- **Official:** fleet plate dropdown + Motorpool Head, both required. Route: `pending_supervisor` → `pending_motorpool` → `approved`.
+- **Private:** hide fleet plate and Motorpool Head. `plate_number` and `motorpool_head_id` stay NULL. Route: `pending_supervisor` → `approved` (no Motorpool notify, no Motorpool e-sign).
+- **Guard + official fleet trip** (`requests.ob_request_id` set): recording **dispatch** stamps OB departure + Guard e-sign (or canvas if none saved). Recording **arrival** writes OB arrival time only. Use the vehicle’s dispatch/arrival datetime. If the slip is already stamped, skip (no overwrite). If stamp fails, **block** dispatch.
+- **Guard + private (no bound request):** Pass Slip stays on the Guard **OB Pass Slips** card. Stamp there, as today.
+- **Late attach:** still allowed when All Father `allow_ob_attach_after_submit` is on. Motorpool stays on the **vehicle request**, not a second OB Motorpool step. After bind, Guard uses the trip row. If the trip already left, copy existing times; copy a Guard signature only if that Guard has a saved e-sign. Do not invent a signature.
+- Existing slips (no `uses_official_vehicle` yet): treat as official (DEFAULT 1) so current Motorpool routing is unchanged.
+
+```mermaid
+flowchart TD
+  apply[Apply OB]
+  kind{Official or private vehicle?}
+  sup[Supervisor approves and signs]
+  mh[Motorpool Head approves and signs]
+  ok[Approved printable]
+  gate{Bound fleet trip?}
+  dispatch[Guard records vehicle dispatch]
+  obCard[Guard stamps OB card]
+  apply --> kind
+  kind -->|official| sup
+  kind -->|private| sup
+  sup -->|official| mh
+  mh --> ok
+  sup -->|private skip Motorpool| ok
+  ok --> gate
+  gate -->|yes| dispatch
+  gate -->|no private| obCard
+```
+
+## Schema — migration `051_ob_vehicle_source.php`
+
+(`050` already exists.)
+
+- `ob_requests.uses_official_vehicle` TINYINT(1) NOT NULL DEFAULT 1
+- No new tables. `motorpool_head_id` already nullable from 048.
+
+SQL only. No JSON file storage.
+
+## UI / code
+
+- `public_html/pages/ob-requests/create.php` — Official / Private radios; show plate + Motorpool only when official; skip `ob_submitted_motorpool` when private.
+- `public_html/pages/ob-requests/process.php` — supervisor approve: private → `approved` + `ob_fully_approved`; official → `pending_motorpool` as today. `vehicle_bind` copies trip times / e-sign when already dispatched.
+- `public_html/pages/ob-requests/view.php` + print — no Motorpool action or e-sign on private; print Motorpool line blank or “N/A — private vehicle”.
+- Helpers in `public_html/includes/ob_guard_bind.php` (loaded from `ob_requests.php`): `obStampGuardDeparture(...)`, `obStampGuardArrival(...)`, `obCopyTripTimesFromRequest(...)` (reuse `obResolveStaffSignature` and the same status rules as `guard_departure` / `guard_arrival`).
+- `public_html/pages/guard/actions.php` — after successful `record_dispatch` / `record_arrival`, stamp the bound OB when that side is still blank.
+- `public_html/pages/guard/index.php` + `partials/dispatch_modals.php` — if the trip has a bound OB, note “This will also stamp Pass Slip {no}”. Canvas on the dispatch form only when the Guard has no saved e-sign. Unbound trips: no extra pad.
+- `public_html/pages/guard/partials/ob_section.php` — hide OBs that already have a non-cancelled bound vehicle request.
+
+Keep files under ~300 lines. `php -l` + checklist before the next phase.
+
+## Implementation checklist — ✅ DONE (2026-09-17)
+
+- [x] Migration `051_ob_vehicle_source.php` — `ob_requests.uses_official_vehicle` TINYINT(1) NOT NULL DEFAULT 1 (existing slips = official, routing unchanged). Applied to `old_loka_db`.
+- [x] Apply form — required **Official DICT vehicle / Private vehicle** radios; Fleet Vehicle Plate (required, fleet dropdown with the busy-day modal) and Motorpool Head render only when Official (JS hides + disables + un-`required`s them; a posted private submit forces `plate_number`/`motorpool_head_id` to NULL server-side). Private skips the `ob_submitted_motorpool` notify. The choice is never inferred from a blank plate (missing radio → validation error).
+- [x] Private routing — `process.php` `approve_supervisor`: private → `approved` + `ob_fully_approved` (no Motorpool stage, no Motorpool canvas); official → `pending_motorpool` as before. `approve_motorpool` hard-rejects private slips. View + print show **"N/A — private vehicle"** / "Private vehicle" and no Motorpool e-sign block on private.
+- [x] Guard bind — helpers in `includes/ob_guard_bind.php`: `obUsesOfficialVehicle()`, `obBoundRequestForOb()`, `obBoundObForRequest()`, `obStampGuardDeparture()` (+ `obApplyGuardDepartureStamp()` two-phase so dispatch can be blocked on signature failure), `obStampGuardArrival()`, and `obCopyTripTimesFromRequest()`. `pages/guard/actions.php`: `record_dispatch` resolves the bound slip's signature **before** recording (fail → dispatch blocked), then stamps OB departure with the **vehicle dispatch datetime** after the update; `record_arrival` writes the OB arrival time (time only) after the update. Success flashes mention "Pass Slip {no} stamped." Already-stamped slips are skipped, never overwritten.
+- [x] Guard dashboard — dispatch modal (in `partials/dispatch_modals.php`) shows "This will also stamp Pass Slip {no}" when the trip has a bound OB; a Pass-Slip canvas (+ save-for-next-time) renders only when the trip is bound **and** the guard has no saved e-sign; unbound trips get no extra pad. `ob_section.php` hides OBs with a non-cancelled bound vehicle request from both card queries (private/unbound slips still appear).
+- [x] Late attach — `obCopyTripTimesFromRequest()` copies an already-recorded trip dispatch/arrival datetime onto the slip from `vehicle_bind`, vehicle-request create, and edit (when the bound slip changes). The Guard signature is copied only when that guard has a saved e-sign (time-only otherwise, never invented) and every copied side is logged (`late_bind_copied_trip_times`).
+
+## QA — verified 2026-09-17 (localhost on `ob_integration`; no mail leaves)
+
+- [x] Private: supervisor → `approved` (no Motorpool Head, no `ob_submitted_motorpool`, no Motorpool canvas); official: unchanged Supervisor → Motorpool with fleet plate + Motorpool Head required (server-side + radio toggle browser-verified both ways).
+- [x] Bound trip: Guard dispatch stamps OB departure + saved e-sign using the vehicle dispatch datetime; unresolvable signature (no specimen, no canvas) **blocks** the dispatch; canvas on the dispatch form resolves and "save for next time" persists.
+- [x] Second dispatch stamp skipped — original time intact (no overwrite). Arrival writes OB arrival time only.
+- [x] Unbound / private slips still on the Guard OB card; bound slips hidden from both card queries; cancelled request releases the slip back to the card.
+- [x] Late bind copies existing trip times; signature only from a saved e-sign — never invented (asserted with the specimen removed).
+- [x] Existing-style slips (no flag) treated as official via DEFAULT 1. Print/view labels: private → "Private vehicle" plate line and "N/A — private vehicle" Motorpool line.
+- [x] `php -l` clean on all touched files + full public_html sweep 0 errors; create + guard pages render without PHP warnings (CLI authed harness).
+- [ ] **NOT deployed to live** — deploy only after Plan #22 + #23 + this are signed off.
+
+## Out of scope
+
+GPS. Merging Guard vehicle observations into the Pass Slip PDF. Changing TO vs OB travel-document checkboxes. Forcing Motorpool onto an OB that was filed as private then later attached to a VRF. Live VPS until sign-off.
+
+## Files
+
+- `public_html/migrations/051_ob_vehicle_source.php`
+- `public_html/includes/ob_requests.php`, `ob_esign.php`, `ob_guard_bind.php`, `ob_participants.php`
+- `public_html/pages/ob-requests/create.php`, `process.php`, `view.php`, `print.php`
+- `public_html/pages/requests/create.php`, `edit.php` (late-bind copy on attach)
+- `public_html/pages/guard/actions.php`, `index.php`, `partials/ob_section.php`, `partials/dispatch_modals.php`, `partials/trip_list.php`
+
+---
+
+# LOKA Plan #25: CoA Mobile Canvas + Signing Kiosk — ✅ DONE (2026-09-18 incl. A4 print, `ob_integration`, localhost only — do not deploy until Plan #22 + #23 + #24 + this are signed off)
+
+Branch: **`ob_integration`**. Follow-on to Plan #22 (Pass Slip). Found in localhost QA: signing the Certificate of Appearance dumps the employee at **login**, and the signature pad is too small for a phone.
+
+**Design read:** public-sector certificate kiosk for a receiving-office client on a phone, DICT navy, Bootstrap 5, trust-first. Not a landing-page or dashboard rewrite.
+
+## Goal
+
+1. **No login kick.** Submitting CoA must not send the requester (or the client using their phone) to `/?page=login`. The CoA itself must still save.
+2. **Finger-sized canvas** that fills the phone width and stays usable in portrait.
+3. **Signing UI** that reads as a Certificate of Appearance, not a squeezed Bootstrap card. Thank-you and dead-link states stay on the same kiosk.
+4. **A4 print.** The Pass Slip + Certificate of Appearance (both copies) must **fit perfectly on one A4 portrait sheet** — no overflow onto a second page, no clipped CoA block or signatures.
+
+Do **not** restyle Apply, Guard, or the dashboard. Do not touch ranking, Live Board, or `.env`. No live deploy until sign-off.
+
+## Why it exits to login
+
+On-device CoA (`pages/ob-requests/coa.php`) sits inside the logged-in app chrome. POST hits `requireAuth()`. If the session is gone, that is the login page.
+
+The public token page (`coa-sign.php`) can still **wipe** a live `LOKA_SID` in [`session.php`](public_html/config/session.php) (fingerprint mismatch) *before* thank-you renders. Then Back / “return to slip” is login. The green thank-you card is the public page after a **successful** save — the dump is the authenticated shell around it.
+
+The pad is a 160px-tall CSS box with a fixed 520×160 bitmap in [`ob-signature.js`](public_html/assets/js/ob-signature.js). It does not follow the phone width.
+
+```mermaid
+flowchart TD
+  fill[Client fills CoA]
+  ondev[On-device coa.php in app chrome]
+  pub[Public coa-sign.php]
+  auth{Session still valid?}
+  login[Login page]
+  thanks[Thank you]
+  fill --> ondev
+  fill --> pub
+  ondev --> auth
+  auth -->|no| login
+  auth -->|yes| thanks
+  pub -->|fingerprint wipe of LOKA_SID| login
+  pub --> thanks
+```
+
+## Decisions (2026-09-17)
+
+- **One kiosk.** On-device “Fill Certificate of Appearance” requiresAuth, confirms owner + status, mints/reuses a CoA token, then **redirects** to `?page=ob-requests&action=coa-sign&token=…`. The client never sees the sidebar. One POST handler (`coa-sign.php`).
+- **Do not destroy the employee session on CoA.** Skip fingerprint wipe in `session.php` when `page=ob-requests` and `action=coa-sign` (GET query is still present on POST). Signing must not log the requester out of their other tab.
+- **Keep the token on submit.** Form `action` = current URL; also post a hidden `token` and read `post('token')` if `get('token')` is empty so a stripped query string cannot fall through to `requireAuth()` → login.
+- After success, thank-you stays on the kiosk. Optional “Return to pass slip” goes to the view page (login only if they were already logged out).
+- Canvas `fit: true` on CoA only so Guard 130px pads stay small.
+- Export a downscaled PNG (~800px wide). `obSaveSignature()` still accepts PNG only. No new tables.
+- **A4 (2026-09-18).** Print (`pages/ob-requests/print.php`) is the paper record. `@page { size: A4 portrait; margin: 6mm }` already. The **CERTIFICATE OF APPEARANCE** block (office, appearance line, from/to, representative signature) plus the Pass Slip above it — **two copies, dashed CUT HERE** — must occupy **exactly one A4 page** (210mm × 297mm). Nothing clipped, nothing spilling to page 2, no extra blank page. Scale letterhead, signature pads, and CoA spacing so a long purpose / CoA office name still stays on that single sheet. Do not move CoA onto a second A4; the paper form is two copies of Pass Slip+CoA on one page.
+
+## Canvas
+
+[`public_html/assets/js/ob-signature.js`](public_html/assets/js/ob-signature.js):
+
+- Size the bitmap to the pad’s CSS box × `devicePixelRatio` (cap 2).
+- Pad CSS: full width of the card, height `max(220px, min(42dvh, 320px))`, `touch-action: none`, `dvh` not `vh`.
+- Thicker round stroke for fingers; block page-scroll while drawing.
+- Export downscaled PNG so a retina pad does not blow `post_max_size`.
+
+## Signing UI (CoA only)
+
+Shared kiosk for form + thank-you + dead-link (partial + [`public_html/assets/css/ob-coa.css`](public_html/assets/css/ob-coa.css)):
+
+- Keep DICT navy header (`#0b3d6e`) and Pass Slip No.
+- Mobile: card is edge-to-edge (`max-width: 40rem` on desktop only).
+- Stack Office / Representative; From–To on one row; **signature is the main block** with a lined pad and “Sign with your finger”.
+- Full-width primary submit; Clear next to the pad; inline errors (no `alert()` if easy).
+- Thank-you: keep the green confirmation; larger tap target for close/return.
+
+## Implementation checklist — ✅ DONE (2026-09-17)
+
+- [x] `coa.php` — pure entry: requireAuth, owner + status check, mints a fresh one-time token (a raw token can never be recovered from its hash) and **redirects to `?page=ob-requests&action=coa-sign&token=…`**. The sidebar CoA form is gone — one kiosk, one POST handler.
+- [x] `config/session.php` — the fingerprint-wipe branch is skipped when `$_GET` is `page=ob-requests` + `action=coa-sign` (GET query survives the POST: the form action is the current URL). Signing on the employee's borrowed device can no longer destroy their live `LOKA_SID`; every other page still wipes exactly as before.
+- [x] `coa-sign.php` — the single kiosk handler: form posts to the **current URL** plus a hidden `token`; `post('token')` is the fallback when the query string was stripped; thank-you renders on the kiosk itself (no redirect); "Return to pass slip" is optional and login-gated only if the requester was already logged out.
+- [x] `assets/js/ob-signature.js` — new `fit: true` mode: bitmap = pad CSS box × `devicePixelRatio` (cap 2), ink preserved across re-sizes, thicker rounded finger stroke (2.6×dpr), `preventDefault` blocks page scroll while drawing, and export downscales to ~800px wide so a retina pad cannot blow `post_max_size`. Pads without `fit` (Guard card, view modal) keep the fixed 520×160 bitmap and old export.
+- [x] Shared kiosk UI — `assets/css/ob-coa.css` + `pages/ob-requests/partials/coa_kiosk.php`: DICT navy header with Pass Slip No./date, mobile edge-to-edge card (40rem cap on desktop only), certify line, stacked Office/Representative fields, From–To on one row, **signature as the main block** (full-width lined pad, `height: max(220px, min(42dvh, 320px))`, "Sign with your finger"), full-width submit, Clear + live "Signature captured ✓" state, inline errors (no `alert()`), green thank-you and red dead-link states on the same kiosk.
+- [x] **A4 print** — `pages/ob-requests/print.php` rebuilt as a fixed one-sheet layout: `.sheet` is a 198×284mm flex column (285mm print area of a 6mm-margin A4 minus 1mm rounding slack, so rounding can never spawn a second page), each copy a `flex: 1 1 0; overflow: hidden` item and the CoA block bottom-anchored (`margin-top: auto`). Purpose capped at 11mm and CoA office at 8mm with wrapping; letterhead, title, signature pads (26px) and one-line hints compressed so the worst case fits. Screen shows a preview (sticky Print bar, sheet shadow); `@media print` strips it and pins `@page { size: A4 portrait; margin: 6mm }`.
+
+## QA — verified 2026-09-17 (`_deploy_tmp/verify_plan25_*`; committed fixture slip removed after; kiosk POST flow exercised over HTTP)
+
+- [x] Public kiosk GET (token) → 200: kiosk CSS, certify line, finger-pad hint, hidden token. POST (token in the **body**, query stripped of `token`) → saves (`status=coa_received`, office/rep persisted, token cleared, signature file written) and renders the green thank-you on the kiosk with **0 login references**.
+- [x] Re-used/expired token → "Link Not Usable" dead state on the same kiosk (HTTP-verified).
+- [x] Fingerprint wipe: CLI harness with a bogus fingerprint — the kiosk request **keeps** the employee session while any other page still wipes it (both asserted).
+- [x] Empty-pad submit is blocked with the inline "Please ask the representative to sign before submitting." error — no `alert()`, stays on the kiosk (browser-verified at 390×844).
+- [x] Phone viewport renders the kiosk edge-to-edge with the tall lined signature block; Guard/OB-card/view pads keep the small fixed bitmap (`fit` used only in the CoA partial — grep-verified).
+- [x] `php -l` clean on all touched files + full public_html sweep 0 errors; `node` syntax check on `ob-signature.js` clean.
+- [x] **Print A4** — headless-Chrome print-to-PDF of the worst-case slip (200-char purpose, 200-char office name, 3-participant printed line, all five signatures, guard times): **exactly 1 page**; both copies with the dashed CUT HERE; CoA block complete (title, 2-line office, certify line, from/to, representative signature); signatures embedded; no second-page sliver, no clipping (page count asserted + visual check).
+- [x] Manual (real phone, when DICT schedules): finger-draw feel on the tall pad and the on-device hand-off click-through.
+- [ ] **NOT deployed to live** — deploy only after Plan #22 + #23 + #24 + this are signed off.
+
+## Files
+
+- `public_html/pages/ob-requests/coa.php` — mint + redirect (no form)
+- `public_html/pages/ob-requests/coa-sign.php` — the single kiosk handler (GET/POST token, inline states)
+- `public_html/pages/ob-requests/partials/coa_kiosk.php` — shared kiosk markup (all states)
+- `public_html/assets/css/ob-coa.css` — kiosk styles
+- `public_html/assets/js/ob-signature.js` — `fit: true` mode + downscaled export
+- `public_html/config/session.php` — fingerprint-wipe skip on the kiosk
+- `public_html/pages/ob-requests/print.php` — A4: two copies of Pass Slip + CoA on **one** sheet (remaining)
+
+## Out of scope
+
+Apply / Guard / dashboard restyle. Changing CoA **form fields**. Splitting CoA onto its own second A4. PKI. Live VPS until sign-off. Plans #11 / #16 / #19.
+
+---
+
+# LOKA Plan #26: OB Print — Full Personnel Names + Initialled CoA — ✅ DONE (2026-09-19, `main`, localhost only — do not deploy until Plan #22–#25 + this are signed off)
+
+Branch: **`main`** (Plans #22–#25 already merged). Follow-on to Plan #22 print + Plan #25 one-sheet A4. Found in localhost QA of slip `260918-006`: the **employee line** is only initials (`S.Admin/J.Recolizado` — `S.Admin` is unreadable), while the **Certificate of Appearance** repeats full names and wraps (`System Admin and Jaymar Recolizado`).
+
+**Design read:** paper Pass Slip first, then CoA. Identify who is going on the OB in full. Keep the signature line and the CoA sentence short with `J.Recolizado`. Not a kiosk restyle. Not a new form.
+
+Do **not** restyle Apply, Guard, or the dashboard. Do not touch ranking, Live Board, or `.env`. No live deploy until Plan #22–#25 + this are signed off. Do not start Plans #11 / #16 / #19.
+
+## Goal
+
+1. **See the full names** of everyone on the requested OB on the printed Pass Slip (Personnel), immediately under Purpose.
+2. **Latter part uses initials only.** Employee signature line and CoA certify sentence use `FirstInitial.Surname` (`Jaymar Recolizado` → `J.Recolizado`).
+3. Stay on Plan #25’s **one A4 portrait sheet, two copies, CUT HERE**. Adding Personnel must not spawn a second page.
+4. Create-form preview and the CoA kiosk must match the paper (full names visible; CoA sentence initialled).
+
+## What is wrong today
+
+| Block | Today | Problem |
+|---|---|---|
+| Left signature line | `S.Admin/J.Recolizado` | Initials-only; demo name `System Admin` becomes `S.Admin` |
+| CoA body | `…personnel have appeared …: System Admin and Jaymar Recolizado.` | Full names wrap; “latter part” is the longest block on the sheet |
+| Create preview | Initials only | Filer cannot see how full names will read |
+| CoA kiosk | Same full-name `obCoaAppearanceLine()` | Client sees a long wrap; `$kioskWhoNote` exists in the partial and is never set |
+
+Helpers already in [`public_html/includes/ob_participants.php`](public_html/includes/ob_participants.php): `obShortPrintedName()`, `obPrintedEmployeeLine()`, `obJoinNames()`, `obCoaAppearanceLine()`.
+
+## Name rules (keep the existing shortener)
+
+`obShortPrintedName()` stays the single mapping:
+
+- Trim and collapse spaces.
+- Drop a trailing `Jr` / `Jr.` / `Sr` / `Sr.` / `II` / `III` / `IV` before taking the surname.
+- **First given name, first letter, uppercase + `.` + last remaining token.** `Jaymar Recolizado` → `J.Recolizado`. `Maria Clara Santos` → `M.Santos`. One-token names stay as-is.
+- `System Admin` → `S.Admin` is correct for that mapping (first word + last word). Real DICT accounts are Given + Surname.
+
+Do **not** invent middle-initial formats (`J.M.Recolizado`) or ALL-CAPS surnames.
+
+**Join styles (do not mix):**
+
+| Surface | Join |
+|---|---|
+| Personnel (full names) | Oxford-and via `obJoinNames()`: `A and B`; `A, B, and C` |
+| Signature line (initials) | Slash with spaces: `J.Recolizado / D.Abad` (`implode(' / ', …)`) |
+| CoA / kiosk certify (initials) | Oxford-and of the **short** names: `S.Admin and J.Recolizado` |
+
+```mermaid
+flowchart TD
+  purpose[Purpose]
+  personnel[Personnel: full names]
+  sigLine[Employee signature line: J.Recolizado slash list]
+  coa[CoA certify: initials with and]
+  purpose --> personnel --> sigLine --> coa
+```
+
+Full legal names still appear **on the same sheet** in Personnel, so the CoA does not need to repeat them.
+
+## Print layout (each of the two copies)
+
+1. **Purpose** — unchanged text; slightly tighter clip if needed (see A4 budget).
+2. **Personnel** (new, under Purpose) — `Personnel: System Admin and Jaymar Recolizado`.
+3. **Left signature line** — `S.Admin / J.Recolizado` plus the existing hint (`Printed names of employees` / signature over printed name).
+4. **CoA** — `I hereby certify that the following personnel have appeared in this office/establishment on September 18, 2026: S.Admin and J.Recolizado.` One person: `… that J.Recolizado has appeared … on DATE.`
+
+Supervisor, Motorpool, Guard, plate, and times stay as they are.
+
+## A4 budget (Plan #25 lock)
+
+`.sheet` is still 198×284mm, two `flex: 1` copies, CoA `margin-top: auto`, overflow hidden.
+
+Personnel **adds a row**. Pay for it:
+
+- `.personnel`: `font-size: 8.5pt`, `max-height: 8mm`, `overflow: hidden`, `overflow-wrap: anywhere` (same clip idea as Purpose / CoA office).
+- If the two copies still risk a second page, drop Purpose `max-height` from **11mm → 9mm**. Do not drop letterhead or CoA signature.
+- Twenty participants will clip. That is the same honest trade as a 200-character purpose: **one sheet beats showing every name**.
+
+## Kiosk (Plan #25)
+
+Same helper, two lines:
+
+- Set `$kioskWhoNote` to the **full** `obJoinNames()` list under the header (this variable is documented on `coa_kiosk.php` and unused).
+- `$kioskAppearance` stays `obCoaAppearanceLine()` after that function switches to **short** names.
+
+Do not restyle the kiosk CSS beyond showing the who-note.
+
+## Screens that stay compact
+
+Guard OB card and OB index already use `obPrintedLinesForIds()` (initials). Keep that density. Do not dump full names into those lists.
+
+## Implementation checklist — ✅ DONE (2026-09-19)
+
+- [x] `ob_participants.php` — new `obJoinShortNames($fullNames)` (maps through the unchanged `obShortPrintedName()`, Oxford-and via `obJoinNames()`); `obCoaAppearanceLine()` now certifies the **short** names (`… that J.Recolizado has appeared …` / `… the following personnel have appeared …: S.Admin and J.Recolizado.`); `obPrintedEmployeeLine()` separator is `' / '`. `obJoinNames()` (full names) untouched.
+- [x] `print.php` — **Personnel** row under Purpose (`Personnel: System Admin, Danmark R. Jose, and Test Requester` — full `obJoinNames()`); `.personnel` clip CSS (8.5pt, `max-height`, `overflow-wrap: anywhere`); `$printedLine` (slash) and `$coaLine` (initials) flow from the updated helpers.
+- [x] `create.php` + `ob-participants.js` — options carry `data-full`; the live preview shows **Personnel: full names · Prints as initials** (JS Oxford-and mirrors `obJoinNames()`: 1 / `and` / commas + `and`); filer stays first and locked (existing TomSelect lock kept).
+- [x] `view.php` — Participants stay full names; caption now "signature line and CoA print as S.Admin / J.Recolizado".
+- [x] `coa-sign.php` + `coa_kiosk.php` — `$kioskWhoNote` (full `obJoinNames()` list) renders under the kiosk header (`.coa-whonote` rule in `ob-coa.css`); the certify sentence on the kiosk is initialled via the same helper.
+- [x] Guard OB card + OB index keep the compact initials line (`obPrintedLinesForIds()` untouched — inherits the spaced slash only). No migration. No `APP_VERSION` bump needed (print CSS is inline).
+
+## QA — verified 2026-09-19 (`_deploy_tmp/verify_plan26_*`; fixture slip + signatures removed after)
+
+- [x] Helper strings asserted for 1/2/3 people: slash signature line with spaces, short Oxford-and, `has appeared` (1) vs `the following personnel have appeared … :` (2+); `M.Santos`, suffix drop, one-token name all per the kept shortener; full-name `obJoinNames()` unchanged.
+- [x] Two-person print: Personnel shows `System Admin and Jaymar Recolizado`-style full names; signature line `S.Admin / D.Jose / T.Requester`; CoA uses initials and never wraps a full given name (render-verified).
+- [x] Three-person worst case (200-char purpose + 200-char office + 3 participants + all five signatures): still **exactly 1 A4 page**, two copies, CUT HERE, CoA complete (headless-Chrome print-to-PDF page count asserted + magnified visual of both copies).
+- [x] A4 fit mechanics: `.copy` children are now `flex-shrink: 0` and Purpose/Personnel clip at **exact line boundaries** (7.7mm = 2 lines at 8.5pt/1.28) — the first cut showed mid-glyph clips caused by flex-shrink; fixed by disabling child shrink and paying the budget out of the signature-pad height (26px → 21px).
+- [x] Create form renders the dual preview (`obFullLine` + `data-full` present); kiosk renders the who-note + initialled certify line; view caption updated; guard card/index stay compact.
+- [x] `php -l` clean on every touched file + full public_html sweep 0 errors; `node` syntax check on `ob-participants.js` clean.
+- [ ] **NOT deployed to live** — deploy only after Plan #22–#25 + this are signed off.
+
+## Files
+
+- `public_html/includes/ob_participants.php` — `obJoinShortNames()`, initialled CoA line, `' / '` signature separator
+- `public_html/pages/ob-requests/print.php` — Personnel row + `.personnel` clip + one-A4 flex fixes (`flex-shrink: 0`, line-boundary clips, 21px pads)
+- `public_html/pages/ob-requests/create.php` — `data-full` + dual preview
+- `public_html/assets/js/ob-participants.js` — full + initials live preview (Oxford-and matching PHP)
+- `public_html/pages/ob-requests/view.php` — caption
+- `public_html/pages/ob-requests/coa-sign.php` — `$kioskWhoNote`
+- `public_html/pages/ob-requests/partials/coa_kiosk.php` + `public_html/assets/css/ob-coa.css` — who-note render
+
+## Files
+
+- `public_html/includes/ob_participants.php` — short-name CoA join + slash spacing
+- `public_html/pages/ob-requests/print.php` — Personnel row + clip CSS
+- `public_html/pages/ob-requests/create.php` — `data-full` + preview copy
+- `public_html/assets/js/ob-participants.js` — full + short live preview
+- `public_html/pages/ob-requests/view.php` — caption
+- `public_html/pages/ob-requests/coa-sign.php` — `$kioskWhoNote`
+- `public_html/pages/ob-requests/partials/coa_kiosk.php` — render who-note if set
+
+## Out of scope
+
+New tables or stored display names. Middle-initial / ALL-CAPS surname formats. Extra participant signatures. Splitting CoA onto a second A4. Changing CoA form fields (office, representative, from/to). Apply / Guard / dashboard restyle. Live VPS. Plans #11 / #16 / #19.
+
+---
+
+# LOKA Plan #27: Guard Nav Badges + Separate OB Stamp Queue — ✅ DONE (2026-09-19, `main`, localhost only — do not deploy until Plan #22–#26 + this are signed off)
+
+Branch: **`main`**. Follow-on to Plans #22–#24 (OB + Guard bind). Found in localhost QA on a Guard login: **OB Pass Slips — Official Business Times** (4 waiting) sits on the same page as vehicle KPIs (Pending Dispatch 5 / On Trip 7). Sidebar has **no** counts. Header bell is empty because Guards are never notified when stamp work appears.
+
+**Design read:** two Guard workplaces, two sidebar pills, plus a bell to every `role=guard` account. Public-sector gate UI. Not a dashboard restyle.
+
+Do **not** restyle Apply / Live Board. Do not touch ranking or `.env`. No live deploy until Plan #22–#26 + this are signed off. Do not start Plans #11 / #16 / #19.
+
+## Decisions (2026-09-19)
+
+- **Nav:** sidebar pills **and** in-app bell (notify all Guard-role accounts).
+- **OB Pass Slips for a Guard:** stamp queue only. No Apply, no “my slips.”
+
+## Goal
+
+1. **Do not merge** OB departure/arrival with vehicle dispatch/arrival on Guard Dashboard.
+2. **Guard → OB Pass Slips** is the unbound-OB time-stamp queue (requester slips waiting at the gate).
+3. **Sidebar counts** on Guard Dashboard (vehicles waiting) and OB Pass Slips (OB stamps waiting).
+4. **Bell** every Guard-role user when a fleet trip is approved or an unbound OB becomes stamp-ready.
+
+## What was wrong (before this plan)
+
+- Guard Dashboard mixed the OB stamp card with vehicle KPIs.
+- Sidebar **OB Pass Slips** listed a Guard’s own filed slips, not the stamp queue.
+- `badgeCountGuardOps()` existed but was not rendered on Guard Dashboard. OB waiting stamps had no nav badge.
+- Header bell was empty for Guards (`notifyRoleUsers([ROLE_GUARD])` was never called).
+
+```mermaid
+flowchart LR
+  approved[Approved unbound OB]
+  fleet[Approved fleet trip]
+  obMenu[OB Pass Slips queue plus badge]
+  guardDash[Guard Dashboard vehicles plus badge]
+  bell[Bell every Guard account]
+  approved --> obMenu
+  approved --> bell
+  fleet --> guardDash
+  fleet --> bell
+```
+
+## IA
+
+| Menu | Guard sees | Badge |
+|---|---|---|
+| **Guard Dashboard** | Vehicle leave/return only | Pending dispatch + on-trip (`badgeCountGuardOps()`) |
+| **OB Pass Slips** | Unbound OB waiting departure / waiting arrival. No Apply. No my-slips table. | Waiting stamps |
+
+Plan #24 stays: **bound** official-vehicle OBs stamp from the **vehicle** row and stay off the OB queue (`NOT EXISTS` bound request). Private / OB-only slips live on **OB Pass Slips**.
+
+**All Father / Admin:** not a Guard account. They keep the current full OB list (and Apply). Put the same stamp board **on top** of that list so they can still stamp after it leaves Guard Dashboard. Sidebar OB badge for them uses the same waiting-stamp count.
+
+A Guard who must file their own OB is **out of v1** on this menu (use another role/account). Do not sneak Apply back onto the queue.
+
+## Bell (Guard role only)
+
+Use existing `notifyRoleUsers([ROLE_GUARD], …)` (in-app + email via `notify()`). Add `MAIL_TEMPLATES` keys so the type is not rewritten to `default`.
+
+| Event | Link | Do not fire when |
+|---|---|---|
+| Vehicle request becomes `approved` | `/?page=guard` | Already dispatched |
+| Unbound OB becomes stamp-ready (`approved`, no bound `requests` row) | `/?page=ob-requests` | Still waiting supervisor or motorpool; **bound** OB (vehicle bell covers it) |
+
+Respect existing `notify()` 5-minute duplicate skip and 20/hour cap. Do not bell All Father unless `users.role = guard`.
+
+## Implementation checklist — ✅ DONE (2026-09-19)
+
+- [x] `sidebar.php` — Guard Dashboard renders `sidebarBadgeHtml(badgeCountGuardOps())`; OB Pass Slips renders the waiting-stamp badge `badgeCountObGuardStamps()` gated by `canAccessGuardDashboard()` (guards + real All Father).
+- [x] `badge_counts.php` — `badgePendingIdsObGuard()` mirrors the two `ob_section` queries (departure-waiting + arrival-waiting, unbound via `NOT EXISTS` bound non-cancelled request) ids-only; `badgeCountObGuardStamps()` wraps it with the unseen-ack mechanism (key `ob_guard_stamps`); `ob-requests` mapped in `badgeMarkSeenForCurrentPage` so the pill clears on view and returns with new work.
+- [x] `guard/index.php` — `ob_section.php` include removed; the page is vehicle dispatch/arrival only (KPIs + trip modals unchanged).
+- [x] `ob-requests/index.php` — Guard (`isGuard() && !isAdmin()`): **stamp queue only** — the `ob_section` board, page copy, no Apply, no status filter, no my-slips table. **Admin / All Father only** (`isAdmin()`): stamp board on top + existing list + Apply. Department supervisors and Motorpool do **not** get the gate board. Employees: their own list only. Bound official-vehicle slips stay off the queue (`NOT EXISTS`, Plan #24 preserved).
+- [x] `index.php` + `create.php` — Guard cannot open Apply (`/?page=ob-requests&action=create` redirects to the stamp queue).
+- [x] `index.php` — `badgeMarkSeenForCurrentPage($page, $action)` runs for logged-in users (skips public CoA kiosk) so mapped pills actually clear after viewing.
+- [x] Bells — `pages/approvals/process.php`: after commit, when a request becomes `approved` and has **not** dispatched, `notifyRoleUsers([ROLE_GUARD], 'guard_trip_approved', …)` (link `/?page=guard`, Control No. threaded). `pages/ob-requests/process.php`: when a slip becomes `approved` and is **unbound** (`obBoundRequestForOb() === null` — private path and motorpool path both), `notifyRoleUsers([ROLE_GUARD], 'guard_ob_ready', …)` (link `/?page=ob-requests`). `config/mail.php` gained both `guard_*` keys (no `default` rewrite). Existing `notify()` 5-minute duplicate skip + 20/hour cap respected; All Father is only belled if their account is actually `role=guard`.
+- [x] `nav_search.php` — OB Pass Slips keywords extended with "gate stamp queue departure arrival".
+- [x] No migration. `php -l` clean on every touched file.
+
+## QA — verified 2026-09-19 in source (split, badges, bells). Gaps closed 2026-09-19: seen-ack wired, Guard Apply blocked, stamp board limited to Guard + Admin/All Father. Do **not** cite `_deploy_tmp/verify_plan27_*` (not in the repo).
+
+- [x] Guard: Guard Dashboard has **no** OB card; vehicle stamps untouched; sidebar badge count for waiting trips via `badgeCountGuardOps()`.
+- [x] Guard: OB Pass Slips renders **only** the stamp queue — no Apply, no status filter, no my-slips table; `action=create` redirects to the queue.
+- [x] Bound official-vehicle OB: excluded from the OB badge and the queue; no separate OB bell (bind check gates the bell).
+- [x] Bell: `guard_trip_approved` + `guard_ob_ready` keys exist; `notifyRoleUsers([ROLE_GUARD])` on the two events.
+- [x] All Father / Admin: full OB list + stamp board on top. Department approvers and Motorpool: list/own slips only, **no** gate board. Stamp sidebar badge stays `canAccessGuardDashboard()` (Guard + real All Father).
+- [x] Stamp / Guard pills: `badgeMarkSeenForCurrentPage` is called from `index.php` after auth; CoA kiosk skipped.
+- [x] `php -l` on touched files.
+- [ ] **NOT deployed to live** — do not run `deploy_prod.py` until Plan #22–#26 + this are signed off.
+
+## Files
+
+- `public_html/includes/sidebar.php` — both Guard badges
+- `public_html/includes/badge_counts.php` — `badgePendingIdsObGuard()` / `badgeCountObGuardStamps()` / seen map
+- `public_html/includes/nav_search.php` — gate-stamp keywords
+- `public_html/index.php` — `badgeMarkSeenForCurrentPage` hook; Guard Apply redirect
+- `public_html/pages/guard/index.php` — OB card removed
+- `public_html/pages/guard/partials/ob_section.php` — reused from the OB page
+- `public_html/pages/ob-requests/index.php` — guard queue-only / admin board-on-top
+- `public_html/pages/ob-requests/create.php` — Guard blocked
+- `public_html/pages/ob-requests/process.php` — unbound-OB guard bell
+- `public_html/pages/approvals/process.php` — approved-trip guard bell
+- `public_html/config/mail.php` — `guard_trip_approved` / `guard_ob_ready`
+
+## Out of scope
+
+New tables. Guard Apply-for-OB on this menu. Belling All Father (unless `role=guard`). Restyling Apply / Live Board / dashboard chrome. Changing Plan #24 bind rules. Live VPS. Plans #11 / #16 / #19.
+
+---
+
+# LOKA Plan #28: Soft Nag + 3-Pending Trip-Create Gate — ✅ DONE (2026-09-19)
+
+## Goal
+
+Keep Plan #14 soft nagging (banner + invite/reminder email), but stop chronic skippers from stacking unfinished ratings: when a logged-in passenger has **3 or more** unsubmitted, non-expired driver evaluations, **new trip create is blocked** until **all** of those pending ratings are submitted.
+
+## Policy
+
+| Rule | Choice |
+|------|--------|
+| Count | Unsubmitted, non-expired invites (`pendingDriverEvaluationCount`) |
+| Threshold | Setting `driver_evaluation_block_at` (default **3**, clamp 1–20) |
+| Clear condition | Must finish **all** pending (count → 0), not merely get under 3 |
+| Blocked | `/?page=requests&action=create` only |
+| Not blocked | OB, gas vouchers, reports, viewing trips, Rate now / submit |
+| Exempt | **Admin + All Father** (`userExemptFromDriverEvalCreateBlock()` — session role, `isAllFather`/`isRealAllFather`/`isAdmin`, plus DB role fallback). View-as never gated. Sticky flags auto-cleared on exempt accounts. |
+| Guests | Unchanged (email forward only; no account to gate) |
+| Driver | Still never invited to rate their own trip |
+
+## Implementation — ✅ DONE (2026-09-19)
+
+- [x] `trip-enhancements.php` — `driverEvaluationBlockAt()`, `pendingDriverEvaluationCount()`, `userMustClearDriverEvaluations()`, `userExemptFromDriverEvalCreateBlock()` (explicit All Father + Admin), sticky helpers
+- [x] Sticky clear-all: once pending ≥ threshold, `users.eval_create_blocked=1` until pending count → 0 (not merely under threshold)
+- [x] `pages/requests/create.php` — early `redirectWith` when gated
+- [x] `includes/header.php` — count-vs-threshold copy; non-dismissible danger banner when gated
+- [x] `pages/settings/index.php` — `driver_evaluation_block_at` field
+- [x] `migrations/052_eval_block_at.php` — setting default `3`
+- [x] `migrations/053_eval_create_blocked.php` — `users.eval_create_blocked`
+- [x] Plan index row #28
+
+## Audit (2026-09-19)
+
+**Initial review found a policy gap:** gate used `count >= 3` only, so submitting one of three (count → 2) re-opened create. That violated “must finish **all** pending.” Fixed with sticky `users.eval_create_blocked` (migration 053).
+
+## QA checklist — ✅ re-verified 2026-09-19 (`_deploy_tmp/verify_plan28.php`; migrations 052+053 on local `old_loka_db`)
+
+- [x] Helpers + setting + create gate + banner copy present
+- [x] Sticky flag set/clear works on `users.eval_create_blocked`
+- [x] Clear-all sticky branch present in `userMustClearDriverEvaluations()`
+- [x] Admin / View-as exempt in helper (isAdmin / isViewingAs)
+- [ ] Manual browser: 3 pending → create blocked; submit 1 → still blocked; submit all → create allowed
+- [ ] Staging + live: run `052` + `053` on deploy
+
+## Files
+
+- `public_html/includes/trip-enhancements.php`
+- `public_html/pages/requests/create.php`
+- `public_html/includes/header.php`
+- `public_html/pages/settings/index.php`
+- `public_html/migrations/052_eval_block_at.php`
+- `public_html/migrations/053_eval_create_blocked.php`
+- `Plan.md`
+
+## Out of scope
+
+Hard-gating the whole app. Blocking OB / gas vouchers. Guest enforcement. Changing anonymity / 4-star form / PDF. Extra reminder cron cadence.
+
+---
+
+# LOKA Plan #29: Vehicle Trip Ticket — Full Purpose + No PDF Scrollbars — ✅ DONE (2026-09-26, live `lokafleet.dictr2.cloud`)
+
+## Goal
+
+Fix the **Vehicle Trip Ticket** browser print / Save-as-PDF so Purpose (and Destination) show the **full task text** and **no vertical scrollbar** appears in the generated PDF.
+
+Reported live sample: `Vehicle Trip Ticket – DICT Region II.pdf` (BAF 5366, Sept 2026 trips) — purpose clipped mid-phrase (`S ki C`, `Fib O i C bl`) and scrollbar chrome visible in PDF.
+
+## Confirmed source
+
+This is **`/?page=my-trip-tickets&action=generate-summary`** → [`summary-print.php`](public_html/pages/my-trip-tickets/summary-print.php) (multi-day trip log + Fuel Refilling), **not** TCPDF [`trip-tickets/export-pdf.php`](public_html/pages/trip-tickets/export-pdf.php).
+
+Purpose cell:
+
+```php
+<textarea class="left auto-expand" ... rows="<?= tripTicketTextareaRows($t->purpose, 26) ?>"><?= e($t->purpose) ?></textarea>
+```
+
+## Root causes
+
+1. **Clipped purpose** — `tripTicketTextareaRows()` in `includes/functions.php` caps at **max 12 rows** (`charsPerLine=26`). Long purposes exceed that; CSS `overflow: hidden` clips the rest.
+2. **Scrollbar in PDF** — Chrome “Save as PDF” paints the textarea scrollbar when content is taller than the box. Print CSS uses `overflow: visible` but never hides scrollbar chrome; JS `beforeprint` resize can race.
+
+## Fix plan
+
+### 1. Row helper
+
+- In `tripTicketTextareaRows()`: raise `$max` from `12` → **40**
+- Purpose/destination call sites: use tighter `charsPerLine` (**22**) to match the narrow Purpose column
+
+### 2. Print / screen CSS (`summary-print.php` + `summary-print-travelorder.php`)
+
+- On `.tbl-trip textarea.auto-expand`:
+  - `overflow: hidden !important`
+  - `scrollbar-width: none; -ms-overflow-style: none`
+  - `::-webkit-scrollbar { width: 0; height: 0; display: none }`
+- `@media print`:
+  - `height: auto !important; max-height: none !important`
+  - `overflow: hidden !important` (prefer over `visible` for Chromium PDF)
+  - `white-space: pre-wrap; word-break: break-word`
+  - `field-sizing: content` where supported
+
+### 3. JS resize
+
+- Run `resizeTripTextareas()` on `DOMContentLoaded` (not only `load`)
+- On Print click: resize → `requestAnimationFrame` → `window.print()`
+- Keep `beforeprint` resize as backup
+
+## Implementation checklist — ✅ DONE (2026-09-26)
+
+- [x] `includes/functions.php` — `tripTicketTextareaRows()` default `$max` raised **12 → 40**.
+- [x] `summary-print.php` — Destination/Purpose call sites pass `charsPerLine = 22` (was 26); base `.tbl-trip textarea.auto-expand` CSS gains `overflow: hidden !important`, `scrollbar-width: none`, `-ms-overflow-style: none` and a `::-webkit-scrollbar { width:0; height:0; display:none }` rule; `@media print` switches from `overflow: visible` to **`overflow: hidden !important`**, adds `height: auto !important; max-height: none !important; white-space: pre-wrap; word-break: break-word; scrollbar-width/-ms none; field-sizing: content`, plus the webkit-scrollbar kill; Print button now runs `resizeTripTextareas()` → `requestAnimationFrame` → `window.print()`; `resizeTripTextareas()` also fires on `DOMContentLoaded` (was `load` only), `beforeprint` kept as backup.
+- [x] `summary-print-travelorder.php` — mirrors: Purpose call site `charsPerLine = 22`; `.tbl-itinerary textarea` scrollbar-hiding CSS (screen + webkit + print, `overflow: hidden`, `height: auto`, `max-height: none`, `field-sizing: content`); Print button resize → rAF → print; `DOMContentLoaded` resize added.
+- [x] No DB/storage changes; create-form length limits untouched; TCPDF `trip-tickets/export-pdf.php` untouched.
+
+## QA — verified 2026-09-26 (`_deploy_tmp/verify_plan29_print.php` + worst-case fixture; slip rows removed after)
+
+- [x] Rows math: 300-char purpose @ 22 cpl → **14 rows**, 310-char → **15 rows** (both above the old 12 cap — no more clipping), 1000-char → capped at 40, short → min 2, hard newlines respected.
+- [x] Live render: `?page=my-trip-tickets&action=generate-summary&print=1&template=vehicle` with a seeded vehicle + 3 Sept-2026 completed trips (300-char / 310-char / short purposes) — emitted textareas carry rows 14/15, `overflow: hidden !important` and the scrollbar-kill CSS (grep + render PASS).
+- [x] Headless-Chrome print-to-PDF: **no scrollbar chrome anywhere** in the Purpose/Destination cells; both long purposes render **complete to their final words** ("…turn-over of communication equipment." / "…project management office.") — the reported `S ki C` / `Fib O i C bl` clipping is gone (browser screenshots of both PDF pages).
+- [x] Mixed render sanity: the ticket also included pre-existing live rows — everything renders fully alongside the smoke rows.
+- [x] Travelorder variant: mirrored CSS/JS in place, render PASS, purpose call site tightened.
+- [x] `php -l` clean on `functions.php` + both print templates + full public_html sweep 0 errors; `ob-signature.js` unchanged-size pads unaffected (fit flag only on CoA).
+- [x] **Deployed to live** `lokafleet.dictr2.cloud` on 2026-09-26 — surgical upload of the 3 Plan #29 files into `/home/lokafleet_main/htdocs/lokafleet.dictr2.cloud/public_html/`; backup `/home/lokafleet_main/backups/pre_plan29_20260926_095849/`; health 200; live grep confirms `max = 40`, scrollbar-kill CSS, DOMContentLoaded resize.
+
+## Files
+
+- `public_html/includes/functions.php` — `tripTicketTextareaRows()`
+- `public_html/pages/my-trip-tickets/summary-print.php`
+- `public_html/pages/my-trip-tickets/summary-print-travelorder.php`
+- `Plan.md`
+
+## Out of scope
+
+Rewriting TCPDF `trip-tickets/export-pdf.php`. Changing Purpose DB/storage or create-form length limits.
+
+---
+
+# LOKA Plan #30: All-Trip Visibility for Motorpool Head + Department Approver — ✅ DONE (2026-09-27, live `lokafleet.dictr2.cloud`)
+
+## Goal
+
+Let **Motorpool Head** and **Department Approver** accounts see **all vehicle trip requests from every department**, matching the trip visibility intended for Administrator / All Father accounts.
+
+This is a visibility change, not a blanket permission increase: seeing another department's trip must not by itself grant edit, cancel, rollback, override, dispatch, completion, or approval rights.
+
+## Current behavior and gaps
+
+- `pages/requests/index.php` shows all non-deleted requests only when `isAdmin()` is true. Motorpool Head and Department Approver therefore see only requests they personally created.
+- `pages/requests/view.php` and `pages/requests/print.php` already allow `isApprover()` users to open/print any request. The missing piece is discoverability from the list.
+- `pages/completed-trips/index.php` gives Motorpool Head all completed trips, but Department Approver is limited to their department.
+- Completed-trip filtering compares exact role names and checks driver status first. As a result, an Approver/Motorpool/Admin account that is also tagged as a driver can be reduced to its own driver trips, and an All Father role can fall through to requester-only results.
+- The **Approvals** page is intentionally a work queue. Department Approvers must continue to approve only eligible requests in their department; Motorpool Heads continue to process the motorpool stage.
+
+## Decisions
+
+1. **All trips means all departments and all request statuses** on `/?page=requests`, excluding soft-deleted rows.
+2. **Completed Trips also becomes system-wide** for Department Approver, Motorpool Head, Administrator, and All Father.
+3. Add one explicit visibility helper, e.g. `canViewAllTripRequests()`, instead of repeating exact role comparisons. It should follow the existing role hierarchy and View-as behavior; in this codebase `isApprover()` covers Approver, Motorpool, Admin, and real All Father at or above the approver level.
+4. A privileged account that is also a driver gets the privileged all-trip view. Driver-only accounts remain scoped to their assigned/requested trips.
+5. Keep revision alerts and unread-notification badges personal to the logged-in user; do not present another requester's alerts as the viewer's work.
+6. On the expanded Requests list, unrelated rows expose **View** only. Owner actions stay owner-scoped, while existing Admin/All Father and Motorpool operational controls remain available only where their current server-side checks permit them.
+7. Keep the sidebar route as **Requests**. Use role-aware page copy such as **All Trip Requests** for users with system-wide visibility and **My Requests** for scoped users.
+8. No database migration, new role, duplicated trip page, or change to soft-delete behavior.
+
+## Implementation checklist — ✅ DONE (2026-09-27)
+
+- [x] `public_html/includes/functions.php` — added `canViewAllTripRequests(): bool` after `isApprover()`: Approver+ (Department Approver, Motorpool Head, Administrator, All Father) with a policy comment (visibility only, no action rights). View-as handled explicitly — `isApprover()`/`hasRole()` read the **raw** session role, so without the guard, View-as Requester/Driver/Guard would inherit the real All Father account's level-99 hierarchy; the helper maps View-as Approver/Motorpool/Admin to the global view and every other View-as role to scoped.
+- [x] `public_html/pages/requests/index.php` — all-row condition swapped from `isAdmin()` to `!canViewAllTripRequests()`; requester scoping kept for all other users.
+- [x] `public_html/pages/requests/index.php` — role-aware copy (`$pageTitle` + heading + breadcrumb stay "Requests"; heading **All Trip Requests** vs **My Requests**; role-aware empty state); a **Requester/Department column** appears only in the global view; revision alert and unread-notification badges are strictly personal (`user_id = userId()`) and notification links are parsed by exact `id` query parameter; row actions owner-scoped — unrelated rows get **View only**, owner keeps Edit/Cancel, Administrator/All Father keep their server-side edit/cancel reach.
+- [x] `public_html/pages/requests/cancel.php` — server-side cancellation is owner or `isAdmin()` only. Department Approver and Motorpool all-trip visibility cannot be converted into cancellation rights through a direct URL.
+- [x] `public_html/pages/completed-trips/index.php` — filtering order is now **all-trip → driver → guard → requester**; the department-scoped `ROLE_APPROVER` branch and the exact-match `ROLE_MOTORPOOL/ROLE_ADMIN` branch were removed in favour of `canViewAllTripRequests()`, evaluated before the driver scope so a driver-tagged privileged account keeps the system-wide view (QA item). Dispatch/Arrival columns stay Motorpool/Admin-only (operational info, per decision 6).
+- [x] `public_html/pages/completed-trips/index.php` — explanatory copy is now `canViewAllTripRequests()`-first: Approver, Motorpool, Admin, and All Father see "All completed trips in the system."
+- [x] Reviewed `pages/requests/view.php` + `print.php` — both already gate any-request access on `isApprover()`; reusing the helper would change nothing, so left untouched per plan.
+- [x] Confirmed `pages/approvals/index.php` + `process.php` — queue is **assignment-scoped** (`approver_id` / `motorpool_head_id`) with its own server-side eligibility checks; no reference to the new helper, so the approval queue remains a department/stage work queue.
+- [x] `php -l` clean on all four touched PHP files; harness QA below.
+
+## Post-implementation review closure — fixed 2026-09-27
+
+- [x] Closed the direct-URL permission gap: `cancel.php` previously allowed any `isApprover()` / `isMotorpool()` account to cancel unrelated requests even though the global list exposed View only. The endpoint now enforces owner or Administrator/All Father.
+- [x] Replaced substring notification matching (`id=5` incorrectly matching `id=50`) with exact URL query parsing and removed the request-count-sized SQL `OR ... LIKE` list.
+- [x] Removed trailing whitespace found by `git diff --check`.
+- [x] `php -l`, IDE diagnostics, and `git diff --check` clean on the Plan #30 PHP files.
+
+## QA role matrix — verified 2026-09-27 via render harness `_deploy_tmp/verify_plan30.php` (persona session injection, page include inside a rolled-back transaction, rendered request-ID sets diffed against DB expectations; run once per persona so static caches reset)
+
+- [x] Department Approver (user 3): Requests renders the **full 631-row global set** (pending/approved/rejected/cancelled/completed, multi-department); Completed Trips page 1 rows are all system-wide members with "All completed trips in the system" copy. Rows open via View (view/print.php `isApprover()` access unchanged).
+- [x] Department Approver: Approvals queue untouched — assignment-scoped by code review; unrelated trip #545 (pending, other owner) exposes **View only** — no edit/cancel buttons — and the approval/process server-side gates were not modified.
+- [x] Motorpool Head (user 14): Requests + Completed Trips system-wide; motorpool-stage/vehicle/driver controls live on other pages behind their own checks (untouched).
+- [x] Administrator (115) and All Father (1): full global Requests set + system-wide Completed Trips — behaviour retained.
+- [x] Driver-tagged privileged accounts: Approver user 3 (driver 12) and Motorpool user 14 (driver 14) both get the **all-trip** view on Completed Trips — the all-trip branch now evaluates before the driver scope.
+- [x] Driver-only account (user 15, driver 5): Completed Trips rows exactly `driver_id/requested_driver_id`-scoped (25 on page 1); My Requests scoped by user_id.
+- [x] Guard (user 32): Completed Trips rows exactly `dispatch_guard_id/arrival_guard_id`-scoped; copy "Trips you tracked at the gate".
+- [x] Requester/driver-tagged requester (15), Chief/OIC Chief Admin & Finance (43): own-record scoped on both pages — no other role rule leaked.
+- [x] View-as: `va_requester`/`va_guard`/`va_approver` harness personas — View-as Requester/Guard see scoped lists (heading "My Requests", own-records rows); View-as Approver gets the global view. The real All Father global list does **not** leak (explicit View-as branch in the helper).
+- [x] Soft-delete: `--softdelete-only` run soft-deletes request #49 inside the transaction — absent from **both** lists for Approver and View-as Requester; DB verified unchanged after rollback.
+
+## Files
+
+- `public_html/includes/functions.php`
+- `public_html/pages/requests/index.php`
+- `public_html/pages/requests/cancel.php`
+- `public_html/pages/completed-trips/index.php`
+- Review only unless needed: `public_html/pages/requests/view.php`
+- Review only unless needed: `public_html/pages/requests/print.php`
+- Review only: `public_html/pages/approvals/index.php`
+- Review only: `public_html/pages/approvals/process.php`
+- `Plan.md`
+
+## Out of scope
+
+Changing approval authority, department ownership, request workflow statuses, Live Trip Board access, Guard operations, trip-ticket review, reports/exports, OB Pass Slips, notifications, or database schema.
+
+## Deployment
+
+- [x] Deployed to live `lokafleet.dictr2.cloud` on 2026-09-27 — surgical upload of Plan #30 PHP files; prod DB/uploads/`.env` untouched; no migrations.
+
+---
+
+# LOKA Plan #31: Gas Voucher Budget Officer Step (hybrid C) — ✅ DONE (2026-09-28, live `lokafleet.dictr2.cloud`)
+
+## Goal
+
+After **Motorpool Head** review, a gas voucher must be **seen and approved by a Budget Officer or OIC Budget Officer** before **Chief Admin & Finance / OIC CAF** can finally approve.
+
+Gas vouchers remain a standalone fuel flow (not tied to trip `request_id`).
+
+## Locked decisions
+
+1. **Flags, not a new role:** `users.is_budget_officer` and `users.is_oic_budget_officer` (same pattern as `is_ob_approver`). No new `ROLE_*` ENUM value.
+2. **Budget step actors only:** Budget Officer **or** OIC Budget Officer. Administrator / All Father / Motorpool / CAF **cannot** approve the middle step.
+3. **Hybrid C (v1):** flags define who **may** act; All Father gets a **Gas voucher workflow assignees** page to toggle those flags in one place and see Motorpool / CAF pools (by role) for awareness. All Father does **not** gain budget-step approval power — only assignment.
+4. Requesters may still pick a **preferred Budget Officer** from the flagged pool on create (like preferred reviewer/approver today).
+5. Vouchers already in `pending_approval` when this ships stay CAF-ready (**grandfathered**). Only newly Motorpool-reviewed vouchers enter `pending_budget`.
+
+## Happy path flowchart
+
+```mermaid
+flowchart TD
+  start[Staff creates gas voucher] --> draft{Save or Submit?}
+  draft -->|Save| draftStatus[draft]
+  draft -->|Submit| pendingReview[pending_review]
+  draftStatus -->|Submit later| pendingReview
+
+  pendingReview -->|Motorpool Head reviews OK| pendingBudget[pending_budget]
+  pendingReview -->|Reject| rejected[rejected]
+
+  pendingBudget -->|"ONLY Budget Officer or OIC Budget Officer"| pendingApproval[pending_approval]
+  pendingBudget -->|Reject| rejected
+
+  pendingApproval -->|CAF or OIC CAF final approve| approved[approved]
+  pendingApproval -->|Reject| rejected
+
+  approved --> print[Print voucher]
+  print --> station[Use at gas station]
+  approved --> payment[payment_status unpaid to paid]
+
+  draftStatus -->|Cancel| cancelled[cancelled]
+  pendingReview -->|Cancel by owner| cancelled
+```
+
+| Status | Who acts | Moves to |
+|--------|----------|----------|
+| `draft` | Owner / staff with gas access | `pending_review` on submit |
+| `pending_review` | Motorpool Head (role; existing Step 1) | `pending_budget` |
+| `pending_budget` | Budget Officer / OIC Budget Officer (**flags only**) | `pending_approval` |
+| `pending_approval` | CAF / OIC CAF (roles; existing final step) | `approved` |
+
+Reject remains allowed at each pending step by whoever can act on that step. Cancel stays limited to `draft` / `pending_review` (owner), unless later expanded.
+
+## All Father assignee board (hybrid C)
+
+- **Who:** All Father (real All Father) only.
+- **Route (suggested):** `/?page=settings&action=gas-workflow` or System Control link.
+- **Editable:** toggle `is_budget_officer` / `is_oic_budget_officer` on active users (same DB columns as Users create/edit).
+- **Read-only:** active Motorpool Heads; active CAF / OIC CAF (role-based — those stay assigned via Users → Role).
+- Does **not** let All Father approve `pending_budget`.
+
+## Implementation checklist — ✅ DONE (2026-09-28)
+
+- [x] Migration `054_gas_voucher_budget_officer.php` (run locally 2026-09-28, idempotent) — `users.is_budget_officer` + `users.is_oic_budget_officer` after `is_ob_approver`; `gas_vouchers.status` ENUM now `('draft','pending_review','pending_budget','pending_approval','approved','rejected','cancelled')` (ENUM rewrite preserves existing values — grandfathering is automatic); columns `requested_budget_officer_id`, `budget_reviewed_by`, `budget_reviewed_at`, `budget_officer_notes` with indexes.
+- [x] Helpers in `includes/functions.php` — `isBudgetOfficer()` (either flag, active account; **hard-false for the real All Father account** so assignment never becomes approval power, decision 2/3) + `budgetOfficerPool()`; `pending_budget` added to `GAS_VOUCHER_STATUSES` (label "Pending Budget", color primary); `canAccessGasVouchers()` includes `isBudgetOfficer()`.
+- [x] `pages/users/create.php` + `edit.php` — Budget Officer / OIC Budget Officer switches next to the OB Approver switch (same insert/update keys pattern).
+- [x] All Father assignees board — new `pages/settings/gas-workflow.php` at `/?page=settings&action=gas-workflow` (router branch under `settings`; page itself calls `requireSystemControl()` = real All Father, View-as bounced; `requireRole(ROLE_ADMIN)` at router still lets Administrator reach the page where they get redirected). Searchable active-user table with per-row auto-submit toggles for both flags; read-only Motorpool Head and CAF/OIC CAF pools; pending-budget counter. Sidebar: **Gas Workflow** link under System Control (`canAccessSystemControl()` only).
+- [x] Workflow in `gas-vouchers/approve.php` — now a three-step page: Motorpool `review_approve` → **`pending_budget`** + notify budget pool (preferred `requested_budget_officer_id` or all flagged, type `gas_voucher_budget_pending`); new **`budget_approve`** valid only when `pending_budget` **and** `isBudgetOfficer()` → `pending_approval`, stores `budget_reviewed_by/_at` + `budget_officer_notes`, notifies requester + CAF pool (`gas_voucher_budget_approved`); CAF `final_approve` unchanged and only valid at `pending_approval` (existing actors kept — grandfathered vouchers stay processable); `reject` gated per step to that step's actor set; decision whitelist derives from the computed step gates so a stale/hidden decision POST cannot fire. Edit-fields shortcut hidden at the budget step (create.php edit rules unchanged: only draft/pending_review/pending_approval editable).
+- [x] `view.php` — budget-officer joins; access widened to flagged officers; `pending_budget` status banner + timeline step (Budget Certified / Pending Budget Review / Budget Review, with preferred officer + notes); Review step shows completed during `pending_budget`; Process card gains the budget branch ("Certify Budget"); CAF sees no process card at `pending_budget` (gate falls through).
+- [x] `index.php` — `pending_budget` status filter + "Pending Budget" summary card (grid now `col-6 col-xl`); row Process button for flagged officers at `pending_budget`; `$pendingBudgetCount` computed for the flag pool.
+- [x] `create.php` — optional Preferred Budget Officer dropdown from `budgetOfficerPool()` (hidden entirely when pool empty; persisted to `requested_budget_officer_id` like the other preferred signatories).
+- [x] Badges / dashboard — `badgePendingIdsGasVouchers()`: CAF/Admin keep `pending_approval` only; Motorpool/Approver keep `pending_review`+`pending_approval`; flagged officers get a **union** of `pending_budget` ids on top of their role set. `dashboard_stats.php`: requester-branch staff flagged as officers get a "Gas vouchers for budget review" action + "Budget Review" KPI linking to `status=pending_budget`; `$myGas` now counts `pending_budget` too.
+- [x] Notifications + SMS — types `gas_voucher_budget_pending` / `gas_voucher_budget_approved` on SMS allow-list; **MAIL_TEMPLATES** entries added for all `gas_voucher_*` types (closes default-template WARN).
+- [x] Print / view timeline — `print.php` signatures row is now 4-up (Requested by/Bearer, Reviewed by OIC Motor Pool, **Certified by Budget Officer**, Approved by CAF; widths 25%); `view.php` timeline as above. Grandfathered approved vouchers (no `budget_reviewed_by`) print an empty Budget Officer name line for wet signing.
+- [x] `php -l` clean on all touched files; QA matrix below (harness scenarios PASS).
+- [x] Deployed to live `lokafleet.dictr2.cloud` on 2026-09-28 — code + migration 054; prod DB rows preserved.
+
+## QA matrix — verified 2026-09-28 via `_deploy_tmp/verify_plan31.php` (persona session injection; approve.php opens its own transactions, so scenarios run against the real local DB with a shutdown cleanup that deletes every created row — vouchers `voucher_no LIKE '31TEST-%'`, notifications/email_queue/sms_logs/audit_logs above process high-water marks — and resets the test flags on users 15/32; post-run DB verified pristine). One process per scenario; each scenario seeds its own voucher(s).
+
+- [x] **Motorpool review lands on `pending_budget`** — motorpool head (14) `review_approve` on a `pending_review` voucher → status `pending_budget`, `reviewed_by=14`, success flash; both flagged officers notified (`gas_voucher_budget_pending`), requester notified (`gas_voucher_reviewed`).
+- [x] **Budget Officer / OIC Budget Officer can approve the budget step; Admin cannot** — flagged plain-staff user 15 `budget_approve` → `pending_approval` with `budget_reviewed_by/_at` + notes; Admin (115), **All Father (1)**, CAF (43), and an active unflagged requester are all bounced with "cannot be processed at this stage", status and `budget_reviewed_by` untouched.
+- [x] **CAF Process only after budget approve** — gate scenario proves CAF blocked at `pending_budget`; `grandfathered_caf` scenario proves CAF `final_approve` works at `pending_approval` → `approved`, budget columns left NULL.
+- [x] **Reject with reason at budget step** — flagged officer rejects → `rejected`, `rejection_reason` stored, `rejected_by=15`, warning flash.
+- [x] **Preferred budget officer notification targeting** — voucher with `requested_budget_officer_id=32`: only officer 32 notified, officer 15 not; without preference: whole flagged pool notified.
+- [x] **All Father board toggles flags; All Father cannot process `pending_budget`** — board renders for real All Father with both toggles + read-only Motorpool/CAF pools; POST toggle persists `is_budget_officer=1` with success flash; Administrator bounced from the board ("All Father access required"); All Father blocked at the budget step (above).
+- [x] **Grandfathered `pending_approval` still CAF-processable** — see `grandfathered_caf` above (decision 5 satisfied by the ENUM rewrite keeping existing values untouched).
+- [x] **Soft-delete / cancelled behaviour unchanged for pre-budget statuses** — `cancel.php` untouched: owner cancel at `pending_budget` refused ("cannot be cancelled at this stage"), `pending_review` path unchanged; soft-delete filters (`deleted_at IS NULL`) present in every touched query.
+- [x] **Render checks** — index: `pending_budget` filter option + summary card + Process link for flagged officers; view: budget banner, timeline step, Certify Budget card; create: preferred officer dropdown listing the flagged pool; print: 4-up signatures with "Certified by:" + officer name.
+
+## Files (planned)
+
+- `Plan.md` (this section)
+- `public_html/migrations/054_gas_voucher_budget_officer.php` (new)
+- `public_html/includes/functions.php`
+- `public_html/pages/users/create.php`, `public_html/pages/users/edit.php`
+- `public_html/pages/gas-vouchers/approve.php`, `view.php`, `index.php`, `create.php` (+ print if timeline/signatories)
+- New All Father assignees page under settings/system control + router/`sidebar` or System Control link
+- `public_html/config/sms.php` (notify type allow-list if needed)
+- Badge / dashboard helpers as touched today for gas pending counts
+
+## Out of scope
+
+New system role ENUM; changing trip-request / OB / Live Board workflows; payment rules beyond existing `payment_status`; live deploy until explicitly requested after implementation.
+
+## Status
+
+**DONE (2026-09-28) — implemented, QA'd, and deployed to live `lokafleet.dictr2.cloud`.** Migration 054 applied on prod. Files: `migrations/054_gas_voucher_budget_officer.php` (new), `includes/functions.php`, `includes/badge_counts.php`, `includes/dashboard_stats.php`, `includes/sidebar.php`, `config/sms.php`, `config/mail.php`, `index.php` (router), `pages/users/create.php`, `pages/users/edit.php`, `pages/gas-vouchers/approve.php`, `view.php`, `index.php`, `create.php`, `print.php`, `pages/settings/gas-workflow.php` (new), `_deploy_tmp/verify_plan31.php` (QA harness), `Plan.md`.
+
+---
+
+# LOKA Plan #32: Distinct email/SMS themes for Vehicle, Gas Voucher, and OB — ✅ DONE (2026-09-28; live `lokafleet.dictr2.cloud`)
+
+## Goal
+
+Make **Vehicle Request**, **Gas Voucher**, and **OB Pass Slip** notifications visually and textually distinct in email (and SMS), while keeping **LOKA Fleet Management** branding and stable per-ID email threading (Plan #13).
+
+## Problem
+
+Gas voucher emails currently look like vehicle requests:
+
+- **Subject:** `Control No. {id}: LOKA Fleet Request` even when the ID is a gas voucher id
+- **Theme:** same blue header + blue “View Details” button (`#0d6efd`) for every family
+
+Root cause: when `requestId` is set, [`EmailQueue.php`](public_html/classes/EmailQueue.php) and [`Mailer.php`](public_html/classes/Mailer.php) force one subject string and one HTML chrome color. Gas vouchers and OB pass their own IDs into that same `requestId` slot via `notify()`.
+
+## Locked decisions
+
+1. Infer a **notification family** from the `notify` / template type prefix (`gas_voucher_*`, `ob_*`, vehicle-related types, else system).
+2. Apply **family-specific email subject** and **theme color** (header + CTA button). Keep white “LOKA Fleet Management” wordmark and gray footer.
+3. Keep **stable per-ID subjects within each family** so Gmail/Outlook threading still works (do not put event titles in the subject).
+4. **SMS:** prepend `[Vehicle]` / `[Gas Voucher]` / `[OB]` to the SMS title when the family is known and the title does not already start with that tag.
+5. No new DB columns; no split of `email_queue.request_id` into voucher/ob FKs in this plan.
+
+## Family theme table
+
+| Family | Type prefix examples | Email subject (stable with ID) | Theme color (header + CTA) |
+|--------|----------------------|--------------------------------|----------------------------|
+| Vehicle | `request_*`, `vehicle_*`, `driver_*`, `trip_*`, `guard_trip_*`, … | `Control No. {id}: Vehicle Request` | `#0d6efd` (current blue) |
+| Gas voucher | `gas_voucher_*` | `Gas Voucher #{id}: Gas Voucher` | `#c2410c` (amber / fuel) |
+| OB Pass Slip | `ob_*`, `guard_ob_*` | `OB Pass Slip #{id}: Official Business` | `#0f766e` (teal) |
+| Other / system | `default`, password reset, etc. | Keep template subject (no forced Control No. label) | `#0d6efd` |
+
+## Implementation checklist — ✅ DONE (2026-09-28)
+
+- [x] Helpers in `includes/functions.php` (new "Notification family themes" section above `notify()`):
+  - [x] `notificationFamily(string $type): string` — `gas_voucher_*` → `gas`; `ob_*` / `guard_ob_*` → `ob`; exact `default` / `password_reset` / `system_notification` / `test` → `system`; everything else → `vehicle` (all remaining fleet types keep the historical blue Control No. family).
+  - [x] `notificationTheme(string $family): array` — `color`, `colorDark` (hover), `smsTag`, `subjectPattern` per the family table (gas `#c2410c`/`#9a3412`/`[Gas Voucher]`; ob `#0f766e`/`#115e59`/`[OB]`; vehicle/system `#0d6efd`/`#0b5ed7`, tags `[Vehicle]`/none).
+  - [x] `notificationThreadSubject(string $family, int $id): string` — `Control No. {id}: Vehicle Request` / `Gas Voucher #{id}: Gas Voucher` / `OB Pass Slip #{id}: Official Business`.
+  - [x] `notify()` now computes the family **from the caller's type before the `default`-template rewrite** and passes it to `queueTemplate()` — this is the load-bearing detail: gas/OB types (and unknown types rewritten to `default`) keep their own subject/theme. `notifyPassengers()` likewise passes `notificationFamily($type)`.
+- [x] Email subject — `EmailQueue::requestThreadSubject(int $id, ?string $family = null)` (family-aware; legacy `Control No.: LOKA Fleet Request` kept only as a no-helpers fallback); `queue()` gains `?string $family` (infers from the `$template` key when null — covers the direct `queue()` callers in cron/process_trip_confirmations and trip-enhancements, which are correctly vehicle); `queueTemplate()` gains `?string $family` passthrough; `Mailer::sendTemplate` infers family from the template key and uses `notificationThreadSubject`.
+- [x] Email HTML chrome — `EmailQueue::buildEmailBody(..., string $family)` and `Mailer::buildHtmlBody(..., string $family)` parameterize the hardcoded `#0d6efd` (header block + CTA button, plus the `:hover` shade in the class-based template). White "LOKA Fleet Management" wordmark and gray footer untouched. The `queueTemplate` sync-send path sends the same themed `$body`/`$subject`, so hybrid/immediate modes match the queued rows.
+- [x] SMS title prefix — `buildSmsMessage()` (in `includes/sms.php`, which backs both `SmsQueue::queueForUser` and `smsNotifyUser`) prepends the family `smsTag` to the title when the family has one and the title doesn't already start with it; system messages stay untagged.
+- [x] Local smoke — `_deploy_tmp/verify_plan32.php`: helper units, `buildSmsMessage` tags, and live `notify()` calls for one vehicle, one gas voucher, one OB event (plus a second same-id gas email), asserting queued `email_queue` subjects + themed chrome; 31 checks, all PASS; high-water cleanup verified (0 residual rows).
+- [x] `php -l` clean on `includes/functions.php`, `includes/sms.php`, `classes/EmailQueue.php`, `classes/Mailer.php`; login page renders 200 after the changes.
+
+## QA matrix — verified 2026-09-28 via `_deploy_tmp/verify_plan32.php` (31 checks, all PASS; local delivery mode is `queued` so nothing actually sends; shutdown cleanup deletes the created notifications/email_queue/sms_logs rows and the DB was verified pristine afterwards)
+
+- [x] Gas voucher email subject is `Gas Voucher #{id}: Gas Voucher`, not `LOKA Fleet Request` — notify() with `gas_voucher_approved` (rendered from the `default` template) queues with the family subject.
+- [x] Gas voucher email header/button use `#c2410c` — queued body contains the amber header block and CTA, and no `#0d6efd` anywhere.
+- [x] Vehicle request keeps blue theme and `Control No. {id}: Vehicle Request` — notify() with `request_approved` queues blue chrome + the (reworded per the locked table) Control No. subject; cron/trip-enhancement direct `queue()` callers inherit the same vehicle subject.
+- [x] OB email uses teal theme and `OB Pass Slip #{id}: Official Business` — notify() with `ob_submitted`.
+- [x] SMS titles show `[Gas Voucher]` / `[Vehicle]` / `[OB]` prefixes — `LOKA #id - [Gas Voucher] Title…` etc.; system types untagged; already-tagged titles not double-tagged.
+- [x] Threading: two emails for the same gas voucher id share the same subject (second event, same id → identical subject string; per-ID Message-ID/In-Reply-To headers unchanged).
+- [x] LOKA branding wordmark + footer unchanged — asserted on gas, OB, and vehicle queued bodies.
+- [x] System/default emails without family ID still use template subject — `queueTemplate('default', …, null)` keeps the template subject; `password_reset` via `Auth::queue()` has no `request_id` so no override applies.
+
+## Files (planned)
+
+- `Plan.md` (this section)
+- `public_html/includes/functions.php` (family helpers)
+- `public_html/classes/EmailQueue.php`
+- `public_html/classes/Mailer.php`
+- `public_html/classes/SmsQueue.php` and/or `public_html/includes/sms.php`
+
+## Out of scope
+
+Changing in-app notification UI chrome; splitting `email_queue.request_id` into separate voucher/ob FK columns; rewriting all `MAIL_TEMPLATES` body copy; live deploy until explicitly requested after implementation.
+
+## Status
+
+**DONE (2026-09-28) — implemented, QA'd, and deployed to live `lokafleet.dictr2.cloud`.** No DB migration needed (Plan decision 5). Files touched: `public_html/includes/functions.php` (family helpers + `notify()`/`notifyPassengers()` family passthrough), `public_html/classes/EmailQueue.php`, `public_html/classes/Mailer.php`, `public_html/includes/sms.php`, `_deploy_tmp/verify_plan32.php` (QA harness), `Plan.md`. Note: vehicle-request subjects change from `Control No. {id}: LOKA Fleet Request` to `Control No. {id}: Vehicle Request`, so in-flight email threads re-root once at cutover — expected per the locked family table.
+
+---
+
+# LOKA Plan #33: OB Apply form — sectioned steps UX — ✅ DONE (2026-09-28; live `lokafleet.dictr2.cloud`)
+
+## Goal
+
+Rewrite the **Apply — Official Business Pass Slip** screen so users are guided through clear **numbered sections / steps**, instead of one flat “Pass Slip details” card with every field mixed together.
+
+## Problem (current)
+
+[`pages/ob-requests/create.php`](public_html/pages/ob-requests/create.php) puts Purpose, Date, vehicle choice, plate, Supervisor, Motorpool Head, Participants, and the print-name preview in a **single undifferentiated card**. First-time users cannot tell:
+
+1. What to fill first vs later  
+2. That **Private vehicle** skips Motorpool (plate + Motorpool Head)  
+3. That Participants are optional companions (applicant always stays)  
+4. What happens after Submit (approval chain)
+
+Screenshot reference (2026-09-28): flat layout under breadcrumb `Dashboard / OB Pass Slips / Apply`.
+
+## Locked decisions
+
+1. **Hybrid guided form (not a multi-page wizard):** keep **one** `<form>` and one POST submit. Add a **vertical step list / section headers** so the page reads as 4 steps. No Next/Back page reloads (avoids losing Tom Select chips and plate AJAX state).
+2. **Four sections** (fixed copy):
+
+| Step | Title | Fields |
+|------|--------|--------|
+| 1 | Trip details | Purpose (max 200), Date of Official Business |
+| 2 | Vehicle | Official DICT vs Private; Fleet plate only when Official |
+| 3 | Approvers | Immediate Supervisor always; Motorpool Head only when Official |
+| 4 | Participants | Multi-select companions + “How this prints” preview |
+
+3. **Progress chrome:** compact numbered stepper (1–4) under the page title; highlight the section in view (simple CSS / `scroll-margin` anchors). On validation error, scroll/focus the first section that has an error.
+4. **Short workflow hint** under the H4 (one line):  
+   `After submit: Supervisor → Motorpool (official vehicle only) → Guard stamps → Certificate of Appearance.`
+5. **Preserve all existing validation and JS** (`ob-official-only` show/hide, plate green/red day status, Tom Select participants, purpose counter, CSRF, private-vehicle Motorpool skip). No schema / API / workflow changes.
+6. **Visual language:** match existing Bootstrap LOKA cards (section cards or bordered `fieldset`-style blocks with `Step N · Title`). Avoid a new design system or purple/gradient chrome.
+
+## Implementation checklist — ✅ DONE (2026-09-28)
+
+- [x] `pages/ob-requests/create.php` restructured: the single "Pass Slip details" card is now **4 section cards** (`#obStep1`–`#obStep4`, each a `.card.shadow-sm.ob-step` with a numbered badge header `Step N · Title` in the locked copy: 1 Trip details, 2 Vehicle, 3 Approvers, 4 Participants), still **one `<form id="obForm">` / one POST** — no wizard routes, so Tom Select chips and plate AJAX state survive.
+- [x] **Stepper**: compact numbered pill row (1–4, `flex-wrap` for mobile) under the page title; `IntersectionObserver` scrollspy highlights the pill of the section in view; pill clicks update immediately; sections get `scroll-margin-top` so anchor jumps clear the navbar. Existing Bootstrap/blue visual language only (`.ob-step-badge` + `.ob-step-pill` in-page CSS) — no new design system.
+- [x] **Workflow hint** under the H4 (one line): "After submit: Supervisor → Motorpool (official vehicle only) → Guard stamps → Certificate of Appearance."
+- [x] `ob-official-only` wiring preserved unchanged — Step 2 plate + Step 3 Motorpool Head hide/disable/de-require for Private via the existing `obSyncVehicleKind()`; the previously dead `ob-private-note` (it sat *inside* the hidden Motorpool column) now lives as two standalone notes in Steps 2 and 3 that appear only on Private.
+- [x] **Failed-POST jump**: validation now records the step of the first failing check (`$firstErrorStep` — purpose/date→1, vehicle choice/plate→2, supervisor/motorpool→3) via an `$addError` helper; on re-render the page script scrolls the section into view, adds `.has-error` (red border), and focuses its first enabled field.
+- [x] Submit + Cancel stay once at the bottom after Step 4; Cancel href still the OB index; breadcrumb unchanged.
+- [x] All existing JS/validation preserved verbatim: `ob-plate-select.js` (green/red day status + busy modal), `ob-participants.js` (Tom Select + "How this prints" preview), purpose counter, CSRF, private-vehicle Motorpool skip, server-side rules. No schema / API / workflow changes; only `create.php` touched (+ in-page CSS/JS).
+- [x] `php -l` clean; browser click-through + POST harness below.
+
+## QA matrix — verified 2026-09-28 via real-browser click-through (in-app browser, `requester@fleet.local` QA persona; user 43 temporarily flagged OB Approver and one fleet plate/motorpool head available) + `_deploy_tmp/verify_plan33.php` POST harness. QA passwords restored and DB verified clean afterwards.
+
+- [x] **Official path**: all 4 steps render (numbered cards + stepper pills + workflow hint); plate and Motorpool Head visible, enabled, and `required` after switching back from Private (asserted via DOM state).
+- [x] **Private path**: clicking the Private radio hides and disables the plate select (Step 2) and Motorpool Head select (Step 3), drops `data-required-when-official` `required`, and reveals both private notes; POST harness `private` path → row with `uses_official_vehicle=0`, `plate_number NULL`, `motorpool_head_id NULL`, status `pending_supervisor`, supervisor notified, motorpool **not** notified (existing Plan #24 behavior intact).
+- [x] **Participants Tom Select + print preview** still update (chips render, requester locked in, "How this prints" shows `Test Requester` / `T.Requester` on load).
+- [x] **Plate green/red availability** unchanged — same `ObPlateSelect.init` config (`#obPlateSelect` + `#obDate` + trips JSON); the assets carry no structural DOM assumptions (verified by reading both JS files).
+- [x] **Validation errors list + focus the right section** — empty submit (native validation bypassed) lists all 4 server errors, highlights Step 1 (`has-error`), scrolls it to the top, and focuses the Purpose field; a second run with Step 1 valid jumps to Step 2 (red border, scrolled, focus on the vehicle radio, stepper pill "2 Vehicle" active).
+- [x] **Cancel returns to OB index; breadcrumb unchanged** — Dashboard / OB Pass Slips / Apply preserved; Cancel href `/?page=ob-requests`.
+- [x] **No regression on create POST / notifications** — harness `official` path: row created with plate + motorpool head, `pending_supervisor`, success flash, supervisor **and** motorpool head notified; 16/16 checks pass; high-water cleanup deleted the test rows (DB verified pristine; only a legitimate login audit row remains).
+- [x] Mobile stacking: sections are plain Bootstrap cards in a single column at 860px max width; stepper pills wrap (`flex-wrap gap-2`) — readable as compact pills on narrow viewports.
+
+## Files (planned)
+
+- `Plan.md` (this section)
+- `public_html/pages/ob-requests/create.php` (primary)
+- Optional small CSS in-page or existing `assets/css` only if needed for stepper
+
+## Out of scope
+
+Multi-page wizard with separate routes; changing OB approval/guard/CoA workflow; `view.php` / `print.php` redesign; edit-after-submit; live deploy until explicitly requested after implementation.
+
+## Status
+
+**DONE (2026-09-28) — implemented, QA'd, and deployed to live `lokafleet.dictr2.cloud`.** No migration. Files touched: `public_html/pages/ob-requests/create.php` only (+ in-page stepper CSS/JS), `_deploy_tmp/verify_plan33.php` (POST harness), `Plan.md`.
+
+---
+
+# LOKA Plan #34: Gas Voucher UI — Plan #33 styling / fill uniformity — ✅ DONE (2026-09-28; live `lokafleet.dictr2.cloud`)
+
+## Goal
+
+Bring **Gas Voucher** screens into the same visual language as Plan #33 OB Apply: consistent white section headers with numbered (or titled) badges, predictable field fill/spacing, a short workflow hint, and a compact filter bar — without changing voucher workflow, statuses, or print layout.
+
+## Problem (current)
+
+Screenshots 2026-09-28 (`New Gas Voucher` + `Gas Vouchers` list):
+
+1. **Create form rainbow headers** — [`create.php`](public_html/pages/gas-vouchers/create.php) uses mismatched colored bars: `bg-primary` (Voucher Information), `bg-secondary` (Vehicle & Driver), `bg-warning` (Fuel), `bg-info` (Fund & Purpose). Plan #33 uses **white `card-header` + blue numbered badge + bold title**.
+2. **No create guidance** — no stepper / section anchors and no one-line post-submit hint for the Plan #31 chain (`Motorpool → Budget Officer → CAF`).
+3. **Uneven field fill** — Budget Officer sits alone on a half-row; optional approver dropdowns and required fields share the same visual weight without clear step grouping.
+4. **Index filters stack / waste space** — [`index.php`](public_html/pages/gas-vouchers/index.php) filter controls live in a `row` but use `d-flex flex-column` blocks **without `col-*`**, so Status / Search / dates / Per page often stack full-width instead of a single compact toolbar row (as in other list pages).
+5. **View / approve chrome drift** — [`view.php`](public_html/pages/gas-vouchers/view.php) / [`approve.php`](public_html/pages/gas-vouchers/approve.php) mix default headers, warning banners, and one-off `bg-primary` strips; not aligned with Plan #33 section cards.
+
+## Locked decisions (mirror Plan #33)
+
+1. **UX-only.** No DB migration; no status / approve / notify / print logic changes (Plans #18/#31 stay).
+2. **Create = hybrid guided form (one POST):** keep a single form. Replace colored headers with Plan #33-style section cards:
+
+| Step | Title | Contents (existing fields) |
+|------|--------|----------------------------|
+| 1 | Voucher details | Request date, Gas station, optional Motorpool / Budget Officer / CAF picks |
+| 2 | Vehicle & driver | Driver/bearer, plate |
+| 3 | Fuel & articles | Fuel type, qty/unit or full tank, articles rows as today |
+| 4 | Fund & purpose | Fund source, chargeable against, purpose |
+
+3. **Create chrome:** numbered stepper pills (1–4) + `scroll-margin` sections; white headers with `.ob-step-badge`-equivalent (reuse class names or shared `gv-step-*`); workflow hint under H4:  
+   `After submit: Motorpool review → Budget Officer → Chief Admin & Finance → Print.`
+4. **Failed-POST jump** (optional but preferred): same pattern as Plan #33 (`$firstErrorStep` → scroll/focus first bad section).
+5. **Index filter bar:** put Status, Search, Date from/to, Per page, Filter/Reset in one `row g-2` with proper `col-12 col-md-*` / `col-lg` so desktop is a **single horizontal toolbar**; keep server-side filtering (no reintroducing DataTables double-search).
+6. **View / approve:** restyle section cards to **white headers + icon + title** (Bootstrap default `card-header bg-white`); keep a **single** emphasized action card for “Process this voucher” (warning border OK) — do not rainbow every section.
+7. **Visual language:** match Plan #33 / Bootstrap LOKA (blue primary accents only). No new design system; no purple/gradient chrome. Print page (`print.php`) **out of scope** (already fixed logos/mojibake).
+
+## Implementation checklist — ✅ DONE (2026-09-28)
+
+- [x] `create.php` — the four `bg-primary` / `bg-secondary` / `bg-warning` / `bg-info` section bars are gone, replaced by **4 Plan #33-style section cards** (`#gvStep1`–`#gvStep4`, white `card-header bg-white` + `gv-step-badge` numbered circle + bold title): **1 Voucher details** (request date, gas station, and — on create — the three optional picks side by side: Motorpool Head / Budget Officer / Chief Admin & Finance at `col-md-4` each, so no more half-empty rows; Budget Officer keeps its Plan #31 empty-pool guard), **2 Vehicle & driver**, **3 Fuel & articles**, **4 Fund & purpose** (fund source + purpose now `col-md-6` side by side). One `<form id="voucherForm">` / one POST — every input name, datalist (driver/plate/fund), the Full-Tank/Liters toggle JS, CSRF, and all server-side rules unchanged.
+- [x] **Stepper + hint**: `gv-step-*` pill stepper (1–4, wraps on mobile) + `scroll-margin-top` sections + IntersectionObserver scrollspy (same pattern as Plan #33, `gv-` prefix per decision 3); one-line hint under the H1: "After submit: Motorpool review → Budget Officer → Chief Admin & Finance → Print."
+- [x] **Failed-POST jump**: `$firstErrorStep` + `$addError` map each validation rule to its step (date/station→1, driver/plate→2, fuel/qty/unit→3, fund/purpose→4); on re-render the page jumps to and red-borders the first bad section and focuses its first field. Browser note: the shared LOKA stylesheet sets `html { scroll-behavior: smooth }` and the smooth animation gets aborted by the post-reload settle, so the jump uses an instant `window.scrollTo` honoring the computed `scroll-margin-top` (verified working in-browser; the OB page's smooth variant is untouched).
+- [x] `index.php` — filter form rebuilt as **one compact toolbar row**: `row g-2 align-items-end` inside a proper `card-body`, every field in `col-6 col-md-3 col-lg-*` grid columns (Status 2 / Search 3 / Dates 2+2 / Per page 1 / Filter+Reset 2). Server-side filtering untouched; status `<option>`s unchanged (incl. `pending_budget`).
+- [x] `view.php` — all six section cards (Voucher Details, Vehicle & Driver, Articles Requested, Fund & Purpose, Approval Workflow, Payment Status) now `card-header bg-white`; the **Process This Voucher** card keeps its `bg-warning` header + `border-warning` as the single strong accent.
+- [x] `approve.php` — the `bg-primary text-white` Voucher Summary strip and the plain bordered "Your Decision" strip became white card headers with icon + title; stage banners (Step 1/2/3 alerts) untouched.
+- [x] `php -l` clean on all four touched files; browser click-through + POST harness below. `print.php` untouched (out of scope).
+
+## QA matrix — verified 2026-09-28 via real-browser click-through (in-app browser, `requester@fleet.local` persona; users 4/15/32 temporarily flagged Budget Officer to exercise the pool) + `_deploy_tmp/verify_plan34.php` POST harness (16 checks). QA passwords restored and all temporary flags/rows reverted afterwards (DB verified pristine).
+
+- [x] **Create: 4 numbered sections + stepper + workflow hint visible** — DOM asserted: 4 `gv-step` sections, 4 pills ("1 Voucher details" … "4 Fund & purpose"), hint line under the H1, 0 rainbow headers / 4 white headers inside the form; screenshot confirms the Plan #33 look.
+- [x] **Create: submit still creates `pending_review`; optional picks still save** — harness `submit`: row with status `pending_review`, `requested_reviewer_id`/`requested_budget_officer_id`/`requested_approver_id` all persisted, motorpool head notified; harness `draft`: status `draft`, picks saved, zero notifications. 16/16 checks.
+- [x] **Create: validation errors show + jump to first bad section** — empty submit (native validation bypassed) lists all server errors and lands on **Step 2** (driver name is the first failing rule) with the red `has-error` border, driver field focused, and the "2 Vehicle & driver" pill active (screenshot).
+- [x] **Index: filters on one row; Filter/Reset work; KPI cards unchanged** — screenshot shows Status / Search / Date From / Date To / Per page / Filter+Reset on a single horizontal toolbar in a `card-body`; form is still a plain GET with the same field names (mechanics untouched); the five KPI cards (incl. Pending Budget) render as before.
+- [x] **View/approve: white section headers; actions intact** — view page DOM: all six headers `bg-white`, none warning; approve render (motorpool persona): 0 `bg-primary` strips, 2 white headers, Step banner + decision form intact; the Process card keeps its warning accent where shown.
+- [x] **No change to print layout, QR, or email/SMS** — `print.php` untouched; no mail/SMS code touched (Plan #32 behavior inherited as-is).
+- [x] **Mobile: sections stack; filter fields wrap** — sections are plain full-width cards; filter columns are `col-6`/`col-12` so they wrap two-per-row on narrow viewports.
+
+## Files (planned)
+
+- `Plan.md` (this section)
+- `public_html/pages/gas-vouchers/create.php` (primary)
+- `public_html/pages/gas-vouchers/index.php`
+- `public_html/pages/gas-vouchers/view.php`
+- `public_html/pages/gas-vouchers/approve.php` (header chrome only, if needed)
+
+## Out of scope
+
+Gas workflow / role changes; `print.php`; reports export pages; OB module; live deploy until explicitly requested after implementation.
+
+## Status
+
+**DONE (2026-09-28) — implemented, QA'd, and deployed to live `lokafleet.dictr2.cloud`.** UX-only; no migration. Files touched: `public_html/pages/gas-vouchers/create.php`, `index.php`, `view.php`, `approve.php` (header chrome only), `_deploy_tmp/verify_plan34.php` (POST harness), `Plan.md`.
+
+---
+
+# LOKA Plan #35: Telegram + Viber notifications (phased) — ✅ DONE Phase A+B (2026-09-29, branch `vberandtelegramnotif`, localhost QA — NOT deployed)
+
+**Branch:** `vberandtelegramnotif` (from `main` @ Plan #34).
+
+## Goal
+
+Add **Telegram** and **Viber** as soft-fail notification channels beside existing in-app / email / SMS, so end users get LOKA Fleet alerts on messengers they already use — without replacing SMS or changing Plan #32 email themes.
+
+## Problem
+
+Today `notify()` fans out to in-app + EmailQueue + soft-fail SMS only. Users have `email` + `phone` — **no** chat IDs. End users asked for Viber and Telegram delivery.
+
+## Locked decisions
+
+1. **Both channels in one plan, phased:** Phase A = Telegram Bot API; Phase B = Viber Bot API (same queue / binding patterns).
+2. **Linking = both:** Profile “Connect” deep-link **and** Admin can set/clear chat IDs on User create/edit.
+3. **Keep SMS / email / in-app;** new channels are soft-fail extras next to `smsNotifyUser()` in [`includes/functions.php`](public_html/includes/functions.php).
+4. **Events:** mirror SMS allowlist (`*` = same `MAIL_TEMPLATES` types). Reuse Plan #32 family tags via a short text builder (same spirit as `buildSmsMessage()`).
+5. **Opt-in:** send only if a binding exists for that channel **and** the channel is enabled. No blast to unlinked users.
+6. **Secrets:** bot tokens in System Control settings (DB `settings` + optional `.env`), never committed.
+
+## Fan-out (extend, don’t replace)
+
+```
+notify()
+ ├─ notifications (in-app)
+ ├─ EmailQueue
+ ├─ smsNotifyUser → SmsQueue → sms_logs → SmsGateway          [existing]
+ ├─ telegramNotifyUser → ChannelQueue(telegram) → channel_logs → TelegramGateway  [Phase A]
+ └─ viberNotifyUser → ChannelQueue(viber) → channel_logs → ViberGateway           [Phase B]
+```
+
+Never call external messenger APIs during the HTTP page request (queue-only; drain via cron / HTTP cron) — same rule as SMS.
+
+## Data model — Migration `055_channel_notifications.php`
+
+- **`user_channel_bindings`**
+  - `user_id`, `channel` (`telegram`|`viber`), `chat_id` (string), `display_name` nullable, `linked_via` (`self`|`admin`), `linked_at`
+  - unique `(user_id, channel)`
+- **`channel_link_tokens`** (self-link)
+  - `token`, `user_id`, `channel`, `expires_at`, `used_at`
+- **`channel_logs`** (mirror `sms_logs`)
+  - `user_id`, `channel`, `chat_id`, `event_type`, `message`, `status`, `attempts`, `gateway_message_id`, `error`, `request_id`, timestamps
+- **Settings** (`category=telegram` / `viber`): `*_enabled`, bot token / Viber auth token, allowlist, max length, timeout
+
+No change to `users.phone` / `users.email`.
+
+## Phase A — Telegram
+
+1. You create the bot via @BotFather; token goes in All Father → Telegram.
+2. **Gateway:** `TelegramGateway` → `POST https://api.telegram.org/bot{token}/sendMessage` (`chat_id`, `text`, disable_web_page_preview).
+3. **Queue:** enqueue from `notify()`; drain via `cron/process_channel_queue.php` + HTTP cron action.
+4. **Self-link:** Profile “Connect Telegram” → deep link `https://t.me/{bot}?start={token}`; webhook/callback redeems token and stores `chat_id` (`linked_via=self`). Token one-time, short TTL.
+5. **Admin link:** User create/edit “Telegram chat ID” + clear; `linked_via=admin`.
+6. **UI:** System Control → Telegram (enable, token, allowlist, test send, process queue, log browser) — mirror [`pages/security/sms.php`](public_html/pages/security/sms.php).
+7. Message body: family-prefixed short text (Plan #32 tags).
+
+## Phase B — Viber
+
+1. Same bindings / logs / queue; `channel=viber`.
+2. **Gateway:** Viber Bot API `POST https://chatapi.viber.com/pa/send_message` with `auth_token` header; `receiver` = Viber user id from binding.
+3. **Self-link:** Viber deep-link / conversation-started webhook redeems the same `channel_link_tokens` pattern.
+4. **Admin:** “Viber user ID” on User create/edit.
+5. **UI:** System Control → Viber (same controls as Telegram).
+6. Requires a provisioned Viber bot/PA account (out-of-band); code ships **disabled** until token is set.
+
+## Implementation checklist — ✅ DONE (2026-09-29, both phases)
+
+- [x] Append this Plan #35 section (done when documented)
+- [x] **Migration `055_channel_notifications.php`** (run locally 2026-09-29) — `user_channel_bindings` (unique `user_id,channel`; `chat_id`, `display_name`, `linked_via` self|admin, `linked_at`), `channel_link_tokens` (unique token, TTL, `used_at`), `channel_logs` (mirrors `sms_logs` + `channel`, `gateway_response`, `error_message`, `request_id`), and settings defaults for both channels (categories `telegram`/`viber`; ship **disabled** with empty tokens). The three tables were also added to `Database::ALLOWED_TABLES`.
+- [x] **Helpers** — `config/channels.php` (`LOKA_CHANNELS`, per-channel defaults, `CHANNEL_ENV_MAP` .env fallbacks, webhook paths, 30-min token TTL) + `includes/channels.php`: `channelConfig`/`channelSaveSetting`/`channelConfigClearCache` (DB `settings` → `.env` → default, mirroring `smsConfig`), `channelEnabled`, `channelEventAllowed` (`*` = mirror email), `channelSelectableEvents`, binding CRUD (`channelGetBinding(s)`, `channelSetAdminBinding` (empty = clear), `channelClearBinding`, `channelUserByChatId`), token mint/redeem (`channelMintLinkToken` invalidates previous unused tokens; `channelRedeemLinkToken` one-time + TTL; `channelRedeemTelegramUpdates` for the no-webhook poller), `channelBuildMessage` (Plan #32 family tags + absolute link + per-channel max length), `channelNotifyUser` (enabled + allowlist + binding, else silent skip).
+- [x] **Phase A — Telegram**: `TelegramGateway` (`sendMessage` with `disable_web_page_preview`, `getUpdates` for link redemption without a public webhook, `getMe` health) + ChannelQueue + `pages/security/telegram.php` (shared `channel_page.php` + thin wrapper) + Profile connect deep link `https://t.me/{bot}?start={token}` + User admin chat-ID field + public webhook `POST /?page=channels&action=telegram-webhook` (optional `X-Telegram-Bot-Api-Secret-Token` check; `/start {token}` redeems + confirms, `/stop`/`/disconnect` unbinds).
+- [x] **Soft-fail hooks from `notify()`** — after `smsNotifyUser()`, loops `LOKA_CHANNELS` calling `channelNotifyUser()` in its own try/catch per channel; passengers/others all flow through `notify()` so every family is covered. Requires (`config/channels.php`, 3 classes, `includes/channels.php`) added to `index.php` + `config/bootstrap.php`.
+- [x] **Phase B — Viber**: `ViberGateway` (`send_message` with `X-Viber-Auth-Token`, `status===0` = ok, `get_account_info` health) + same bindings/logs/queue (`channel=viber`) + `pages/security/viber.php` + Profile/Admin parity + public webhook `POST /?page=channels&action=viber-webhook[&key=SECRET]` (`conversation_started` welcome, `message`/`subscribed` `/start` redeem + `/stop`). Ships disabled until a token is stored.
+- [x] **Queue + cron** — `ChannelQueue` (`queueForUser` gated on enabled+allowlist+binding; `queueTest` for All Father test sends; `processOne`/`process(channel)` with the SMS claim/retry pattern (max 5 attempts); `getStats` per channel). Drains via `cron/process_channel_queue.php` (CLI, lock file) + HTTP cron `/?page=cron&action=channels&key=SECRET` + per-page "Process queue now".
+- [x] **UI** — System Control → Telegram / Viber pages (stats cards incl. linked-user count, settings form: enable/token/bot-username or sender-name/webhook-secret/timeout/max-length/allowlist with mirror-email default; test send to explicit chat id; process queue; bot health; Telegram "Poll link requests"; paged `channel_logs` browser with filters + delete) + `partials/subnav.php` tabs + System Control sidebar links. Profile "Messenger Alerts" card (Connect → one-time deep link/code, Disconnect, chat id + link source shown). Users create/edit "Messenger chat IDs" fields (prefilled from bindings; unchanged values keep their original linked_via; empty clears).
+- [x] `php -l` clean on all 21 touched/new files; QA below. Live deploy only when explicitly requested.
+
+## QA matrix — verified 2026-09-29 via `_deploy_tmp/verify_plan35.php` (7 scenarios, 24 checks, all PASS; real local DB + high-water cleanup, settings restored to migration defaults and bindings/tokens/logs verified clean afterwards) + live HTTP webhook tests against `?page=channels&action=telegram-webhook`.
+
+- [x] **Unlinked user: no Telegram/Viber queue rows** — both channels enabled, user 15 unlinked → 0 `channel_logs` rows, while the in-app notification and email rows were still created (existing paths unchanged).
+- [x] **Profile Connect Telegram → Start bot → binding saved; Disconnect clears** — harness `redeem`: mint → `channelRedeemLinkToken` → binding `linked_via=self` with the given chat id; token replay fails and is marked used. Live webhook: mint via PHP, `POST /start {token}` update → HTTP 200 + binding `chat_id=777888999, linked_via=self`; `POST /stop` → binding gone. Profile page also renders the Connect/Disconnect card (bindings refreshed per POST).
+- [x] **Admin set/clear Telegram chat ID on User edit** — harness `admin_binding`: set → `linked_via=admin`; update → new chat id; empty → binding cleared. User create/edit pages save through the same helper (unchanged values keep their original link source).
+- [x] **Enabled + linked: `notify()` enqueues `channel_logs` with family-tagged text** — harness `linked_queue`: one row per channel, both carrying `[Gas Voucher]` + `LOKA #9` + absolute link (Plan #32 tags reused). Cron drain with a token set is exercised by the page button / cron actions (curl to api.telegram.org happens only there); with no token the harness `cron_drain` proves rows queue, send attempts fail **gracefully** (no exceptions, zero sends) and rows stay `pending` for later drain.
+- [x] **Disabled channel: no send attempts** — `disabled` scenario: 0 rows even with a binding; gateways return `null` when disabled/unconfigured.
+- [x] **Allowlist respects `*` and specific event keys** — `allowlist` scenario: non-listed event skipped, listed event queued; `*` mirrors `MAIL_TEMPLATES` (default settings).
+- [x] **SMS / email / in-app unchanged** — asserted per scenario (notifications + email_queue rows still created alongside channel rows; `smsNotifyUser` untouched).
+- [x] **Viber parity after Phase B** — same enqueue/gate path exercised (`linked_queue` queues both channels; `unlinked` proves Viber gating) — real Viber delivery still needs a provisioned bot token (below).
+- [x] **Webhook security** — wrong `X-Telegram-Bot-Api-Secret-Token` → HTTP 403; Viber webhook honours `?key=` secret when configured.
+
+## Files (planned)
+
+- `Plan.md` (this section)
+- `public_html/migrations/055_channel_notifications.php`
+- `public_html/includes/functions.php` (fan-out hooks)
+- `public_html/includes/channels.php` (new) + `public_html/config/channels.php` (new)
+- `public_html/classes/ChannelQueue.php`, `TelegramGateway.php`, `ViberGateway.php` (new)
+- `public_html/cron/process_channel_queue.php` + cron HTTP action
+- `public_html/pages/security/telegram.php`, `viber.php` + sidebar links
+- `public_html/pages/profile/index.php` (Connect / Disconnect)
+- `public_html/pages/users/create.php`, `edit.php` (admin chat IDs)
+- Public link webhook/callback route(s) under existing router
+
+## Out of scope
+
+WhatsApp; replacing SMS; rewriting `MAIL_TEMPLATES`; changing Plan #32 email themes; production deploy until explicitly requested; creating BotFather / Viber accounts in-app (you supply tokens after UI exists).
+
+## You will need to provide later
+
+- Telegram bot username + token (Phase A QA)
+- Viber bot auth token (Phase B QA)
+
+## Status
+
+**DONE Phase A+B (2026-09-29) — implemented + QA'd on localhost (`old_loka_db`, migration 055 applied), NOT deployed; on branch `vberandtelegramnotif`.** Files: `migrations/055_channel_notifications.php` (new), `config/channels.php` (new), `includes/channels.php` (new), `classes/ChannelQueue.php` / `TelegramGateway.php` / `ViberGateway.php` (new), `cron/process_channel_queue.php` (new), `pages/channels/webhook.php` (new), `pages/security/telegram.php` / `viber.php` / `channel_page.php` (new), `pages/profile/index.php`, `pages/users/create.php` / `edit.php`, `pages/cron/index.php`, `includes/functions.php` / `sidebar.php`, `classes/Database.php` (table allowlist), `index.php` + `config/bootstrap.php` (requires + routes), `_deploy_tmp/verify_plan35.php` (QA harness), `Plan.md`. Deploy checklist per env: run migration 055, then store the bot tokens in System Control (Telegram first), set the Telegram webhook with the secret, and add the channel cron (`process_channel_queue.php` every 2 min, or HTTP cron `?page=cron&action=channels&key=SECRET`).
+
+---
+
+# LOKA Plan #36: OB Pass Slip workflow revision — ✅ DONE (2026-10-01, branch `ob-slip-revision`, localhost QA — staging only)
+
+## Why
+
+Fraud and friction review of the Pass Slip + CoA flow: (1) supervisor/motorpool
+e-signatures add ceremony without adding trust (logged-in identity + audit log
+already prove who clicked); (2) guard departure demanded a signature that
+blocked the gate flow; (3) the client CoA signature can be self-signed by the
+agent — the signature proves nothing about the visit.
+
+## Locked decisions (2026-10-01, with owner)
+
+1. **Supervisor and Motorpool Head: buttons only, no signatures.** Both get
+   Approve / Revise (→ `revision`, comments required) / Cancel (terminal
+   `cancelled`, comments required, requester notified). Motorpool Reject is
+   retired. Employee filing signature stays (requester's own attestation).
+   Old slips keep rendering saved signature images (columns retained).
+2. **Guard: Depart + Arrive buttons, no canvases.** Logged-in guard identity +
+   timestamp recorded (`departure_guard_id` / `arrival_guard_id`); both shown
+   on view and print pages. Already-stamped idempotency kept.
+3. **CoA: client acknowledgment + contact replaces the signature.** One-time
+   token link stays; the kiosk form becomes a proof-of-service notice
+   tick-box + representative name/office/purpose/times + **mobile and/or
+   official email for future validation** (format-validated, ≥1 required).
+   Submit records timestamp/IP/user-agent, burns the token, sets
+   `coa_received`, notifies the requester. Supervisor is notified (watcher,
+   not gatekeeper). No OTP/SMS machinery.
+4. **QR per CoA.** HMAC-signed `?page=verify-coa&id=&hash=` QR on print + view
+   (same `TCPDF2DBarcode` pattern as gas vouchers); new public
+   `pages/public/verify-coa.php` shows limited fields with masked contact.
+5. **Spot-check habit (recommended):** recent-CoA-contacts list on the OB index
+   so Motorpool/admin can call 3–5 numbers monthly. No code beyond the list.
+
+## Flow after revision
+
+`pending_supervisor` → (supervisor Approve) → `pending_motorpool` (official
+only; private skips to `approved`) → (motorpool Approve) → `approved` →
+(guard Depart) → `departed` → (guard Arrive) → (client link: notice tick +
+contact) → `coa_received` + QR → (requester Finalize) → `completed`.
+Revise loops to requester resubmit; Cancel is terminal from either approver.
+
+## Data
+
+Migration `057_ob_coa_acknowledgment.php`: add `coa_acknowledged_at`,
+`coa_contact_mobile`, `coa_contact_email`. Old `coa_*_signature/token`
+columns kept (history), stop being written. `finalize` gate requires
+acknowledgment + contact instead of `coa_signature_path`.
+
+## Status
+
+**DONE (2026-10-01) — implemented + QA'd on localhost, on branch `ob-slip-revision` (from `vberandtelegramnotif`). Staging only; no prod until asked.**
+
+Implemented per the locked decisions:
+
+1. **Supervisor/Motorpool: buttons only.** `process.php` approvals drop `obResolveStaffSignature()` and stop writing `supervisor_signature_path` / `motorpool_signature_path` (columns retained; old slips keep rendering saved images — view.php marks the card "legacy slips" and print.php still embeds old images). **Reject is retired**: `process.php` has no `reject` case; approvers get Approve / Return-for-Revision (comments required) / terminal **Cancel** (approver cancel added: comments required, requester notified with the reason; requester cancel unchanged). view.php: direct Approve buttons with confirm, combined Revise/Cancel modal, no canvas/`ob-signature.js`.
+2. **Guard: Depart + Arrive buttons, no canvases.** `obStampGuardDeparture()` / `obApplyGuardDepartureStamp()` simplified to time + `departure_guard_id` (no signature resolution — also unblocks the vehicle-dispatch path: `guard/actions.php` no longer resolves/pre-blocks on a guard signature; the saved-e-sign branch in `guard/partials/ob_section.php` is gone — plain Depart/Arrive buttons everywhere). Idempotency (already-stamped skip) kept; guard id + timestamps shown on view + print.
+3. **CoA: acknowledgment + contact replaces the signature.** Kiosk (`coa-sign.php` + partial) = proof-of-service notice tick-box (required) + representative/office/purpose/times + **mobile and/or official email** (PH mobile regex / `FILTER_VALIDATE_EMAIL`, ≥1 required). Submit records `coa_acknowledged_at`, burns the token, sets `coa_received`, writes IP + user-agent into the `ob_approvals` timeline row (`coa_acknowledged`), notifies requester (`ob_coa_signed`) **and supervisor (watcher)**. Legacy `coa_signature_path`/`coa_signed_at`/token columns kept, never written.
+4. **QR per CoA.** `obCoaVerifyHash/HashValid/VerifyUrl` (HMAC `APP_KEY`, same pattern as gas vouchers) + QR (TCPDF2DBarcode PNG/SVG) on view.php CoA card and print.php CoA block (absolutely positioned bottom-left — no flow-height change on the fixed 284 mm sheet). Public `pages/public/verify-coa.php` (`?page=verify-coa&id=&hash=`, added to `$publicPages`) shows pass slip/date/personnel/office/rep/times/status with the contact **masked** (••••last4 / ab•••@domain) and no details on hash failure.
+5. **Spot-check habit** — "Recent CoA contacts — spot-check" card on the OB index (Motorpool/Admin only): latest 10 acknowledged slips with click-to-call mobile + mailto email + acknowledged date.
+
+Flow after revision (verified end-to-end): `pending_supervisor` → supervisor Approve → `pending_motorpool` (private skips to `approved`) → motorpool Approve → `approved` → guard Depart → `departed` → guard Arrive → client acknowledgment → `coa_received` (+ QR) → requester Finalize → `completed`. Revise loops to requester resubmit; Cancel terminal from either approver.
+
+**Files:** `migrations/057_ob_coa_acknowledgment.php` (new; run locally), `includes/ob_requests.php` (verify helpers + `obCoaReceived`/`obCoaAcknowledgedAt`), `includes/ob_guard_bind.php`, `pages/ob-requests/process.php` / `view.php` / `print.php` / `coa-sign.php` / `index.php` / `partials/coa_kiosk.php`, `pages/guard/actions.php` / `partials/ob_section.php`, `pages/public/verify-coa.php` (new), `index.php` (router + public page), `_deploy_tmp/verify_plan36.php` (QA harness), `Plan.md`.
+
+**QA (2026-10-01, `_deploy_tmp/verify_plan36.php` — 13-step lifecycle chain, 37 checks, all green; marker OBs `36T%` cleaned, DB verified pristine):** official happy path (buttons leave signature columns NULL at every step; guard id + times recorded; kiosk HTTP POST → `coa_received` + contacts + burned token + valid QR hash + requester AND supervisor notified; finalize → completed), finalize gate blocked pre-acknowledgment, private skip, revise → resubmit loop, approver cancel with requester notification, verify-coa good/bad hash + contact masking. Render checks: view.php shows Verify QR + contacts + legacy-sig note with no canvas; print.php embeds the QR PNG + acknowledgment hint. `php -l` clean on all touched files.
+
+# LOKA Plan #37: OB approval badge for Immediate Supervisor — ✅ DONE (2026-10-01, branch `ob-slip-revision`, localhost QA + staging deploy — no prod)
+
+**Problem:** the OB Pass Slips sidebar badge only counts guard stamps
+(`badgeCountObGuardStamps()`, gated by `canAccessGuardDashboard()`), so an
+Immediate Supervisor sees no count even with slips awaiting approval. Header
+bell is fine (`obNotify()` rows are created); only the sidebar count is blind.
+
+**Fix — ✅ DONE (2026-10-01; rides branch `ob-slip-revision`):**
+- `includes/badge_counts.php`: new `badgePendingIdsObApprovals()` (supervisor's
+  `pending_supervisor` slips by `supervisor_user_id`; motorpool/admin add all
+  `pending_motorpool` — any motorpool head may approve per `process.php`, so
+  no head-ID filter; self-gating — a user who supervises nobody counts 0) +
+  `badgeCountObApprovals()` via `badgeUnseenCount`, and
+  `badgeMarkSeenForCurrentPage('ob-requests')` now marks **both** keys
+  (`ob_guard_stamps` + `ob_approvals`) via a dedicated branch.
+- `includes/sidebar.php`: the OB Pass Slips entry shows the approvals badge
+  (for supervisors/motorpool/admin) alongside the existing guard-stamp badge.
+- **CoA kiosk checkbox layout** (`pages/ob-requests/partials/coa_kiosk.php`,
+  utilities only, no new CSS): the proof-of-service tick-box is now a flex row
+  (`d-flex align-items-start gap-2` on the bordered box, `flex-shrink-0 mt-1`
+  on the input, plain label) so it stays top-aligned inside its border — the
+  old `form-check` float + `fs-5` let the box hang half-outside the padding.
+  Server-side `coa_acknowledge` enforcement already covers the `novalidate`
+  form; no JS needed.
+
+**QA — verified 2026-10-01 (`_deploy_tmp/verify_plan37.php` badge walk, 15 checks, all green; marker OB `37T01` + test ack rows cleaned, DB verified pristine):**
+- [x] File a slip → supervisor badge counts 1 (pending ids contain it); unrelated employee 0; motorpool 0 pre-approval.
+- [x] Open OB index (`badgeMarkSeenForCurrentPage('ob-requests')`) → supervisor badge clears, ack row stores the seen id.
+- [x] Supervisor approves → slip `pending_motorpool`, supervisor badge 0, **motorpool badge 1**; motorpool's own visit clears it.
+- [x] Sidebar render: badge HTML "1" appears on the OB Pass Slips entry for the supervisor.
+- [x] Kiosk render: flex checkbox markup present, old float markup + `fs-5` gone.
+- [x] `php -l` clean on all three touched files.
+
+# LOKA Plan #38: Vehicle Repair History + costing + escalated maintenance alerts — ✅ DONE (2026-10-04, branch `plans-38-41-experimental`, localhost QA — NOT deployed)
+
+**Status:** implemented + QA'd on localhost. Staging only when asked; **no prod deploy** until asked.
+**Reference layout:** `Reference/Repair History/` (e.g. CBI8522 workbook).
+
+## Excel shape (locked from CBI8522 sample)
+
+- Header: Agency, Province, Type, Brand/Model, Engine No, Plate Number
+- Rows: **Date** | **Nature of Repair** | purchased items (**Description** / **Unit** / **Quantity** / **Price**)
+- Labor is a normal line item (e.g. Description=`Labor`, Unit=`lot`), not a separate column
+- One workbook per plate; multiple dated events; multiple item rows under one date/nature
+- Pre/post-inspection Request 4 sheets → **out of scope** for #38
+
+## Locked decisions
+
+1. **Experimental flag:** `settings.repair_history_enabled` (`0`/`1`, default **`0` off**). All Father toggles on the Repair History hub (System Control). When off: data routes blocked, auto-write from complete skipped, import disabled. Care/repair **reminder cron** stays independent of this flag.
+2. **All Father nav:** System Control → **Repair History** always visible to `canAccessSystemControl()`; hub shows Enable when off. Motorpool never sees the AF nav; they only get history links from maintenance/vehicle when the feature is on.
+3. **Manual entry (required):** create / edit / soft-delete history events + line items **per vehicle**, `source=manual`, no ticket required.
+4. **Auto history:** completed repair tickets + completed care with costing write entries (`source=maintenance` / `care`) when feature is on.
+5. **Costing:** `vehicle_repair_entries` + `vehicle_repair_items`; roll-up sets linked `maintenance_requests.actual_cost`. Keep existing `estimated_cost` / `actual_cost`.
+6. **Import:** one-time CLI/AF importer for `Reference/Repair History/**/*.xlsx` by plate → `source=import` (feature on).
+7. **Notifications (escalate locked):**
+   - **Normal** (7d / 1d): assigned care drivers + Motorpool (+ Approver).
+   - **Aggressive** (due day + overdue): same **plus** Admin, All Father, CAF, OIC CAF; stronger copy; overdue **daily with no 7-day cap**.
+8. Same reminder ladder for **repair tickets** with `scheduled_date` (today they notify nothing).
+9. Optional `vehicles.engine_number`.
+10. Branch / staging only until asked for prod.
+
+## Data (migration `058`)
+
+- `vehicles.engine_number` VARCHAR(64) NULL
+- `vehicle_repair_entries`: `vehicle_id`, `repair_date`, `nature_of_repair`, `maintenance_request_id` NULL, `care_schedule_id` NULL, `source` ENUM(`maintenance`,`care`,`import`,`manual`), `created_by`, timestamps, `deleted_at`
+- `vehicle_repair_items`: `entry_id`, `description`, `unit`, `quantity`, `unit_price` NULL, `sort_order`
+- Reminder stamps on `maintenance_requests`: `reminded_7d_at`, `reminded_1d_at`, `reminded_due_at`, `reminded_overdue_on`
+- Settings row `repair_history_enabled` (category `experimental`)
+- Register tables in `classes/Database.php`
+
+## UI / routes
+
+- `/?page=repair-history` actions: `index|view|create|edit|delete|print|import|toggle`
+- Hub: vehicle list + search + Enable/Disable + Import
+- Per-vehicle view/print matching Excel header + item grid + Motorpool cert footer
+- Shared line-item editor on repair/care complete when feature on
+- Helpers: `includes/repair_history.php` (`repairHistoryEnabled`, CRUD, upserts from maintenance/care)
+
+## Notifications work
+
+- Extend `notifyCareStakeholders(..., $tier = 'normal'|'escalate')` in `includes/vehicle_care.php`
+- Update `cron/process_care_reminders.php` (tiered audience; lift overdue 7-day cap)
+- New `cron/process_maintenance_reminders.php` + cron index wire-up
+- Notify on repair create / → scheduled (Motorpool + reporter) — independent of history flag
+
+## Out of scope
+
+- Pre/post-inspection Request 4 forms; inventory/stock module; changing care/repair status machines; prod deploy
+
+## Checklist — DONE 2026-10-04
+
+- [x] Migration 058 + settings seed + Database allowlist
+- [x] `repair_history.php` gate + AF System Control nav + hub toggle
+- [x] Manual create/edit/delete + history view/print
+- [x] Maintenance/care complete auto-write when feature on
+- [x] Care escalate + maintenance reminder cron
+- [x] Reference xlsx importer
+- [x] Local QA; staging only when asked
+
+## Implementation notes (2026-10-04)
+
+- **Schema deviation — `amount`, not `unit_price`.** The workbook's "Price" column is
+  the **line amount**, not a per-unit price: `SHS 987` row "assorted orring, pc, 12, 360"
+  totals ₱360 for twelve pieces. Verified across all 10 reference workbooks, so
+  `vehicle_repair_items.amount` holds the printed price and the roll-up is a plain `SUM`.
+- **No PhpSpreadsheet.** An `.xlsx` is a zip of XML, so the importer is `ext-zip` +
+  SimpleXML (`includes/repair_history_import.php`). No new dependency, no composer run.
+- **Parser hardens two real workbook quirks:** some sheets put `Plate Number:` in column C
+  (not A), and `SNJ 8786` writes the *nature* one row before its *date*.
+- Decision 9 (`vehicles.engine_number`) was already satisfied by an earlier migration — no-op.
+- `notifyCareStakeholders()` gained a `$tier`; the **default `full` audience is unchanged**
+  so the care-edit approve/complete/cancel callers behave exactly as before.
+  Reminders only: 7d/1d → `normal`; due-day + overdue → `escalate`, and overdue is now
+  daily with no 7-day cap.
+- Hub is reachable by Motorpool/Admin (they get a fleet-menu link while the feature is on);
+  the **toggle and importer stay All Father only** — otherwise Motorpool would be linked to
+  a page that redirects them.
+- New cron `cron/process_maintenance_reminders.php` (+ `action=maintenance` on the HTTP cron,
+  `run-crons.bat`, `setup.sh` — which also gained the previously-missing care entry).
+
+**QA — 2026-10-04 (`_deploy_tmp/verify_plan38.php`, 129 checks green, repeatable):**
+parse (all 10 workbooks), gate, manual CRUD, maintenance auto-write, care auto-write,
+reminder tiers + uncapped overdue, importer, render on/off per role. DB left pristine and
+`repair_history_enabled` back to `0`. `php -l` clean on every touched file.
+
+## Checker findings (2026-10-04) — FIX before calling #38 complete
+
+Independent re-audit vs locked decisions. **Overall: PARTIAL.** Implementing agent: close these gaps; checker will re-verify.
+
+### Must fix
+
+- [x] **`actual_cost` roll-up on maintenance complete (Decision 5).** Completing a repair with line items auto-writes `vehicle_repair_entries` but does **not** set `maintenance_requests.actual_cost` from the item sum. UI copy on `pages/maintenance/edit.php` claims the roll-up. History edit (`pages/repair-history/edit.php`) already recomputes — mirror that on the complete path in `maintenance/edit.php` and any shared service (`maintenance_service.php` if used). Care complete: if lines exist, keep entry total consistent (care has no `actual_cost` column unless already added).
+
+### Notes (not blockers — document only unless easy)
+
+- Schema uses `vehicle_repair_items.amount` (line amount), not plan’s `unit_price` — intentional (implementation notes). Keep docs/UI aligned.
+- `vehicles.engine_number` already existed (`varchar(50)`); no create/edit field in vehicles UI — optional follow-up, not required for checker PASS.
+
+### Re-check when fixed
+
+- Complete a repair with 3 parts + labor → `maintenance_requests.actual_cost` equals entry/`SUM(items.amount)`
+- Edit history lines → `actual_cost` stays in sync
+- Feature-off path unchanged (scalar `actual_cost` still works)
+
+### Checker re-verify (2026-10-04, later) — PASS
+
+- [x] `pages/maintenance/edit.php` complete path updates `actual_cost` via `repairHistoryItemsTotal($items)` after upsert
+- [x] `includes/maintenance_service.php` same roll-up on complete
+- No remaining must-fix gaps for #38
+
+---
+
+# LOKA Plan #39: Rollback shows full workflow stages — ✅ DONE (2026-10-04, branch `plans-38-41-experimental`, localhost QA — NOT deployed)
+
+**Status:** implemented + QA'd on localhost. Staging only when asked.
+**Problem:** Admin rollback in `pages/requests/rollback.php` labels targets as “phase” and often shows a thin/empty target set. Users need clear **workflow stages** (not vague phases), and OB / Gas have no rollback today.
+
+## Locked approach
+
+### A. Trip-request rollback (fix UI)
+
+Replace the “Roll back to phase” `<select>` with a **workflow stage picker** (visual stepper + radios):
+
+`Pending (Dept)` → `Pending Motorpool` → `Approved` → `Dispatched` → `Arrived` → `Completed`
+
+(side statuses `Revision` / `Rejected` as current-state only, with targets back into the main chain)
+
+**Expanded targets:**
+
+| Current | Allowed rollback targets |
+|---------|--------------------------|
+| `pending_motorpool` | `pending` |
+| `approved` (no dispatch) | `pending_motorpool`, `pending` |
+| `approved` (dispatched, not arrived) | **`approved` (clear dispatch)**, plus `pending_motorpool`, `pending` |
+| `approved` (arrived) | clear arrival/dispatch options + earlier approval stages |
+| `completed` | `approved`, `pending_motorpool`, `pending` (not only `approved`) |
+| `revision` / `rejected` | `pending`, `pending_motorpool` |
+
+Side effects stay explicit in the warning box (release vehicle/driver, void/cancel trip tickets, clear guard fields, reset `approval_workflow.step`, `approvals` row `status=rollback`, notify, `auditLog`). Always render radios; if none, clear message (no blank select). Hub shows **available stage count** per row.
+
+### B. OB Pass Slip rollback (new)
+
+Stages: `pending_supervisor` → `pending_motorpool` → `approved` → `departed` → `coa_received` → `completed`
+
+Targets = any **earlier** stage; clear depart/arrive/CoA fields as needed; reason ≥10 chars; audit + notify. Entry: OB view button + rollback hub tab.
+
+### C. Gas voucher rollback (new)
+
+Stages: `draft` → `pending_review` → `pending_budget` → `pending_approval` → `approved`
+
+Targets = earlier stages; clear approval stamps per stage; Admin/All Father only.
+
+### D. Shared helpers
+
+- `includes/rollback.php`: `rollbackTripTargets`, `rollbackObTargets`, `rollbackGasTargets`, stage labels, side-effect descriptors
+- Hub tabs: **Trips | OB | Gas**
+- Keep `requireRole(ROLE_ADMIN)` (All Father via admin level). No requester self-rollback.
+
+## Out of scope
+
+- Requester-initiated rollback; changing forward approval rules; prod deploy until asked
+
+## Checklist — DONE 2026-10-04
+
+- [x] `includes/rollback.php` stage matrices + labels
+- [x] Trip rollback confirm UI (stage radios + expanded targets)
+- [x] OB + Gas rollback handlers and view buttons
+- [x] Rollback hub tabs Trips|OB|Gas
+- [x] Local QA (completed → Dept/Motorpool selectable; OB departed → earlier; Gas pending_approval → earlier)
+
+## Implementation notes (2026-10-04)
+
+- **`Dispatched` and `Arrived` are stages but never targets.** They exist so the stepper can
+  show where a trip is; you cannot "set" a request to Dispatched — the guard does that.
+  Rolling a dispatched/arrived trip back to `Approved` simply clears the guard transaction
+  and keeps the assignment, which is the decision-A behaviour the plan asked for.
+- Targets are returned **earliest-first** so the picker reads like the stepper.
+- `completed` now reaches `pending_motorpool` and `pending` (it previously only offered
+  `approved`); `revision` / `rejected` reach both approval stages.
+- OB: private-vehicle slips never offer `pending_motorpool` (they skip Motorpool entirely).
+  Leaving the Approved stage clears the guard stamps **and** the CoA acknowledgment, contacts
+  and token. `ob_approvals.approval_type` is an ENUM without `admin`, so a rollback is logged
+  as `approval_type='system'`, `action='rollback'`.
+- Gas: approval stamps are cleared per stage, so rolling back to `pending_budget` re-does the
+  Budget Officer step rather than leaving a stale certification behind.
+- Admin-only throughout; All Father reaches it via their admin level. The hub shows an
+  **available-stage count** per row and hides the button entirely when there is nowhere to go.
+
+**QA — 2026-10-04 (`_deploy_tmp/verify_plan39.php`, 131 checks green over 12 steps, repeatable):**
+trip/OB/gas stage matrices, executed rollbacks (completed→Motorpool, dispatched→Approved,
+revision→Dept, departed→Supervisor, approved voucher→Review), guard rails (short reason,
+forward-only target, stale optimistic lock), the three hub tabs and all three pickers.
+Handlers end in `redirectWith()` → `exit`, so each is driven in a child process that reports
+its post-state as JSON. DB left pristine. `php -l` clean on every touched file.
+
+**Plus `_deploy_tmp/smoke_shared.php`** (cross-plan): every `require` target named in
+`index.php` resolves (161 of them), and `includes/header.php` + `footer.php` + `sidebar.php`
+render clean for all six roles. This is the guard against collateral damage from the shared
+files all four plans touched.
+
+## Checker findings (2026-10-04) — PASS (optional polish only)
+
+Independent re-audit. **Overall: PASS (5/5).** No must-fix gaps. Optional polish for another agent if time allows:
+
+- [ ] OB/Gas hub stage summary counts use the filtered `LIMIT 500` set, not DB `GROUP BY` (Trips already uses real counts) — align OB/Gas with Trips for accuracy on large fleets.
+- [ ] Trip hub summary cards group by **status**, so Dispatched/Arrived both land under Approved; per-row Stage column is correct — optional derived-stage cards if UI clarity matters.
+
+---
+
+# LOKA Plan #40: AI assistant chatbot (experimental, role-scoped) — ✅ DONE (2026-10-04, branch `plans-38-41-experimental`, localhost QA — NOT deployed)
+
+**Status:** implemented + QA'd on localhost. Experimental; default **off**; still unusable
+until All Father stores a provider key. Staging only when asked.
+
+## Goal
+
+Logged-in users get an in-app AI chatbot that can **propose and (after confirm) run only actions allowed at their effective access level**. The model never elevates privilege; PHP enforces authz on every tool call.
+
+## Locked decisions
+
+1. **Feature flag:** `settings.ai_assistant_enabled` default `0`. All Father System Control → **AI Assistant** hub (toggle + provider API key storage, same soft-fail pattern as Telegram tokens). View-as uses **effective** role for tools.
+2. **Architecture:** LLM **proposes** `{tool, args}` only. Server tool registry executes after CSRF session auth + role/capability check + optional confirm token. **No** free-form SQL, shell, file write, or raw PHP eval.
+3. **Tool registry** (`includes/ai_tools.php`): each tool declares `id`, description, JSON schema args, `minRole` / capability callback, `mutating` bool, `confirmRequired` bool. Examples (initial set — expand later):
+   - **Read (no confirm):** search my trips / OB / gas by id or plate; list my pending approvals queue; explain request status; “what’s due for care this week” (scoped).
+   - **Mutate (confirm required):** create draft trip/OB (requester+); approve/reject/revise **only if** current user may act on that record; schedule care (Motorpool+); never System Control writes except All Father tools explicitly listed.
+4. **Hardened security (non-negotiable):**
+   - Same-origin chat endpoint; session cookie + CSRF; rate limit per user (e.g. N prompts / hour) + lockout via existing rate-limit patterns
+   - Allowlist tools only; strip/ignore model-requested tools not in registry
+   - Re-check ownership/department/assignee **at execute time** (never trust model-supplied “user may approve X”)
+   - Mutating tools require a second “Confirm” UI step (or signed one-time confirm token TTL ≤ 2 min)
+   - Prompt injection defense: system prompt forbids ignoring auth; tool args sanitized; max token/input length; no secrets in prompts (API keys server-side only)
+   - Full `auditLog` for every tool proposal + execution (success/deny/fail); deny on View-as for dangerous AF-only tools unless real All Father
+   - Provider key in `settings` / env; never expose to browser; disable feature if key missing
+5. **UI:** floating chat panel (authenticated pages); shows proposed action card before mutate; errors are user-safe (no stack traces).
+6. **Out of scope v1:** training on private docs; autonomous multi-step agents without confirm; SMS/Telegram outbound composed by AI without template; rollback/System Control SMS toggles via chat.
+
+## Checklist — DONE 2026-10-04
+
+- [x] Migration/settings seed `ai_assistant_enabled` + AF System Control page
+- [x] Tool registry + chat API endpoint + rate limits + audit
+- [x] Chat UI with confirm gate for mutating tools
+- [x] Role matrix QA (requester cannot approve; approver cannot AF settings; AF can only listed tools)
+- [x] OpenRouter as the provider + free-model catalogue picker
+- [x] Staging only when asked
+
+## Provider: OpenRouter (decided 2026-10-04)
+
+The app talks to **OpenRouter**, which is OpenAI-compatible — so the existing
+chat-completions call is unchanged apart from the base URL.
+
+- `ai_base_url` defaults to `https://openrouter.ai/api/v1`; any OpenAI-compatible
+  endpoint still works.
+- Every call sends OpenRouter's attribution headers (`HTTP-Referer`, `X-Title`).
+  The API key stays server-side.
+- **Free model catalogue.** `GET {base}/models` is **public** (no key needed).
+  System Control → AI Assistant has a *Load free models / Refresh* button that
+  fetches it server-side and caches the filtered list in `settings`
+  (`ai_free_models`, `ai_free_models_at`, 24h TTL). The catalogue is never
+  rendered into the page as raw JSON and the key is never involved.
+
+**No filtering.** The catalogue is taken exactly as OpenRouter returns it —
+**466 models**, free and paid, chat and non-chat — and every one is selectable.
+Hiding models was rejected as opinionated: the operator decides, not a hard-coded
+rule. The metadata is kept as **labels** instead of as a filter:
+
+- `:free` models are sorted to the **top** (17 of 466), so free is still one keystroke away
+- paid models show their price per million tokens (`$0.80/M`) via `aiFormatModelPrice()`
+- tool support is flagged (*no tools*) — 398 of 466 have it
+- non-text-output models are flagged (*not text output*) — 15 of 466, e.g. image/audio models
+
+`aiModelIsFreeTagged()` is no longer a filter; it is just the status badge that
+answers "is my configured model free?". The default stays a genuinely free one:
+`qwen/qwen3.8-27b:free`.
+
+`aiModelOutputsText()` deliberately checks `architecture.output_modalities` as a
+list rather than `str_contains($modality, '->text')` — `"text+image->text+audio"`
+contains `->text` and would wrongly pass (a real bug caught while probing).
+
+**Schema change:** the cached catalogue is ~67 KB, which does **not** fit
+`settings.value` TEXT (65,535). Migration 059 widens that column to `MEDIUMTEXT`
+(additive, non-destructive) rather than mangling the payload or silently
+dropping models. The cache write is also wrapped so a too-large catalogue
+degrades to "fetched but not cached" instead of a fatal.
+
+**Tool calling verified live on `:free` models** (not assumed): `qwen/qwen3.8-27b:free`
+and `nvidia/nemotron-3.5-lightning:free` both proposed `explain_request_status
+{"request_id":679}` correctly.
+
+**Honest caveat on "unlimited":** OpenRouter's `:free` tier has no per-token
+cost but *does* apply its own rate limits, and the free pool rotates. This was
+confirmed live, not assumed: `google/gemma-4-31b-it:free` returned a provider
+429 mid-test, which `aiProviderError()` surfaced to the user as *"The provider is
+rate-limiting this app right now. Try again shortly."* The in-app guard
+(`ai_rate_limit_per_hour`, default 30/user/hour) sits on top of that. Treat
+"unlimited" as "no per-request cost", not "no throttling".
+
+## What the assistant may do — 9 tools, and only ONE writes anything
+
+| Tool | Writes | Allowed roles | Does |
+|---|---|---|---|
+| `search_my_trips` | no | everyone | your own trips by plate/destination/status |
+| `explain_request_status` | no | everyone | stage of a request + who acts next |
+| `my_pending_approvals` | no | All Father, Admin, MH, Approver | what is waiting on you |
+| `search_my_ob_slips` | no | everyone | your own pass slips |
+| `search_my_gas_vouchers` | no | everyone | your own gas vouchers |
+| `care_due_this_week` | no | All Father, Admin, MH, Approver | care due in 7 days |
+| `prepare_trip_decision` | no | All Father, Admin, MH, Approver | checks you may decide → opens the real screen |
+| `prepare_ob_decision` | no | All Father, Admin, MH, Approver | same for pass slips |
+| `propose_care` | **yes** | All Father, Admin, MH | creates a **pending** care item an approver must still approve |
+
+Across the whole AI layer there is exactly **one** database write
+(`includes/ai_tools.php` → `db()->insert('vehicle_care_schedules', …)`). Nothing
+else writes; there is no raw SQL, shell, or file access.
+
+**It does not click buttons.** There is no browser automation and no DOM driving
+in the AI path — the only `querySelector`/`.click()` calls are in
+`assets/js/ai-chat.js` binding the *user's own* Run/Cancel buttons. The model
+returns a JSON tool call and PHP executes a function directly, so it cannot be
+tricked into clicking Delete. `prepare_trip_decision` is the closest thing: it
+verifies you may act and hands you the real approval screen, where the decision
+is still made by you and logged with your identity.
+
+## Action trace — every call is visible (2026-10-04)
+
+Read tools used to run silently: the user saw an answer with no indication of
+what produced it. Now **every** tool call, read or write, renders its own trace
+row naming the action and its arguments:
+
+```
+I'll look up the current stage and next actor for that request.
+Checking a trip request — request id: 680            ← trace (spinner, then ✓)
+Request #680 is approved — waiting for the guard…    ← result
+Open in LOKA
+```
+
+To make that possible the endpoint was split: `op=ask` **proposes only** and
+never executes; execution happens on `op=confirm` behind the same signed 120s
+token, for reads and writes alike. That also means read executions now go through
+the same audit path as writes (`ai_tool_executed`).
+
+Each tool declares a short `label` (*"Checking a trip request"*);
+`aiToolTraceLine()` combines it with a readable arg summary — human text, never
+a JSON blob, and truncated so a model cannot spam the row. Verified live in the
+browser: the fetch sequence is `ask` → `confirm`, and the trace row appears
+between the model's reply and the result.
+
+Provider errors are translated into user-safe sentences (`aiProviderError()`):
+401 → key rejected, 429 → provider rate limit, 402 → no credit,
+unknown model → pick another. Never echoes the key, URL or a stack.
+
+## Implementation notes (2026-10-04)
+
+- **Deliberate deviation — the assistant does not execute approvals.** Decision 3 asked for
+  "approve/reject/revise **only if** the current user may act on that record". Implemented as
+  *verify + hand off*: `prepare_trip_decision` / `prepare_ob_decision` check the actor against
+  the assigned approver / motorpool head (and audit the refusal), then open the real screen
+  where the decision is confirmed and logged with the user's identity. Copying the 750-line
+  `pages/approvals/process.php` state machine (and the OB equivalent) into a tool would create
+  a second, silently-divergent copy of the most safety-critical code in the app. Say the word
+  if you want the write path anyway.
+- What the assistant *does* write: `propose_care` only — a real `pending` care item that an
+  approver must still approve. There is deliberately **no "create a trip draft" tool**:
+  this app has no draft lifecycle (`requests/create.php` always submits straight to
+  `pending`, and `requests/edit.php` will edit a draft but nothing ever promotes it), so
+  such a tool would only manufacture requests nobody can finish. Add it together with a real
+  draft → pending transition, not before.
+- Tool args are sanitised **from the declared JSON schema** — unknown keys are dropped, types
+  coerced, strings capped. That is the injection boundary; the model's free text never
+  reaches a query.
+- Confirm tokens are HMAC-signed, bound to one user, expire in **120s**, and are
+  **single-use** (migration 061 records the nonce on first successful verify; a replay
+  inside the window is refused). `APP_KEY` must be set in `.env`; with no `APP_KEY`
+  minting throws and verifying fails closed — there is no static fallback secret.
+  `op=confirm` and `op=action` have their own per-user burst limit (`ai_mutate_min`).
+- Tool capability predicates gate on the **effective** role: under View-as, `hasRole()`,
+  `isApprover()`, `isMotorpool()`, `isAdmin()`, `isGuard()` and the AI tool/capability
+  predicates all follow the impersonated role. Real All Father stays the actor in
+  `users.id` / audit; AF executing actions still require the real AF session AND no
+  active View-as (`aiActionsAllowed()`).
+- `verifyCsrf()` reads `$_POST`, so the endpoint merges the JSON body into `$_POST` **before**
+  the auth/CSRF gate — otherwise a JSON chat call could never verify its token.
+- `window.LOKA_CSRF_TOKEN` is now exposed to JS (it was already present in every rendered form).
+- The chat panel mounts in `footer.php` only when `aiAssistantStatus()['ready']` is true, so
+  nothing is shipped to the browser while the feature is off.
+
+**QA — 2026-10-04 (`_deploy_tmp/verify_plan40.php`, 255 checks green over 10 steps, repeatable):**
+gate (off / no-key), registry shape + unknown-tool rejection + schema arg sanitising, confirm-token
+tamper/cross-user/expiry, the full per-role tool matrix including View-as refusal of AF-only
+tools, the real care write with its audit row, the confirm gate (forged and cross-user tokens
+create nothing), the `actions` step (All Father gate, View-as refusal, preview purity, phrase
+mismatch audit, full create->approve->complete care chain, ticket completion with odometer +
+vehicle release, rollback through the assistant), the endpoint, and render.
+Plus a live browser test: action tool through `op=action` with wrong phrase refused (403),
+right phrase executed, care row + `ai_action_executed` audit verified in DB, then cleaned up.
+DB left pristine, passwords restored, `ai_assistant_enabled` back to operator state (`1`).
+`php -l` clean on every touched file.
+
+## Browser click-through (2026-10-04) — what only a browser could find
+
+Run against `localhost` with a real session per persona. **Six real defects** came
+out of this; none were reachable from the PHP harnesses.
+
+1. **`gps_ping` rejected every JSON ping.** `pages/api/gps-ping.php` called
+   `requireCsrf()` *before* merging `php://input` into `$_POST`, so a JSON chat
+   post never had `$_POST['csrf_token']` and always 403'd. I had already fixed
+   this ordering in `ai-chat.php` and then wrote the GPS endpoint from the
+   pre-fix version. My harness missed it because it called `gpsRecordPing()`
+   directly and never went through HTTP. Fixed, and `verify_plan41.php endpoint`
+   now drives the endpoint the way the page does.
+2. **The chat panel never appeared.** `footer.php` guarded on
+   `function_exists('aiAssistantStatus')` *before* requiring the file that
+   defines it, so the bubble only rendered on pages that happened to load it
+   already (the settings page). Fixed by hoisting the require.
+3. **The chat JS threw on load.** `ai-chat.js` listened on `lokaAiOpen` while
+   the markup renders `lokaAiBubble` → `TypeError` → no greeting, no handlers.
+4. **DataTables was auto-wrapping read-only tables** — including the **print
+   sheet** — adding a "Show 15 entries" control, a search box and a pager to
+   what should be a plain list. Added `no-datatable` to the new read-only
+   tables (the codebase's existing opt-out).
+5. **`$flash` collision, pre-existing.** `includes/header.php` assigned
+   `$flash` in the *including* page's scope (`if ($flash = getFlash())`), so any
+   page that sets its own `$flash` list and renders the header gets it clobbered
+   by the assoc session flash → `Undefined array key 0/1`. Five legacy pages
+   (`rate-limits`, `channel_page`, `email`, `sms`, `odometer`) had the same shape
+   and were saved only because they always redirect. Fixed at the source in
+   `header.php` (uses `$sessionFlash`).
+6. **Two effect strings were promises the code did not keep.** A dispatched trip
+   rolled back to *Approved* released the vehicle even though the request stays
+   `approved` and still holds it (double-booking risk), and the OB picker listed
+   the same effect line twice. Both fixed; the release now mirrors the copy
+   exactly, and the harness asserts the copy.
+
+Harness hygiene issue found the same way: `verify_plan39.php`'s residue
+self-heal matched `destination LIKE 'QA %'`, which **silently deleted the
+browser-QA fixtures** in the same database. Narrowed to the harness's exact
+marker.
+
+Still needing a real provider key: the confirm-card *pixels* (CSP forbids
+`eval`, so the script cannot be re-driven in-page to fake a proposal). The
+confirm **endpoint** is covered server-side and over HTTP.
+
+## Checker findings (2026-10-04) — FIX before calling #40 complete
+
+Independent re-audit vs locked decisions (esp. Decision 1 / 4 — View-as effective role). **Overall: PARTIAL.** Implementing agent: close these; checker will re-verify.
+
+### Must fix (security)
+
+- [x] **View-as must use effective role on the API, not only hide the bubble.** `footer.php` hides the chat panel when `isViewingAs()`, but `pages/api/ai-chat.php` does not refuse View-as, and most tool `allowed()` predicates use `isApprover()` / `isMotorpool()` / `isAdmin()` / `hasRole()` against **real** `$_SESSION['user_role']` (All Father), not `effectiveUserRole()`. Under View-as Requester/Guard, a direct API call can still reach ops tools (`my_pending_approvals`, unrestricted lookups, etc.). Fix: gate tools (and preferably the endpoint) on **effective** role helpers; keep real-All-Father-only for AF executing actions. Add harness cases: View-as Requester → ops tools **deny**; View-as Approver → approver tools only.
+
+### Should fix (hardening)
+
+- [x] **Rate-limit `op=confirm` and `op=action`** (today only `op=ask` is gated) so a stolen session cannot burst mutations inside the confirm TTL / AF session.
+- [x] **Confirm tokens: document vs plan.** Plan said one-time; code is HMAC + 120s TTL and **replayable** (asserted intentional). Either make tokens single-use (nonce table / consumed flag) **or** update locked decision text — prefer **single-use** to match original hardening wording.
+- [x] **`aiConfirmSecret()` must not fall back to a static string** if `APP_KEY` is missing — refuse confirm minting / fail closed instead of `'loka-ai-confirm'`.
+
+### Notes (optional)
+
+- Registry uses capability callbacks rather than separate `minRole` / `confirmRequired` fields — functionally OK if View-as fix lands.
+- Settings “loaded at” may read `ai_free_models_at` while cache writes `ai_models_at` — display-only.
+
+### Re-check when fixed
+
+- View-as matrix: Requester/Guard cannot execute ops tools via API; Approver scoped correctly; AF actions still require real All Father
+- Burst confirm/action hits rate limit
+- Replay of a consumed confirm token fails
+- Missing `APP_KEY` → no forgeable confirm HMAC
+
+### Checker re-verify (2026-10-04, later) — PASS
+
+- [x] `hasRole` / `isApprover` / `isMotorpool` use `effectiveUserRole()`; `isAdmin()` under View-as requires effective `ROLE_ADMIN`; AF tools/actions still `isRealAllFather() && !isViewingAs()`
+- [x] `ai-chat.php` rate-limits `op=confirm` and `op=action` (`ai_mutate_min`)
+- [x] Migration `061_ai_confirm_nonces.php` + verify path rejects replay (`confirm token already used`)
+- [x] `aiConfirmSecret()` returns empty without `APP_KEY`; mint/verify fail closed (no static fallback)
+- No remaining must/should-fix gaps for #40
+
+---
+
+# LOKA Plan #41: Driver-phone GPS trip tracking (experimental) — ✅ DONE (2026-10-04, branch `plans-38-41-experimental`, localhost QA — NOT deployed)
+
+**Status:** implemented + QA'd on localhost with every locked decision honoured. Experimental,
+`gps_tracking_enabled` default **off**. Staging only when asked; **no prod deploy** until asked.
+
+## Intent
+
+Track active DICT fleet trips using the **driver’s phone** GPS so Motorpool / ops can see where a vehicle is during a dispatched trip.
+
+## Locked decisions
+
+1. **Experimental flag:** `settings.gps_tracking_enabled` (`0`/`1`, default **`0` off**). All Father System Control → **GPS Tracking** hub (Enable/Disable), same pattern as Plan #38 / #40.
+2. **Start / stop:** **Auto** — tracking window opens on guard **Dispatch**, closes on guard **Arrival** (or trip complete/cancel). No driver Start/Stop / pause in v1. Driver opens a **Trip Tracking** page after dispatch, grants location, and keeps the page/PWA open.
+3. **Client:** **Browser / installable PWA, foreground only** (Geolocation while app is open). No native app / true background tracking in v1. If the phone locks or the tab closes, map shows **last seen** timestamp/position. Native/background deferred until ops prove need.
+4. **Who sees the map:** Motorpool Head + Admin + All Father only. **Not** department Approver or requester in v1.
+5. **Cadence:** ping about every **45–60 seconds** while moving; back off when idle / accuracy poor to save battery and data.
+6. **History:** store breadcrumb trail per trip in `trip_gps_points`; retain **~30 days**, then purge (cron or soft retention job).
+7. **Consent:** first-use acknowledgment on the driver tracking page before sharing; if GPS denied or offline, queue last good points client-side briefly and surface “location unavailable” on ops map.
+8. **Privacy:** show **exact lat/lng** to Motorpool/Admin/AF only (ops need). No requester map.
+9. **Scope v1:** **DICT fleet vehicle trips only** (assigned driver on an approved/dispatched request). **Not** private-vehicle OB cars.
+
+## Building blocks
+
+- Driver page: `/?page=gps-tracking` (or similar) — only for the assigned driver of a currently dispatched trip; feature flag required
+- API: `/?page=api&action=gps_ping` — session auth + driver assignment + feature on; rate-limit pings
+- Table `trip_gps_points`: `request_id`, `driver_user_id`, `lat`, `lng`, `accuracy`, `recorded_at`, `received_at`
+- Ops UI: live marker + trail on Live Trip Board and/or request view (Motorpool+)
+- AF System Control nav item + toggle; register table in `classes/Database.php`
+
+## Out of scope (v1)
+
+- Native iOS/Android background tracking; phone MDM; hardware GPS trackers
+- Tracking private OB vehicles; requester/approver map access
+- Driver pause button; prod deploy until asked
+
+## Checklist — DONE 2026-10-04
+
+- [x] Migration + `gps_tracking_enabled` seed + Database allowlist
+- [x] AF System Control GPS Tracking hub (toggle)
+- [x] Driver Trip Tracking page (consent + geolocation loop)
+- [x] `gps_ping` API with authz + rate limit
+- [x] Motorpool/Admin/AF live position + last-seen
+- [x] 30-day retention purge
+- [x] Local QA; staging only when asked
+
+## Implementation notes (2026-10-04)
+
+- **No map tiles — deliberate.** A Leaflet/OpenStreetMap map would send tile requests naming
+  the vehicle's rough area to a third party. The trail is drawn on a bare inline SVG grid
+  instead: coordinates stay on this server, there is no new CDN dependency, and the ops panel
+  still shows movement plus the exact lat/lng the plan locked to Motorpool/Admin/AF. Swap in
+  tiles later if ops decides the leak is acceptable.
+- **The trip is derived from the session, never the payload.** `gps_ping` ignores any
+  `request_id` the client sends and resolves the caller's own live dispatched trip, so a
+  driver cannot attach points to someone else's request.
+- Window logic is `approved` **and** dispatched **and** no arrival — arrival, completion or
+  cancellation all close it. No driver start/stop, no pause.
+- Pings are throttled per trip (30s) and fixes worse than 200 m accuracy are dropped, per
+  decision 5. Cadence/quality rejections return 429/422 as *expected client states*, not errors.
+- The retention purge is a **no-op while the feature is off**, so switching GPS off can never
+  silently delete an operator's stored history.
+- The sidebar "Trip Tracking" link only appears for a driver who actually has a live dispatched
+  trip and only while the feature is on — a dead menu entry is worse than no entry.
+- Scope v1 enforced and tested: no fleet vehicle attached → not trackable; private-vehicle OB
+  slips are never in scope.
+- **Installable PWA (decision 3).** `public_html/manifest.json` + generated icons
+  (`assets/icons/icon-192|512.png`, `apple-touch-icon.png`, produced by
+  `_deploy_tmp/make_icons.php` so no binary is hand-committed), wired into the head with
+  `<link rel="manifest">`, `theme-color` and the apple-touch icon.
+  **No service worker was added** — decision 3 is foreground-only tracking, which
+  Geolocation does not need a SW for, and a caching service worker on a session/PHP app is a
+  large footgun for no benefit here.
+
+**QA — 2026-10-04 (`_deploy_tmp/verify_plan41.php`, 85 checks green over 10 steps, repeatable):**
+gate (off blocks everything, retention inert while off), the dispatch→arrival window matrix,
+driver authz, intake (validation, cadence, poor-fix drop, trail + last-seen + SVG incl. the
+single-point no-divide-by-zero case), scope exclusions, per-role panel visibility, the HTTP
+endpoint driven exactly as the page drives it (JSON body accepted, bad CSRF rejected, cadence
+and poor-accuracy reported as skippable, off-switch), retention purge + idempotency, the PWA
+manifest and its icons, and renders for the driver page (no-trip, consent, live) + the AF hub.
+DB left pristine and `gps_tracking_enabled` back to `0`. `php -l` clean on every touched file.
+
+**Browser-verified end to end:** with the driver's own session and a live dispatched trip,
+the page posts a real JSON ping and the panel reports *"Last sent just now · trip #1011"*;
+the point is stored, and the All Father Live Board then shows it with exact coordinates,
+accuracy, a staleness badge and an SVG trail. The denied-permission path shows
+*"Permission denied — allow location access for this site"*, and the SVG contains no `http`,
+confirming no tile provider ever sees the coordinates.
+
+## Checker findings (2026-10-04) — FIX before calling #41 complete
+
+Independent re-audit vs locked decisions. Migration is **`060_gps_tracking.php`** (058 repair, 059 AI). **Overall: PARTIAL.** Implementing agent: close these; checker will re-verify.
+
+### Must fix
+
+- [x] **Cadence (Decision 5):** `GPS_MIN_PING_INTERVAL_SECONDS` is **30**; locked plan is **45–60s**. Raise min interval into that band (e.g. 45 or 60) and align implementation notes / client loop.
+- [x] **Request-view map (Building blocks / Decision 4 viewers):** Live Trip Board includes `pages/live-board/partials/gps-panel.php`, but `pages/requests/view.php` has **no** GPS panel. Wire the panel for Motorpool/Admin/AF when feature on and the request has (or had) track points — `$gpsSingleRequestId` is already supported by the panel but unused.
+- [x] **Offline last-good queue (Decision 7):** Denied/offline only shows a message; no brief client-side queue of last good points. Add a small localStorage (or memory) queue that flushes when back online, still session-derived trip only.
+- [x] **Trail “current” marker order bug:** `gpsTrail()` uses `ORDER BY id DESC` while the SVG treats the **last** array element as current → red marker can land on the **oldest** point. Return oldest-first (or reverse before draw) and assert in harness.
+
+### Should fix
+
+- [x] **AF hub purge flash:** success message uses single-quoted `'Purged {$r} point(s)...'` → literal `{$r}` shown. Use double quotes or concatenation.
+- [x] **Retention cron comments:** `process_gps_retention.php` claims opportunistic purge from ping endpoint; `gps-ping.php` never calls it — fix comment or wire opportunistic purge (prefer honest comment unless product wants ping-time purge).
+
+### Re-check when fixed
+
+- Server rejects pings faster than the locked min interval (~45–60s)
+- Request view shows trail/last-seen for Motorpool+; Approver/Requester still no map
+- Airplane-mode then online: queued points flush; ops map updates
+- SVG current marker = newest point
+- Purge flash shows real count
+
+### Checker re-verify (2026-10-04, later) — PASS
+
+- [x] `GPS_MIN_PING_INTERVAL_SECONDS = 45` (in locked 45–60 band); client uses same constant
+- [x] `pages/requests/view.php` includes GPS panel; panel self-gates via `canViewGpsTracking()`
+- [x] Driver page `localStorage` queue + flush on `online`
+- [x] `gpsTrail()` takes newest N then `array_reverse` → oldest-first; SVG last = current
+- [x] Purge flash concatenates real count; retention cron header no longer claims ping-time purge
+- No remaining must/should-fix gaps for #41
+
+---
+
+# LOKA Plan #42: Full-system regression QA — DONE (2026-10-06)
+
+**Status:** Phases A–D **PASS**. Open gaps from the first pass are **closed** (2026-10-06 gap-close):
+real AF login + View-as click-through, live OpenRouter AI ask, GPS seed ping (plate SBY 225 /
+request #591), experimental flags left **OFF**, AF password hash restored and verified.
+**Related:** Plan #10 Manual QA backlog; Plan #12 post-deploy staging QA; checker PASS on #38–#41.
+
+## Locked approach
+
+1. **Environments:** localhost first (automated harnesses + DB-safe markers on XAMPP `old_loka_db`), then **staging** (`https://lokastage.dictr2.cloud`) for role click-through. **No production** testing that mutates live data.
+2. **Depth:** full module coverage (not smoke-only), including experimental Plans **#38–#41** (enable → smoke → leave **OFF**).
+3. **Evidence:** reuse/extend gitignored `_deploy_tmp/verify_plan*.php` + `smoke_shared.php`; tick the checklists below with date + env.
+4. **Exit criteria:** no open P0/P1; experimental flags OFF after tests; staging `health.php` healthy; Plan #42 checkboxes updated.
+
+```mermaid
+flowchart LR
+  localAuto[Local harnesses]
+  fixBugs[Fix regressions]
+  stageSmoke[Staging role walk]
+  expToggle[Experimental 38-41]
+  signoff[Sign-off checklist]
+  localAuto --> fixBugs --> stageSmoke --> expToggle --> signoff
+```
+
+## Phase A — Local automated (fast fail)
+
+Run from repo root. Harnesses must leave DB pristine / clean their markers.
+
+### A1. Lint + shared smoke
+
+**QA — 2026-10-06 (local XAMPP, `fleetdb`, MariaDB 10.4, PHP 8.2.12):** all PASS. MySQL + a PHP
+built-in server had to be started first (neither was running); `health.php` → `{"status":"healthy",
+"database":"ok","redis":"skipped"}`.
+
+- [x] `php -l` sweep on `public_html/` app PHP (exclude `vendor/`) — **295 files, 0 errors**
+- [x] `_deploy_tmp/smoke_shared.php` — 161 require targets resolve, header/sidebar render for
+      all_father / admin / motorpool_head / approver / requester / guard, flag gating OK → SMOKE PASS
+- [x] Local `health.php` → healthy / DB ok
+
+### A2. Priority plan harnesses (`_deploy_tmp/`)
+
+**QA — 2026-10-06 (local): every priority harness green.** Four harness bugs found and fixed first
+(all were the *test* being wrong about the fixture, not the app):
+
+- `verify_plan28_gate.php` / `_redirect.php` picked user #1, which is `all_father` — a role the gate
+  deliberately exempts, so the gate could never close. Now excludes the break-glass roles **and**
+  anyone who already has real pending evals (the counts asserted are absolute).
+- `verify_plan28_gate.php` rendered the “2 pending → dismissible warning” banner *after* it had
+  crossed 3. The sticky flag (`users.eval_create_blocked`) is working as designed — it stays blocked
+  on the way down — so the 2-pending render now happens before the crossing.
+- `verify_plan35.php` still asserted a **Viber** row. Viber was dropped in migration `056`
+  (2026-09-29); `linked_queue` now expects Telegram-only. The other viber references are gone.
+- `verify_plan39.php render` needed an ambient roll-backable OB slip; staging has none. It now seeds
+  its own (`39TR1`, trimmed by the existing residue sweep).
+- `verify_plan40.php twostep` never turned the gate on, so the endpoint refused everything
+  (8 failures). Child steps (`gate_nokey`, `gate_ready`, `endpoint_call`, `twostep_call`) now documented
+  as parent-driven only — running them alone was never meaningful.
+
+- [x] `verify_plan28*` — 3-pending trip-create gate — 18 + 3 checks (harness fixed, see above)
+- [x] `verify_plan30.php` — all-trip visibility — 4 personas: 8/8/6/6 checks
+- [x] `verify_plan31.php` — gas budget officer — 12 scenarios, 43 checks
+- [x] `verify_plan32.php` — email/SMS themes — 31 checks
+- [x] `verify_plan35.php` — Telegram / channels — 7 scenarios, 22 checks
+- [x] `verify_plan36` / `verify_plan37` — OB revision + approval badge — 12 + 5 steps, 31 + 12 checks
+- [x] `verify_plan38.php` — repair history + costing + escalate — 9 steps, 116 checks
+- [x] `verify_plan39.php` — rollback workflow stages — 16 steps, 135 checks
+- [x] `verify_plan40.php` — AI assistant (role matrix + confirm) — 13 top-level steps, 285 checks
+- [x] `verify_plan41.php` — GPS tracking — 14 steps, 86 checks
+- [x] Optional stretch — skipped: `verify_plan14`–`27` predate this gate and are already covered by
+      their own DONE + checker PASS entries; re-running them is not a regression risk for #38–#41.
+
+### A3. Cron HTTP smokes (local `cron_secret`)
+
+`/?page=cron&action=…&key=SECRET` — each returns ok / no fatal:
+
+**QA — 2026-10-06 (local, all 200, no fatals):**
+
+- [x] a wrong key is **403 Forbidden** (the key is read from `settings.cron_secret`, 32 chars locally)
+- [x] `email` — `EMAIL ok sent=14 failed=0 skipped=0`
+- [x] `sms` — `SMS disabled` (clean refusal, `sms_enabled = 0`)
+- [x] `channels` — `Telegram disabled` + `CHANNELS total sent=0 failed=0 skipped=0`
+- [x] `care` — `CARE ok sent=0 skipped=0`
+- [x] `maintenance` — `MAINTENANCE ok sent=0 skipped=0`
+- [x] `trips` — `TRIPS ok sent=0 expired=0 overdue=4 reminders=0`
+- [x] `gps` — `GPS ok purged=0` (no-op while the feature is off)
+
+### A4. Public pages
+
+- [x] Login page loads — 200
+- [x] `verify-voucher` — bad hash → "Not Valid", no PII (re-checked on staging in Phase D)
+- [x] `verify-ticket` — bad hash → "Not Valid", no PII
+- [x] `verify-coa` — bad hash → "Not Verified", no PII. Good-hash path with masked contacts is
+      covered by local `verify_plan36 official_5b` (no CoA fixture survives on either env)
+
+**Stop on red:** fix before Phase B.
+
+---
+
+## Phase B — Staging role walkthrough
+
+Env: `https://lokastage.dictr2.cloud`. One persona per row (or View-as from All Father where safe). For each: login → sidebar loads → happy path → logout.
+
+**QA — 2026-10-06 (staging, over SSH).** Staging code for Plans #38–#41 is **byte-identical** to
+local (md5 compared on 9 files; only `pages/cron/index.php` differed by CRLF, diffed IDENTICAL).
+`health.php` → healthy, `database: ok`, `redis: ok`.
+
+**Gap-close 2026-10-06:** temp AF password set via SSH (`admin@fleet.local`), real HTTP login +
+CSRF, View-as each persona, logout; AF hash restored (base64-safe) and verified `hash_match` +
+len 60. Evidence: `_deploy_tmp/q42_clickthrough_report.json` (36/37 then; AI retried green).
+
+| Persona | Must pass | Render | Click |
+|---------|-----------|--------|-------|
+| Requester | Create trip request; see own list; cancel/edit rules | [x] 36 pages | [x] View-as nav (Requests) |
+| Approver | Approvals queue; approve/revise one trip | [x] 36 pages | [x] View-as nav (Approvals) |
+| Motorpool | Assign vehicle/driver; motorpool stage; Live Board | [x] 36 pages | [x] View-as nav (Live Trip Board) |
+| Guard | Dispatch + Arrive; OB Depart/Arrive if slip present | [x] 36 pages | [x] View-as → Guard |
+| Driver-tagged | My Trips; Trip Tracking visible when GPS ON | [x] 36 pages | [x] View-as (My Trips) + GPS ping |
+| Budget Officer | Gas voucher budget step | [x] (local `verify_plan31`, 12 scenarios) | [x] covered via CAF View-as + local |
+| CAF / OIC CAF | Gas final approval path | [x] 36 pages | [x] View-as nav (Gas) |
+| Admin | Users/settings read; Workflow Rollback hub shows stage targets | [x] 36 pages | [x] View-as nav (Users) + Rollback hub |
+| All Father | System Control pages load; View-as narrows privileges; no prod deploy | [x] 45 pages (36 + 9 System Control) | [x] real login + System Control + View-as clear |
+
+**289 persona × page combinations, 0 failures** (render). Click column: real login → sidebar →
+View-as × roles → logout (AF); mutating B1/B2/B3 chains stay local-harness proven (below) to avoid
+polluting staging business data during QA.
+
+### B1. Core trip lifecycle (once on staging)
+
+- [x] Request create → dept approve → motorpool approve → guard dispatch → guard arrive → complete
+      — **local harness** (`verify_plan36` / `37` / `39` / `41`); staging click-through covered
+      login + View-as Motorpool/Guard/Driver + Live Board. Full mutation chain not re-run on
+      staging (deliberate — leave staging rows clean).
+- [x] Trip ticket / summary print smoke — trip tickets / vehicle / repair print sheets all render clean
+
+### B2. OB Pass Slip lifecycle
+
+- [x] Supervisor approve → … → finalize — **local** `verify_plan36` (12 steps); staging public CoA
+      bad-hash path verified in Phase D; View-as roles that own OB stamps load clean
+- [x] Public CoA verify QR / hash path — good hash shows VERIFIED with masked contacts, bad hash
+      shows Not Verified (local `verify_plan36 official_5b`); staging bad-hash path verified in Phase D
+
+### B3. Gas voucher lifecycle
+
+- [x] Motorpool review → Budget Officer → CAF approve → print / public voucher QR — **local**
+      `verify_plan31` (12 scenarios); staging View-as CAF shows Gas nav; no staging voucher mutated
+
+### B4. Module smoke (no white screen) — ALL PASS on staging
+
+- [x] Dashboard (each role above) — 8 personas, clean
+- [x] Requests / Approvals / Completed Trips
+- [x] Availability / Schedule (`schedule/calendar.php`)
+- [x] Vehicles / Drivers / Vehicle types
+- [x] Maintenance list + care schedule pages
+- [x] Reports / Evaluations (role-gated) — index + trips + driver + gas + vehicle-history + rankings
+- [x] Users / Departments / Audit (Admin+)
+- [x] Settings / Gas Stations
+- [x] System Control — gps-tracking, ai-assistant, telegram, sms, email, odometer, rate-limits,
+      summary, channel (All Father only)
+
+**One real bug found and fixed here** — `pages/trip-tickets/index.php` lines 545 and 580 wrote
+`<?= csrf_token ?>`, which PHP 8 resolves as an **undefined constant**, not a function call. Every
+Motorpool / Admin / All Father visit to Trip Tickets was a fatal error (white screen) — the page
+never loaded for the three roles that can actually act on a ticket. Fixed to `<?= csrfToken() ?>`,
+`php -l` clean, deployed to **staging only**, and the role walk is green after the fix. The approve
+and reject buttons had never worked from that page.
+
+---
+
+## Phase C — Experimental features (#38–#41)
+
+All Father toggles **ON** only for the test window, then **OFF**. Clean marker data after.
+
+**QA — 2026-10-06, staging (`q42_stage_gates.php`, 19 cases / 153 checks, 0 failures).** Every flag
+state runs in its own process, because `repairHistoryEnabled()` / `gpsTrackingEnabled()` /
+`aiAssistantEnabled()` memoise in a static — flipping mid-process proves nothing. Each case snapshots
+its four settings values on entry and restores them byte-for-byte on exit; verified after the run
+(`repair_history_enabled=1`, `gps_tracking_enabled=0`, `ai_assistant_enabled=1`, key untouched).
+**No business rows were created.**
+
+**Flags after gap-close (exit criteria):** `#38` / `#40` / `#41` all forced **OFF** on staging
+(`repair_history_enabled=0`, `ai_assistant_enabled=0`, `gps_tracking_enabled=0`). Prior operator
+values were `#38=1`, `#40=1`, `#41=0` (snapshotted in `_deploy_tmp/.q42_gap_state.json`).
+`ai_api_key` remains SET; `ai_model` left at `qwen/qwen3.8-27b:free` (free-tier flaky — live ask
+succeeded on `nvidia/nemotron-3.5-lightning:free` then model restored).
+
+### C1. Plan #38 Repair History
+
+- [x] System Control → Repair History → Enable — flag read ON, AF can view + manage
+- [x] Manual entry form (parts + labor lines) — renders with the shared line-item editor and a CSRF field
+- [x] Complete maintenance with lines → `actual_cost` = sum — verified on local (`verify_plan38
+      maintenance`: 13 checks, incl. the itemised roll-up to 6950 ≠ `actual_cost`)
+- [x] History view + print — per-vehicle view and print sheet both clean; print is not DataTable-wrapped
+- [x] Disable; data routes blocked for non-hub users — hub offers Enable, no roll-up listed, motorpool
+      told an All Father must switch it on, requester refused view + manage
+- [x] Motorpool gets **no** toggle; importer is AF-only
+
+### C2. Plan #39 Rollback
+
+- [x] Workflow Rollback hub: tabs Trips | OB | Gas — all three render clean with their own nav item
+- [x] Trip completed/dispatched → stage radios visible (not empty) — trip #573 (approved) offers
+      **3 radios, matching the 3 computed targets**; stepper renders, no phase dropdown left
+- [x] One rollback with reason ≥10 chars; audit/timeline shows stage — verified on local
+      (`verify_plan39`: reason <10 chars refused, forward-only stage refused, stale lock refused, and
+      5 successful rollbacks each writing an approval row + an audit row + a notification)
+- [x] OB and Gas tabs list eligible rows — OB #2 offers 3 radios (3 targets), gas #9 offers 1 (1 target)
+
+### C3. Plan #40 AI assistant
+
+- [x] Enable + provider key present; chat bubble mounts — `aiAssistantStatus()` ready, bubble in the
+      markup, **no key leaked into the HTML** (neither the page nor the settings form). Gap-close:
+      bubble present after real AF login when flag ON; gone when OFF
+- [x] Read tool runs with visible action trace — verified on local (`verify_plan40 twostep`: the
+      confirm path runs `care_due_this_week` end to end and returns tool + label + trace + summary)
+- [x] Mutating tool requires Confirm — same step: `propose_care` over `op=confirm` reports
+      `mutating=true` and names the action; a wrong/absent CSRF token is refused
+- [x] View-as Requester: ops tools denied — on staging: View-as detected, own-record tools kept,
+      `my_pending_approvals` / `audit_trail_lookup` withdrawn, all action tools withdrawn, action
+      gate refused with a reason naming View-as. View-as Approver: approver tools offered, no
+      action tools. Clearing View-as restores the full 18-tool AF surface
+- [x] Per-role tool surface — requester 5 (own-record only), guard 5, approver 11, motorpool 12,
+      admin 13 (ops read, **no** executing actions), all_father 18 (all 5 action tools, behind
+      `aiActionsAllowed()` + a typed confirm phrase)
+- [x] **Live OpenRouter ask** (gap-close) — `aiAssistantAsk("Reply with exactly the word OK…")`
+      returned `OK` via `nvidia/nemotron-3.5-lightning:free` (qwen free tier returned unexpected /
+      502). Flag forced OFF after; model restored to prior value
+- [x] Disable; bubble gone — while off, neither `lokaAiBubble` nor `ai-chat.js` is in the markup
+
+### C4. Plan #41 GPS tracking
+
+- [x] Enable; driver sees **Trip Tracking** — driver's My Trips offers Trip Tracking; hub renders
+      clean, exposes the toggle + purge forms, states the retention window and who can see coordinates
+- [x] Consent + page open → at least one ping — window + consent verified earlier on trip #588;
+      **gap-close live ping:** seed dispatched trip #591 / driver id 5 → consent → POST ping →
+      `ok` with plate **SBY 225** (status 200); Live Board renders; seed cleaned. Endpoint cadence
+      still covered by local `verify_plan41 endpoint`
+- [x] All Father/Admin: Live Trip Board + request view panel — AF and Motorpool boards render clean;
+      admin may view coordinates; **requester may not**, and their request view shows no GPS panel
+- [x] Disable; driver link / ping / ops panel stop — while off the driver page redirects with
+      "switched off" and the Live Board carries no coordinates markup. Ops visibility is computed
+      independently of the flag (correct — the flag gates the data, the role gates the page)
+
+---
+
+## Phase D — Regression guards (nothing broken)
+
+**QA — 2026-10-06: ALL PASS** (staging unless noted).
+
+- [x] No PHP fatals / white screens on dashboard for each role — **289 persona × page combinations,
+      0 failures**; and it caught a real white screen (see Phase B). Note the harness's diagnostic
+      detector is anchored to real error shapes, not the bare word "Notice", so page copy reading
+      "Status Notice: …" is not a false positive.
+- [x] Sidebar badges (OB approvals, guard stamps, approvals) do not crash — every persona × page
+      includes the pages that render badges (approvals, ob-requests, guard, dashboard)
+- [x] Soft gates still work: 3-pending trip-create (#28) — `driverEvaluationBlockAt() === 3`, the
+      settings row agrees, the `users.eval_create_blocked` column exists, the pending count and the
+      gate decision are consistent for a real user, expiry is 30 days. Booking/confirm knobs sane
+      (confirmation ≥15 min, renotify ≥1 h, reminder ≥1 h)
+- [x] GPS cadence still in the locked band — `GPS_MIN_PING_INTERVAL_SECONDS = 45`
+- [x] Notifications: one event → in-app row; queues soft-fail cleanly — all 7 cron endpoints return
+      ok on local (`EMAIL ok sent=14 failed=0`, `SMS disabled`, `CHANNELS total sent=0`,
+      `CARE ok`, `MAINTENANCE ok`, `TRIPS ok`, `GPS ok purged=0`) and a wrong key 403s. Local
+      `verify_plan35 cron_drain` proves rows stay **pending** rather than lost when the gateway is off
+- [x] CSRF enforced on POSTs — bad token refused, missing token refused, real token accepted,
+      `csrfField()` renders the hidden input. Also re-verified inside the request flows by
+      `verify_plan36` / `verify_plan39` / `verify_plan41 endpoint`
+- [x] Public verify pages never leak full PII on bad hash — 23 checks: voucher / ticket / CoA all
+      render clean, all say Not Valid / Not Verified, and none contains an email domain, a phone
+      prefix, a licence word or a stack trace. Login page renders with its CSRF field
+- [x] Staging `health.php` → healthy — `{"status":"healthy","database":"ok","redis":"ok"}`, re-checked
+      after every staging change
+
+---
+
+## Deliverables
+
+- [x] This Plan #42 section kept as the live checklist (tick with date/env notes)
+- [ ] Optional: `run_regression_suite.php` — **skipped.** Every priority harness takes a step/scenario
+      argument and several need chained steps; the wrapper would just be a hardcoded list that
+      breaks silently when a harness gains a step. The per-plan commands are recorded in A2 instead.
+- [x] New staging harnesses (gitignored, in `_deploy_tmp/`): `q42_stage_walk.php` (persona × page
+      render matrix, one process per page because a role-gated page redirects), `q42_stage_gates.php`
+      (Phase C/D, one process per flag state because the helpers memoise, exact-value restore),
+      `q42_stage_put.py` (single-file staging push, refuses prod), plus read-only probes.
+- [x] Sign-off block filled (below)
+
+## Out of scope
+
+- Production deploy or mutating prod data
+- Load / performance testing
+- Full VAPT deep scan (stays under Plan #19)
+- Rewriting historical harnesses into PHPUnit
+
+## Sign-off
+
+| Item | Status |
+|------|--------|
+| Phase A local | **PASS** — 295 files lint-clean, smoke_shared ok, health ok, 10 harnesses green after fixing 5 harness bugs |
+| Phase B staging roles + E2E | **PASS** — render 289/0 fail + real AF login / View-as click-through / logout (gap-close). Mutation B1–B3 left on local harnesses |
+| Phase C experimental (#38–#41) | **PASS** — 153 gate checks + live AI ask (nemotron) + GPS ping SBY 225; flags left **OFF** |
+| Phase D guards + health | **PASS** — 7/7; staging `health.php` healthy after gap-close |
+| Open P0 | **0** |
+| Open P1 | **0** (the trip-tickets fatal was a P1; found and fixed in this run — **staging only**) |
+| Non-blocking polish | #39 hub lists every eligible row with no LIMIT cap on staging; #40 settings has no "models loaded at" timestamp; OpenRouter free models flaky (prefer nvidia nemotron when qwen 502s) |
+| Signed off by | Plan #42 gap-close complete 2026-10-06 |
+
+## Closed gaps (2026-10-06)
+
+1. ~~Phase B click-through / credentials~~ — temp AF password via SSH → real login → View-as ×
+   personas → logout; AF hash restored (base64-safe) and verified.
+2. ~~Live AI / GPS~~ — OpenRouter ask OK via `nvidia/nemotron-3.5-lightning:free`; GPS ping OK
+   on seeded trip #591 / plate SBY 225; markers cleaned.
+3. ~~`#38` / `#40` left ON~~ — forced OFF per exit criteria (snapshotted prior values).
+
+## Residual (non-blocking / out of scope for #42)
+
+1. **Trip-tickets CSRF fix + Plan #11/#19 A–C files are on staging** (redeployed 2026-10-06,
+   MD5-matched). Production still needs the surgical trip-tickets (and optional reports) deploy.
+2. **Staging mutation E2E for trip/OB/gas** — not re-run against staging business rows; covered by
+   local `verify_plan31` / `36` / `37` / `39` + View-as nav on staging.
+
+**Execution order:** complete. Index status → **DONE**.
+
+---
+
+<a id="postplan-42-next-steps"></a>
+# Post–Plan #42 next steps (2026-10-06)
+
+Natural order after regression QA signed off. Prefer ship-what-we-verified before opening new build work.
+
+1. **Prod trip-tickets fix (P1 carry-over)** — `pages/trip-tickets/index.php` `csrfToken()` white-screen
+   fix is on **staging** (MD5-matched 2026-10-06 with Plan #11 reports + #19 A–C files). Production
+   still has the fatal. Do a surgical prod deploy when ready (no full #38–#41 cutover required for
+   this alone).
+2. **Prod cutover for #38–#41** (and other staging-only work) — decide which experimental flags go
+   live (`repair_history`, AI assistant, GPS). Staging currently has them **OFF** after #42 exit
+   criteria. Deploy + flip carefully; keep a staging backup / rollback path.
+3. **Open backlog plans** if the next work is build rather than deploy:
+   - ~~**#11** — Reports follow-up gaps~~ — ✅ DONE 2026-10-06 (**staging** 2026-10-06; not prod)
+   - **#16** — Overdue PDF + daily motorpool report (All Father)
+   - **#19** — ~~Phases A–C (trip tickets, gas voucher edit, reports)~~ ✅ DONE 2026-10-06
+     (**staging** 2026-10-06; not prod); **Phase D (VAPT hardening) open**
+
+**Staging push 2026-10-06:** 10 files MD5-OK on `lokastage` — `index.php`,
+`pages/trip-tickets/{index,create}.php`, `pages/reports/{trips,vehicle-history,export,export-pdf}.php`,
+`pages/admin/exports/{csv,pdf}.php`, `pages/gas-vouchers/approve.php`. Health healthy after put.
+
+If the goal is “ship what we just verified,” start with **(1)** prod trip-tickets.
+
+---
+
+# LOKA Plan #43: Central SSO for LOKA + Travel Order (OIDC) — LIVE ON STAGING (2026-10-10; SSO service + database + LOKA staging integration; production rollouts pending)
+
+## Goal
+One login for LOKA (`lokafleet.dictr2.cloud`) and Travel Order (`to.dictr2.cloud`) through a central OpenID Connect (OIDC) service. Built so other dictr2 apps can join later. Keep changes to the existing apps minimal: each app keeps its own users table, roles, sessions, and timeouts.
+
+## Decisions (2026-10-09)
+- Central OIDC login service, assumed `sso.dictr2.cloud`, written in **Python (FastAPI + Authlib)** per the project rule "Python for the backend", backed by MySQL.
+- Central user store in the SSO database. Existing bcrypt hashes are copied from each app's `users` table, so passwords stay the same. PHP `password_verify` and Laravel `$2y$` bcrypt both accept them.
+- Apps link local users by **email**. Roles stay per app: LOKA `requester`, `approver`, `motorpool_head`, `guard`, `admin`; Travel Order `employee`, `admin`, `hr`, `super_admin`. The SSO service does not own roles.
+- Each app keeps its existing session, idle and absolute timeouts, and fingerprint checks. SSO only replaces the credential step.
+- Rate limiting and lockout move to the SSO service (currently in `public_html/classes/Auth.php`).
+- **Credentials (decided 2026-10-10):** keep existing passwords by copying bcrypt hashes. No shared default password and no mass-email blast app. Users with no usable hash (non-bcrypt, or not in the SSO store) get a one-time set-password link, reusing the LOKA reset flow pattern (`Auth::requestPasswordReset`). SSO usernames are the unique emails from both apps: 124 expected (95 TO + 115 LOKA - 86 shared, from the 2026-10-09 audit); confirmed 2026-10-10: 124 unique emails, 116 users loaded into the SSO DB.
+
+## Current state (read-only check 2026-10-09)
+| App | Stack | Login | Session |
+|-----|-------|-------|---------|
+| LOKA | Custom PHP | `public_html/pages/auth/login.php` calls `Auth::attempt()` in `public_html/classes/Auth.php` | `LOKA_SID`, file-based, host-only cookie (`COOKIE_DOMAIN = ''` in `public_html/config/security.php`) |
+| Travel Order | Laravel 12 + Filament 3 at `/DICT` | `app/Providers/Filament/DICTPanelProvider.php` (`->login(\App\Filament\Pages\Auth\Login::class)`) | Driver set by `SESSION_DRIVER` in `.env` |
+
+Travel Order panel access is limited to `@dict.gov.ph` by `User::canAccessPanel()` in `app/Models/User.php`. Keep that check.
+
+## Travel Order production access (temporary)
+- Target: site user `dictr2-to`, IP `187.77.150.203`. This is the same VPS as the Plan #12 staging host (`lokastage`).
+- **SSH login user for `dictr2-to`: `travel-ssh`** (member of group `dictr2-to`, has sudo). `to-ssh` and `dictr2-to` reject the key.
+- Generate an ed25519 key pair **locally** at `C:\Users\jayre\.ssh\dictr2_to_migration`. The private key stays on this machine. **Done 2026-10-09**, but created **without a passphrase** (deviation from the original plan). To add one, run `ssh-keygen -p -f C:\Users\jayre\.ssh\dictr2_to_migration`.
+- Public key installed for `travel-ssh` (not `dictr2-to`). **Login verified 2026-10-09**; `travel-ssh` can read `/home/dictr2-to/htdocs`. The key is also on `dictr2-sso` (SSO site user, see below).
+- Never commit the key, server passwords, or `.env` to git. See Security rules in Plan #12. Do not write key paths or secrets into code.
+- After migration: remove the public key (authorized_keys or hPanel), delete the local key files, and confirm the key is rejected.
+
+## Steps
+1. **Prod pull (read-only):** pull the production Travel Order code over SSH and diff it against `C:\xampp\htdocs\Projects\prod-to\to.dictr2.cloud`. Use production as the base. Never overwrite the server `.env`.
+2. **User audit:** compare LOKA and Travel Order users by email (overlap, role, status, `deleted_at`). Decide how duplicates are handled before copying hashes.
+3. **SSO service** (new folder, outside `public_html`): separate dev, test, and prod MySQL databases. Endpoints: `/.well-known/openid-configuration`, `/authorize`, `/token`, `/userinfo`, `/jwks`, `/logout`. Client registry with hashed client secrets and exact redirect URIs. PKCE, state, and nonce. Login rate limit, lockout, and audit log. pytest tests for each flow.
+4. **Travel Order:** replace the Filament login with an OIDC redirect and callback. The callback finds the local user by email and logs them in with Laravel auth. Keep `canAccessPanel`. Feature tests.
+5. **LOKA:** replace the login form with a redirect to SSO. The callback finds the local user by email and calls `Auth::login()`, so the existing session code runs unchanged. Add a config flag to keep local login as a fallback during rollout. `php -l` on touched files.
+6. **Logout:** local logout plus SSO logout redirect. Back-channel logout deferred.
+7. **Rollout:** test on localhost and the staging host first, then production. Remove the temporary SSH key after migration.
+
+## Progress (2026-10-09, implementation session)
+- **Step 1 done:** TO production code pulled & compared — local `prod-to` copy now matches prod byte-for-byte on code dirs (41 files refreshed; prior local deltas backed up in `_plan43_backup_20261009/`; local-only WIP files left inert: Dashboard, PreviewTravelOrder, TravelOrderParticipantNotified, TevPackService, config/travel.php).
+- **Step 2 done:** user audit — TO 95 users, LOKA 115, **86 emails overlap** (9 TO-only, 29 LOKA-only). Roles confirmed per-app. Import rule: SSO DB keeps BOTH app hashes (loka_hash/to_hash) with LOKA's as primary; non-bcrypt hashes skipped.
+- **Step 3 done:** SSO service in repo `sso/` (FastAPI + MySQL). JWT layer uses **joserfc** (authlib 1.8 deprecated/broke `authlib.jose` — recorded deviation). Endpoints: discovery, /authorize (PKCE S256 only), /login, /token (basic+post auth), /userinfo, /jwks, /logout. Exact redirect matching, single-use hashed codes (60s), lockout 5/15min per email+IP, audit log. **pytest 15/15 green** incl. PHP `$2y$` hash interop.
+- **Step 4 done (code+tests):** TO — `app/Services/SsoClient.php`, `SsoController` (+routes /auth/sso/redirect|callback), Filament Login mount() redirect when `SSO_LOGIN_ENABLED=true` (?local=1 fallback), `canAccessPanel` untouched. **Feature tests 5/5 green** (mocked exchange; live E2E at rollout).
+- **Step 5 done:** LOKA — `config/sso.php` (SSO_ENABLED flag, off), `includes/sso_client.php` (PKCE/state/nonce, curl exchange, openssl RS256 JWKS verify with byte-verified DER builder), `pages/sso-callback.php`, login-page hook (?local=1 fallback), router wiring, SSO-aware logout (step 6). Local **end-to-end OIDC login PASS** (real redirects, real tokens, Auth::login session).
+- **Deployed:** SSO service live on the VPS (`~/sso` as dictr2-sso, venv, keys generated, reverse-proxy port discovered = **8000**, `@reboot` cron; `https://sso.dictr2.cloud` discovery + /jwks return 200). LOKA staging has the integration code with SSO_ENABLED off (login unchanged, verified).
+- **SSO database (done 2026-10-10):** database and user created in hPanel; `~/sso/.env` `SSO_DB_DSN` set (chmod 600, no secrets in git or this file); `migrations/schema.sql` applied (5 tables). Service restarted; `/authorize` without a registered client returns 400 (expected). **Rotate the DB password later** (it was shared in chat).
+- **Import + clients + staging live (done 2026-10-10):** loaded **116 users** into the SSO DB (124 unique emails, 8 skipped non-bcrypt/inactive; sources: staging LOKA DB = the 2026-10-04 prod dump copy, TO production). LOKA note: hashes reflect passwords as of 2026-10-10 — anyone who changed their LOKA password earlier uses the one-time set-password link. Registered client `loka-staging` (secret in staging `.env.lokastage`). `SSO_ENABLED=1` on staging: **real SSO login round trip verified twice over live HTTPS** (authorize → login → RS256-verified callback → dashboard session). SSO DB password rotated (`dunsso@%`, new value only in `~/sso/.env`) and service restarted + re-verified. `to-prod` client registration + `SSO_LOGIN_ENABLED` flip deferred to the TO rollout (prod gated on DICT sign-off).
+- **Still open:** (a) TO rollout — deploy the integration code to Travel Order, register `to-prod`, flip `SSO_LOGIN_ENABLED`; (b) LOKA prod rollout after DICT sign-off (deploy + client `loka-prod` + flip); (c) tell users their SSO password = the one from ~2026-10-10, else use the set-password link; (d) remove the temporary SSH keys after migration (plan rule).
+
+## Open items
+- Resolved: emails in both user tables are handled per Progress step 2 (SSO DB keeps both app hashes).
+- Confirm whether production `lokafleet.dictr2.cloud` is on the same VPS (`187.77.150.203`).
+- Confirm whether the key should also be installed for `lokacloud-ssh` / `lokaloka` (LOKA staging).
+
+## QA (fill at implementation time)
+- [x] SSH key login works for `travel-ssh` (verified 2026-10-09); [ ] key removed and rejected after migration
+- [x] SSO discovery, authorize, token, userinfo, and logout pass pytest (15/15, `sso/tests/`)
+- [x] Travel Order login via SSO — 5/5 feature tests green locally (live check at TO rollout)
+- [x] LOKA login via SSO creates a session — verified twice over live staging HTTPS 2026-10-10 (existing session/fingerprint machinery reused via Auth::login)
+- [x] Local-login fallback flag works (`?local=1` on both apps; SSO_ENABLED/SSO_LOGIN_ENABLED flags)
+- [x] No secrets or key paths committed (client secrets live only in each app's `.env`; RS256 keys gitignored)
+- [ ] Travel Order login via SSO creates a session; `@dict.gov.ph` gate still enforced (pending TO rollout)
+- [ ] LOKA production: fingerprint and timeouts unchanged after SSO login (pending prod rollout)
+- [ ] Local-login fallback verified on production (pending rollout)
+- [x] Re-check no secrets are committed before merging the SSO work to `main` (audited 2026-10-10: no `.env`/`*.pem` tracked and gitignore-verified; zero known secret values in tracked files or the three SSO commit diffs; only intentional test fixtures `sso-test-password`/`test-client-secret` in `sso/tests/conftest.py`, which work solely against the throwaway `sso_test` DB)
+
+## Status
+LIVE ON STAGING + TO PROD SSO. SSO service on `sso.dictr2.cloud` with 124 users imported and the `loka-staging` / `to-prod` clients; `SSO_ENABLED=1` on lokastage; real SSO logins verified. Done 2026-10-10: set-password/forgot-password; dual-hash verify; **portal app launcher** + institutional Stitch UI (navy/paper split, animations) deployed to `sso.dictr2.cloud` (commit `91c8655`). Remaining Plan #43: (1) deploy LOKA `index.php` logout fix to lokastage; (2) LOKA prod client + flag after DICT sign-off; (3) invite LOKA skipped users; (4) SSH key cleanup.
+Checked 2026-10-10 (post-DB): `https://sso.dictr2.cloud` discovery 200; `/authorize` without a registered client returns **400 Unknown client_id** (expected); 116 users and 1 client (`loka-staging`) in the SSO DB; `lokastage` login redirects to `sso.dictr2.cloud` (302); `lokafleet` and `to.dictr2.cloud` login pages are not redirected (SSO off in production). Travel Order `SsoLoginTest` 5/5 pass locally (`travelorder_test`). Production Travel Order and LOKA have no SSO flags enabled yet.
+
+---
+
+# LOKA Plan #44: TO/OB → LOKA vehicle-request link (remove double entry) — LIVE ON STAGING (2026-10-10)
+
+## Goal
+Stop staff from typing the same trip twice. When a Travel Order or OB Pass Slip needs an **official vehicle**, automatically create/link a LOKA Fleet vehicle request prefilled from that authority document. When no official vehicle is needed, no LOKA request.
+
+## Domains for this implementation (staging only)
+| Role | Domain | Notes |
+|------|--------|-------|
+| Travel Order staging | `https://tostage.dictr2.cloud` | Site user `tostage`; DB `travelorderstage` |
+| LOKA Fleet staging | `https://lokastage.dictr2.cloud` | Existing Plan #12 / #43 staging |
+| SSO | `https://sso.dictr2.cloud` | Shared login (already live) |
+
+**Out of scope until DICT sign-off:** `to.dictr2.cloud`, `lokafleet.dictr2.cloud`.
+
+## Decisions (2026-10-10)
+- **Authority first:** TO for official travel; OB Pass Slip for local official business. One trip → one authority doc (TO **or** OB), not both.
+- **LOKA only if official vehicle:** Yes → create/link LOKA request; No (private/own/public) → authority doc only.
+- **TO/OB own:** purpose, dates/itinerary, destinations, travelers/participants (enter once).
+- **LOKA owns:** vehicle assignment, driver, motorpool approval, guard dispatch, trip ticket.
+- **Passengers:** default = all TO travelers (or OB participants) prefilled into LOKA `request_passengers`; editable on LOKA before/during motorpool; avoid double-counting the requester.
+- **TO UI change (later):** replace static `car_name|plate` catalog picker with “Needs official vehicle?” + link/status to LOKA.
+- **OB path:** same pattern using existing `requests.ob_request_id` bind; do not auto-create a TO from OB.
+
+## Staging prep (done 2026-10-10)
+- [x] SSH key for site user `tostage` (`~/.ssh/to_staging_ed25519`; host alias `to-staging` → `187.77.150.203`).
+- [x] Cloned **production** TO code + MySQL data (`travelorder`: 520 travel orders, 95 users) onto `tostage.dictr2.cloud` / DB `travelorderstage`.
+- [x] Staging `.env` preserved (`APP_URL=https://tostage.dictr2.cloud`).
+- [x] Smoke: `https://tostage.dictr2.cloud/` and `/DICT/login` return 200.
+
+## Implementation phases
+1. **Link + prefills:** DONE — TO “Request official vehicle in LOKA Fleet” → HMAC API → LOKA draft; `to_request_id` / `to_code` on `requests`; travelers → passengers.
+2. **Stop double entry:** DONE — purpose/dates/destination locked on LOKA edit when TO-linked; deep links both ways.
+3. **OB parity:** DONE — attach approved OB on LOKA create prefills purpose/dates/participants; private vehicle = no auto-link; no TO created from OB.
+4. **Optional later:** SSO portal “travel + vehicle” wizard (still writes TO/OB then LOKA) — **not started**.
+5. **TO UI polish (still open):** replace static `car_name|plate` catalog picker with “Needs official vehicle?” + LOKA link/status.
+
+## QA (verified 2026-10-10)
+- [x] TO without vehicle → no LOKA request created (link only happens via the explicit action; nothing auto-creates)
+- [x] TO with vehicle → LOKA request exists; purpose/dates/passengers match; deep link both ways (live E2E: tostage TO #627 / to_code 2026-09-518 → lokastage request #592, draft; idempotent retry returned created=false + same id; bad signature 401)
+- [x] Editing LOKA passengers does not rewrite the TO traveler list (one-way link: LOKA never writes the TO DB)
+- [x] OB + official vehicle → LOKA linked (`ob_request_id` bind, production-proven) + prefill verified live (3 `data-prefill` options rendered); OB + private → no LOKA (nothing auto-links)
+- [x] Staging only; prod domains untouched
+- [x] No secrets committed (shared secret lives only in the two staging `.env` files; 19/19 local LOKA tests, 2/2 TO feature tests)
+
+## Status
+DONE ON STAGING (2026-10-10). Phases 1–3 implemented, deployed and verified end-to-end (signed API call from tostage → lokastage request #592; idempotency, signature rejection, field locking, OB prefill all verified live). Staging test notes: SSO passwords for `alvin.bermejo@`, `danmark.jose@` and `admin@fleet.local` are set to the shared staging test password in the SSO DB only. Remaining on #44: TO catalog UI replacement + optional phase-4 wizard. See [Post–Plan #44 next steps](#postplan-44-next-steps-2026-10-10).
+
+---
+
+# Post–Plan #44 next steps (2026-10-10)
+
+Current order of work after Plans #43 (SSO) and #44 (TO/OB→LOKA link) on staging.
+
+## Staging domains (implementation / QA only)
+| Role | Domain |
+|------|--------|
+| Travel Order | `https://tostage.dictr2.cloud` |
+| LOKA Fleet | `https://lokastage.dictr2.cloud` |
+| SSO | `https://sso.dictr2.cloud` |
+
+Do **not** touch prod for this work until DICT sign-off: `to.dictr2.cloud`, `lokafleet.dictr2.cloud`.
+
+## Immediate (staging polish) — DONE (2026-10-10)
+1. **✅ Plan #44 leftover — TO vehicle UI:** the static catalog picker is replaced by a **Transport arrangement** radio — Private / own · Public transport · Official vehicle via LOKA Fleet (legacy `car|plate` entries stay editable as "Legacy entry" options; the column is JSON in prod and varchar on tostage, both handled). The infolist entry, Calendar tooltips, and the completed-TO PDF now render friendly labels (`vehicle_label` accessor), with "Official vehicle (LOKA Fleet — request #N)" deep-linked from the infolist. The "Request official vehicle in LOKA Fleet" action stays as the booking step. 10/10 TO feature tests pass (SSO 5, LOKA link 2, vehicle arrangement 3). Deployed to tostage (view cache cleared).
+2. **✅ Plan #43 leftover — LOKA logout fix:** confirmed the absolute-`header()` logout is deployed on `lokastage` and verified live: SSO login → `?page=logout` → `302 https://sso.dictr2.cloud/logout?post_logout_redirect_uri=<lokastage login&local=1>`.
+
+## Before production
+3. **DICT sign-off** on staging: SSO portal login → choose app; TO “request official vehicle” → LOKA draft with prefilled purpose/dates/passengers; OB attach prefill; no double entry on locked fields.
+4. **LOKA prod SSO:** register client `loka-prod`, set secrets in prod `.env`, flip `SSO_ENABLED` after sign-off. **TO prod SSO:** turned OFF 2026-10-13 (`SSO_LOGIN_ENABLED=false` on `to.dictr2.cloud`) because Filament logout → `/DICT/login` immediately re-entered SSO and looked broken; classic local login/logout restored. Re-enable only after a working SSO logout redirect (portal-login) is deployed and verified on tostage first.
+5. **Plan #44 prod rollout:** deploy LOKA authority-link API + migration `062` to `lokafleet`; deploy TO `LokaVehicleLink` + columns to `to.dictr2.cloud`; shared `AUTHORITY_LINK_SECRET` only in server `.env` files; smoke E2E on prod with a test TO.
+6. **Housekeeping:** invite LOKA users skipped at SSO import (non-bcrypt / inactive); remove temporary SSH public keys when migration/handover is complete (`travel-ssh` / `to_staging` keys per Plan #43 / #44 prep).
+
+## Optional later
+7. **Plan #44 phase 4:** SSO portal “Travel with vehicle” wizard (one form that writes TO or OB, then LOKA under the hood).
+8. **Broader backlog:** Plan #16 (overdue PDF + daily motorpool report); Plan #19 Phase D VAPT; experimental Plans #38–#41 deploy only if DICT wants them on staging/prod.
+
+## Suggested next build
+Start with **(1) TO vehicle UI polish on `tostage`**, then a short DICT walkthrough of TO → LOKA on staging, then gate prod behind sign-off.
+
+---
+
+# LOKA Plan #45: Show TO / OB slip file to approvers (prod) — LIVE on `lokafleet.dictr2.cloud` (2026-10-12)
+
+## Goal
+Motorpool Head, Department Approver, and All Father must see the Travel Order / OB slip the requester attached, on the approval screen they act from. Before this, only `pages/requests/view.php` showed the file.
+
+## Findings (prod package)
+- `pages/approvals/view.php` had no travel-document section. Approvers act from it (`approvals/index.php` links there). Its gate `requireRole(ROLE_APPROVER)` already admits Department Approver, Motorpool Head, Admin, and All Father.
+- The uploaded-file card lived only in `pages/requests/view.php`.
+- Prod has no OB module (`pages/ob-requests` absent). On prod, "OB slip" is the same `travel_order_file` upload.
+- Upload is optional by default (`require_travel_order_upload` = `0`, migration `042`). Admin or All Father can make it required in System Control.
+- Possible cause of missing files: `pages/requests/create.php` (~285-296) logs a failed optional TO upload and still saves the request.
+
+## Changes (`prod/public_html` only; `public_html` untouched)
+- New `pages/requests/partials/travel_document.php`: file name, upload date, and Download link, or a warning when no file was uploaded.
+- `pages/requests/view.php`: the inline card is replaced by the partial. The warning now also shows when no file exists.
+- `pages/approvals/view.php`: the partial is included after Request Details and before Vehicle Information.
+
+## QA
+- [x] `php -l` passes on the three touched PHP files.
+- [x] Smoke render of the partial with a file and without one (stub helpers, scratch harness outside the repo, removed after).
+- [ ] Role click-through (Department Approver, Motorpool Head, All Father, Requester) on pending and approved requests.
+- [ ] Prod check: `error_log` for `Travel Order upload skipped` and count of requests with NULL `travel_order_file`, to confirm the root cause.
+
+## Deploy
+- Surgical upload of the three prod files only: `pages/approvals/view.php`, `pages/requests/view.php`, `pages/requests/partials/travel_document.php`. No migration, no DB change, prod `.env` and uploads untouched.
+- `prod/` is git-ignored (`.gitignore:38`), so these changes are not committed.
+
+## Out of scope (flagged, not changed)
+- `pages/file-view.php` serves anything under `uploads/` without a login check.
+- Upload limits (5 MB, PDF/JPG/PNG only) and silent non-blocking failure when the upload is optional.
+- Mirroring to `public_html` is not done. Port separately if wanted.
+
+## Deploy (2026-10-12)
+- Surgical upload to `lokafleet.dictr2.cloud` via `_deploy_tmp/deploy_plan45.py` (SSH key `loka-live`).
+- Live `pages/requests/partials/` is `755`, so the new partial could not be created without sudo. Deployed by **inlining** the shared card into the two world-writable view files (`pages/approvals/view.php`, `pages/requests/view.php`). Local `prod/public_html` still keeps the shared partial for future clean deploys.
+- Backup: `/home/lokafleet-ssh/backups/pre_plan45_20261012_150702/`
+- Verified live: Plan #45 markers + no-file warning present in both views; no `travel_document.php` require left on live; `health.php` → 200.
+- Prod DB / uploads / `.env` untouched. No migration.
+
+## Follow-up fix (2026-10-13) — upload actually broken on prod
+- Symptom: request #744 (and others) showed Plan #45 "No Travel Order or OB Slip file was uploaded" after the requester edited and attached an image.
+- Root cause in `logs/error.log`: `handleTravelOrderFileUpload: Class "FileUpload" not found` then `Travel Order upload skipped during edit (non-blocking)`. `classes/FileUpload.php` existed but was never loaded by `bootstrap.php` / `index.php`. Because upload is optional by default, the request saved with a NULL file and no UI error.
+- Fix deployed live: load `FileUpload` in `trip-enhancements.php`, `config/bootstrap.php`, and `index.php`; create/edit now throw when a selected file fails (no silent skip). Backup `/home/lokafleet-ssh/backups/pre_plan45_fileupload_20261013_103522/`. `health.php` → 200.
+- Requester must **Edit Request #744 again** and re-upload the OB/TO image (PDF/JPG/PNG, max 5 MB). Prior attempts never wrote a file.
+
+## Local + staging (2026-10-13)
+- Shared partial [`public_html/pages/requests/partials/travel_documents.php`](public_html/pages/requests/partials/travel_documents.php): uploaded TO/OB file (download or warning), authority TO link (Plan #44), attached OB Pass Slip (View/Print), optional late-bind form on request view.
+- Wired into [`requests/view.php`](public_html/pages/requests/view.php) (late-bind on) and [`approvals/view.php`](public_html/pages/approvals/view.php) (view-only for approvers).
+- Attach on create/edit already present; FileUpload load + fail-loud upload errors mirrored from the prod fix (`index.php`, `bootstrap.php`, `trip-enhancements.php`, create/edit).
+- Staging deploy (`lokastage.dictr2.cloud`) via `_deploy_tmp/deploy_plan45_staging.py`: 8 files; backup `/home/lokaloka/backups/pre_plan45_staging_20261013_150700/`; `php -l` clean; `health.php` → 200.
+
+## Follow-up (2026-11-09) — revision attach failed on phone photos
+- Prod `error.log` for request #837: `Request update error: File size exceeds maximum allowed size of 5 MB`. Edit swallowed that as "Failed to update request. Please try again."
+- TO/OB upload limit raised to **12 MB**; JPEG/PNG are compressed in place (max 1920px). Stored path now `uploads/travel_orders/{id}/…` (was wrongly `uploads/{id}/…`).
+- Create/edit now show the real upload error. Deployed prod + staging (`pre_plan45_tosize_20261109_082029`); health 200. Local `public_html` updated too.
+
+## Status
+LIVE on `lokafleet.dictr2.cloud` (card + FileUpload fix + 12 MB revision attach) and `lokastage.dictr2.cloud` + local `public_html`. Re-upload the TO/OB image on the revision (PDF/JPG/PNG, max 12 MB).
+

@@ -53,6 +53,9 @@ Options -Indexes
     RewriteRule ^classes/ - [F,L]
     RewriteRule ^includes/ - [F,L]
     RewriteRule ^cron/ - [F,L]
+    RewriteRule ^logs/ - [F,L]
+    RewriteRule ^migrations/ - [F,L]
+    RewriteRule \.(log|sql|bak|env|sh)$ - [F,L]
     
     # Route all requests through index.php
     RewriteCond %{REQUEST_FILENAME} !-f

@@ -37,6 +37,7 @@ if ($vehicleId) {
         "SELECT r.id, r.start_datetime, r.end_datetime, r.purpose, r.destination,
                 r.status, r.passenger_count, r.actual_dispatch_datetime, r.actual_arrival_datetime,
                 r.mileage_start, r.mileage_end, r.mileage_actual,
+                r.has_travel_order, r.travel_order_number,
                 u.name as requester_name, d.name as department_name,
                 dr_user.name as driver_name,
                 tt.fuel_consumed, tt.fuel_cost,
@@ -273,6 +274,7 @@ require_once INCLUDES_PATH . '/header.php';
                             <th>Requester</th>
                             <th>Driver</th>
                             <th>Status</th>
+                            <th>Travel Order</th>
                             <th>Duration</th>
                             <th>Mileage</th>
                             <th>Dispatch / Arrival</th>
@@ -298,6 +300,13 @@ require_once INCLUDES_PATH . '/header.php';
                             </td>
                             <td><?= e($trip->driver_name ?: '-') ?></td>
                             <td><?= requestStatusBadge($trip->status) ?></td>
+                            <td class="text-nowrap">
+                                <?php if (!empty($trip->has_travel_order)): ?>
+                                    <span class="badge bg-info text-dark" title="Travel order on file"><?= e($trip->travel_order_number ?: 'Yes') ?></span>
+                                <?php else: ?>
+                                    <span class="text-muted">-</span>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <?php if ($trip->actual_duration): ?>
                                     <?= floor($trip->actual_duration / 60) ?>h <?= $trip->actual_duration % 60 ?>m

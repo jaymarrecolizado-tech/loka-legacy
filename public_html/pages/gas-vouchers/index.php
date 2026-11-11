@@ -19,7 +19,7 @@ $whereClause = 'gv.deleted_at IS NULL';
 $params = [];
 
 // Non-admins see only their own vouchers unless they are approvers or Chief Admin/Finance
-if (!isAdmin() && !isMotorpool() && !isApprover() && !isChiefAdminFinance()) {
+if (!isAdmin() && !isMotorpool() && !isApprover() && !isChiefAdminFinance() && !isBudgetOfficer()) {
     $whereClause .= ' AND gv.requested_by_user_id = ?';
     $params[] = userId();
 }
@@ -102,6 +102,12 @@ if (isMotorpool() || isApprover() || isAdmin() || isChiefAdminFinance()) {
     $pendingReviewCount = $counts['pending_review'] ?? 0;
 }
 
+// Pending budget (Budget Officer flag pool only — Plan #31)
+$pendingBudgetCount = 0;
+if (isBudgetOfficer()) {
+    $pendingBudgetCount = $counts['pending_budget'] ?? 0;
+}
+
 // Pending approval (for Chief Admin & Finance / Admin role)
 $pendingApprovalCount = 0;
 if (isAdmin() || isMotorpool() || isChiefAdminFinance()) {
@@ -134,12 +140,14 @@ require_once INCLUDES_PATH . '/header.php';
     <div class="row g-4 mb-4">
         <?php $gvStats = [
             ['Pending Review', $counts['pending_review'] ?? 0, 'text-warning'],
+            ['Pending Budget', $counts['pending_budget'] ?? 0, 'text-primary'],
             ['Pending Approval', $counts['pending_approval'] ?? 0, 'text-info'],
+            ['For Revision', $counts['revision'] ?? 0, 'text-warning'],
             ['Approved', $counts['approved'] ?? 0, 'text-success'],
             ['Total Vouchers', array_sum($counts), 'text-secondary'],
         ]; ?>
         <?php foreach ($gvStats as [$gvLabel, $gvVal, $gvColor]): ?>
-        <div class="col-6 col-xl-3">
+        <div class="col-6 col-xl">
             <div class="card stat-card h-100">
                 <div class="card-body">
                     <div class="stat-value text-<?= $gvColor ?>"><?= $gvVal ?></div>
@@ -152,42 +160,50 @@ require_once INCLUDES_PATH . '/header.php';
 
     <!-- Filters -->
     <div class="card mb-4">
-        <form method="GET" class="row g-3 mb-3">
-            <input type="hidden" name="page" value="gas-vouchers">
+        <div class="card-body">
+            <form method="GET" class="row g-2 align-items-end">
+                <input type="hidden" name="page" value="gas-vouchers">
 
-            <div class="d-flex flex-column gap-2 min-w-140">
-                <label class="form-label small fw-semibold text-muted text-uppercase">Status</label>
-                <select name="status" class="form-select form-select-sm">
-                    <option value="">All</option>
-                    <option value="draft" <?= $statusFilter === 'draft' ? 'selected' : '' ?>>Draft</option>
-                    <option value="pending_review" <?= $statusFilter === 'pending_review' ? 'selected' : '' ?>>Pending Review</option>
-                    <option value="pending_approval" <?= $statusFilter === 'pending_approval' ? 'selected' : '' ?>>Pending Approval</option>
-                    <option value="approved" <?= $statusFilter === 'approved' ? 'selected' : '' ?>>Approved</option>
-                    <option value="rejected" <?= $statusFilter === 'rejected' ? 'selected' : '' ?>>Rejected</option>
-                    <option value="cancelled" <?= $statusFilter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
-                </select>
-            </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label small fw-semibold text-muted text-uppercase">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="draft" <?= $statusFilter === 'draft' ? 'selected' : '' ?>>Draft</option>
+                        <option value="pending_review" <?= $statusFilter === 'pending_review' ? 'selected' : '' ?>>Pending Review</option>
+                        <option value="pending_budget" <?= $statusFilter === 'pending_budget' ? 'selected' : '' ?>>Pending Budget</option>
+                        <option value="pending_approval" <?= $statusFilter === 'pending_approval' ? 'selected' : '' ?>>Pending Approval</option>
+                        <option value="revision" <?= $statusFilter === 'revision' ? 'selected' : '' ?>>For Revision</option>
+                        <option value="approved" <?= $statusFilter === 'approved' ? 'selected' : '' ?>>Approved</option>
+                        <option value="rejected" <?= $statusFilter === 'rejected' ? 'selected' : '' ?>>Rejected</option>
+                        <option value="cancelled" <?= $statusFilter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                    </select>
+                </div>
 
-            <?= listSearchFieldHtml($searchFilter, 'Voucher no, plate, driver, purpose...') ?>
+                <div class="col-12 col-md-6 col-lg-3">
+                    <?= listSearchFieldHtml($searchFilter, 'Voucher no, plate, driver, purpose...') ?>
+                </div>
 
-            <div class="d-flex flex-column gap-2 min-w-140">
-                <label class="form-label small fw-semibold text-muted text-uppercase">Date From</label>
-                <input type="date" name="date_from" class="form-control form-control-sm" value="<?= e($dateFrom) ?>">
-            </div>
-            <div class="d-flex flex-column gap-2 min-w-140">
-                <label class="form-label small fw-semibold text-muted text-uppercase">Date To</label>
-                <input type="date" name="date_to" class="form-control form-control-sm" value="<?= e($dateTo) ?>">
-            </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label small fw-semibold text-muted text-uppercase">Date From</label>
+                    <input type="date" name="date_from" class="form-control form-control-sm" value="<?= e($dateFrom) ?>">
+                </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label small fw-semibold text-muted text-uppercase">Date To</label>
+                    <input type="date" name="date_to" class="form-control form-control-sm" value="<?= e($dateTo) ?>">
+                </div>
 
-            <?= perPageFieldHtml($pag['perPage']) ?>
+                <div class="col-6 col-md-3 col-lg-1">
+                    <?= perPageFieldHtml($pag['perPage']) ?>
+                </div>
 
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary btn-sm">
-                    <i class="bi bi-search me-1"></i>Filter
-                </button>
-                <a href="<?= APP_URL ?>/?page=gas-vouchers" class="btn btn-secondary btn-sm">Reset</a>
-            </div>
-        </form>
+                <div class="col-6 col-md-3 col-lg-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+                        <i class="bi bi-search me-1"></i>Filter
+                    </button>
+                    <a href="<?= APP_URL ?>/?page=gas-vouchers" class="btn btn-secondary btn-sm">Reset</a>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Vouchers Table -->
@@ -256,7 +272,7 @@ require_once INCLUDES_PATH . '/header.php';
                                        class="btn btn-sm btn btn-light text-primary" title="View">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    <?php if ($v->status === 'draft' && ($v->requested_by_user_id == userId() || isAdmin())): ?>
+                                    <?php if (in_array($v->status, ['draft', 'revision'], true) && ($v->requested_by_user_id == userId() || isAdmin())): ?>
                                     <a href="<?= APP_URL ?>/?page=gas-vouchers&action=edit&id=<?= $v->id ?>"
                                        class="btn btn-sm btn btn-light" title="Edit">
                                         <i class="bi bi-pencil"></i>
@@ -269,9 +285,11 @@ require_once INCLUDES_PATH . '/header.php';
                                     </a>
                                     <?php endif; ?>
                                     <?php if (($v->status === 'pending_review' && (isMotorpool() || isApprover() || isAdmin() || isChiefAdminFinance())) ||
+                                              ($v->status === 'pending_budget' && isBudgetOfficer()) ||
                                               ($v->status === 'pending_approval' && (isAdmin() || isMotorpool() || isChiefAdminFinance()))): ?>
                                     <a href="<?= APP_URL ?>/?page=gas-vouchers&action=approve&id=<?= $v->id ?>"
-                                       class="btn btn-sm btn btn-light text-warning" title="Process">
+                                       class="btn btn-sm btn btn-light <?= $v->status === 'pending_budget' ? 'text-primary' : 'text-warning' ?>"
+                                       title="<?= $v->status === 'pending_budget' ? 'Certify Budget' : 'Process' ?>">
                                         <i class="bi bi-check-circle"></i>
                                     </a>
                                     <?php endif; ?>

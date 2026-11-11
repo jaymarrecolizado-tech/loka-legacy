@@ -19,6 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $name = postSafe('name', '', 100);
     $email = $security->sanitizeEmail(post('email'));
+    $officialEmail = normalizeOptionalEmail($security->sanitizeEmail(post('official_email')));
     $password = post('password'); // Don't sanitize password
     $phone = postSafe('phone', '', 20);
     $role = post('role');
@@ -28,9 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($name))
         $errors[] = 'Name is required';
     if (empty($email))
-        $errors[] = 'Email is required';
+        $errors[] = 'Individual email is required';
     elseif (!filter_var($email, FILTER_VALIDATE_EMAIL))
-        $errors[] = 'Invalid email format';
+        $errors[] = 'Invalid individual email format';
+    if ($officialEmail !== '' && !filter_var($officialEmail, FILTER_VALIDATE_EMAIL))
+        $errors[] = 'Invalid official email format';
 
     if (empty($password)) {
         $errors[] = 'Password is required';
@@ -46,11 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Invalid role selected';
     }
 
-    if ($email) {
-        $existing = db()->fetch("SELECT id FROM users WHERE email = ? AND deleted_at IS NULL", [$email]);
-        if ($existing)
-            $errors[] = 'Email already exists';
-    }
+    if ($email && userIndividualEmailTaken($email))
+        $errors[] = 'This individual email is already registered';
 
     if (empty($errors)) {
         db()->beginTransaction();
@@ -60,25 +60,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $userId = db()->insert('users', [
                 'name' => $name,
                 'email' => $email,
+                'official_email' => $officialEmail !== '' ? $officialEmail : null,
                 'password' => $auth->hashPassword($password),
                 'phone' => $phone,
                 'role' => $role,
                 'department_id' => $departmentId,
+                'is_ob_approver' => post('is_ob_approver') === '1' ? 1 : 0,
+                'is_budget_officer' => post('is_budget_officer') === '1' ? 1 : 0,
+                'is_oic_budget_officer' => post('is_oic_budget_officer') === '1' ? 1 : 0,
                 'status' => USER_ACTIVE,
                 'failed_login_attempts' => 0,
                 'created_at' => date(DATETIME_FORMAT),
                 'updated_at' => date(DATETIME_FORMAT)
             ]);
 
+            // Messenger bindings set by the admin (Plan #35) — after the insert
+            foreach (LOKA_CHANNELS as $plChannel) {
+                $plChatId = trim(postSafe($plChannel . '_chat_id', '', 100));
+                if ($plChatId !== '') {
+                    channelSetAdminBinding((int) $userId, $plChannel, $plChatId);
+                }
+            }
+
             auditLog('user_created', 'user', $userId);
             $security->logSecurityEvent('user_created', "New user: $email ($role)", userId());
 
             db()->commit();
             clearUserCache(); // Clear user cache after creating user
-            redirectWith('/?page=users', 'success', 'User created successfully.');
+
+            // Specimen e-sign upload (Plan #23) — after commit; file writes cannot roll back
+            $esignError = null;
+            $res = obSaveUserEsignUpload($userId, $_FILES['signature_file'] ?? []);
+            if ($res['error'] !== null) {
+                $esignError = $res['error'];
+            }
+
+            redirectWith('/?page=users', 'success', 'User created successfully.'
+                . ($esignError !== null ? ' (Specimen e-sign failed: ' . $esignError . ')' : ''));
         } catch (Exception $e) {
             db()->rollback();
-            $errors[] = 'Failed to create user.';
+            $dup = $e instanceof PDOException && (int) ($e->errorInfo[1] ?? 0) === 1062;
+            $errors[] = $dup ? 'This individual email is already registered' : 'Failed to create user.';
         }
     }
 }
@@ -112,7 +134,7 @@ require_once INCLUDES_PATH . '/header.php';
                             </ul>
                         </div><?php endif; ?>
 
-                    <form method="POST">
+                    <form method="POST" enctype="multipart/form-data">
                         <?= csrfField() ?>
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -121,9 +143,17 @@ require_once INCLUDES_PATH . '/header.php';
                                     required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Email <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" name="email"
-                                    value="<?= e(post('email', '')) ?>" required>
+                                <label class="form-label">Individual Email <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" name="email" id="individualEmail"
+                                    value="<?= e(post('email', '')) ?>" required autocomplete="off">
+                                <small class="text-muted">Login and notifications. Must be unique.</small>
+                                <div id="individualEmailHint" class="form-text"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Official / Office Email</label>
+                                <input type="email" class="form-control" name="official_email"
+                                    value="<?= e(post('official_email', '')) ?>">
+                                <small class="text-muted">Shared unit mailbox is allowed (not unique).</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Password <span class="text-danger">*</span></label>
@@ -155,6 +185,49 @@ require_once INCLUDES_PATH . '/header.php';
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                            <div class="col-12">
+                                <label class="form-label">Specimen E-sign <span class="text-muted">(optional, PNG/JPG ≤ 1 MB)</span></label>
+                                <input type="file" class="form-control" name="signature_file" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
+                                <small class="text-muted">Used to stamp OB Pass Slips automatically when this user approves or a guard stamps departure.</small>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label d-block">OB Approver</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="is_ob_approver" value="1"
+                                        role="switch" id="obApproverChk" <?= post('is_ob_approver') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="obApproverChk">
+                                        Can act as <strong>Immediate Supervisor</strong> for OB Pass Slips
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label d-block">Budget Officer</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="is_budget_officer" value="1"
+                                        role="switch" id="budgetOfficerChk" <?= post('is_budget_officer') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="budgetOfficerChk">
+                                        Can act as <strong>Budget Officer</strong> on gas vouchers (pending budget step)
+                                    </label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="is_oic_budget_officer" value="1"
+                                        role="switch" id="oicBudgetOfficerChk" <?= post('is_oic_budget_officer') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="oicBudgetOfficerChk">
+                                        Can act as <strong>OIC Budget Officer</strong> on gas vouchers
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label d-block">Messenger chat IDs <span class="text-muted fw-normal">(Plan #35 — optional)</span></label>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1">Telegram chat ID</label>
+                                        <input type="text" class="form-control form-control-sm" name="telegram_chat_id"
+                                               value="<?= e(postSafe('telegram_chat_id', '', 100)) ?>" placeholder="e.g. 123456789">
+                                    </div>
+                                </div>
+                                <small class="text-muted">Set to deliver LOKA alerts over that messenger. Users can also self-link from their Profile.</small>
+                            </div>
                         </div>
                         <hr class="my-4">
                         <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create
@@ -167,4 +240,8 @@ require_once INCLUDES_PATH . '/header.php';
     </div>
 </div>
 
-<?php require_once INCLUDES_PATH . '/footer.php'; ?>
+<?php
+$emailCheckExcludeId = 0;
+require __DIR__ . '/partials/email_unique_check.php';
+require_once INCLUDES_PATH . '/footer.php';
+?>

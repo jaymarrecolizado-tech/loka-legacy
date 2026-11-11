@@ -19,6 +19,8 @@ if (php_sapi_name() !== 'cli') {
     die('CLI access only');
 }
 
+require_once __DIR__ . '/../includes/harden_logs.php';
+
 // Change to LOKA directory
 chdir(dirname(__DIR__));
 

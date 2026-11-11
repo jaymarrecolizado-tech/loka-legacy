@@ -18,7 +18,7 @@ if ($voucher->requested_by_user_id != userId() && !isAdmin() && !isChiefAdminFin
     redirectWith('/?page=gas-vouchers', 'danger', 'Access denied.');
 }
 
-if (!in_array($voucher->status, ['draft', 'pending_review'])) {
+if (!in_array($voucher->status, ['draft', 'pending_review', 'revision'], true)) {
     redirectWith('/?page=gas-vouchers&action=view&id=' . $voucherId, 'warning', 'This voucher cannot be cancelled at this stage.');
 }
 

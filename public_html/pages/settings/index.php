@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $settingsToUpdate = [
         'system_name' => post('system_name', APP_NAME),
         'max_advance_booking_days' => $trackClamp('Maximum advance booking', post('max_advance_booking_days', '30'), 1, 365, 30),
-        'min_advance_booking_hours' => $trackClamp('Minimum notice', post('min_advance_booking_hours', '24'), 0, 168, 24),
+        'min_advance_booking_hours' => $trackClamp('Minimum notice', post('min_advance_booking_hours', '0'), 0, 168, 0),
         'max_trip_duration_hours' => $trackClamp('Maximum trip duration', post('max_trip_duration_hours', '72'), 1, 720, 72),
         'require_return_confirmation' => post('require_return_confirmation', '0') === '1' ? '1' : '0',
         // Travel Order / OB Slip toggle — Admin and All Father only (both pass requireRole admin via level)
@@ -53,6 +53,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'trip_overdue_renotify_hours' => $trackClamp('Overdue renotify (hours)', post('trip_overdue_renotify_hours', '24'), 1, 168, 24),
         'driver_evaluation_reminder_hours' => $trackClamp('Evaluation reminder (hours)', post('driver_evaluation_reminder_hours', '48'), 1, 720, 48),
         'driver_evaluation_expiry_days' => $trackClamp('Evaluation expiry (days)', post('driver_evaluation_expiry_days', '30'), 1, 90, 30),
+        'driver_evaluation_block_at' => $trackClamp('Evaluation trip-create block at', post('driver_evaluation_block_at', '3'), 1, 20, 3),
+        // OB Pass Slip (Plan #22)
+        'allow_ob_attach_after_submit' => post('allow_ob_attach_after_submit', '0') === '1' ? '1' : '0',
+        'ob_coa_token_days' => $trackClamp('OB CoA token validity (days)', post('ob_coa_token_days', '7'), 1, 60, 7),
     ];
     
     foreach ($settingsToUpdate as $key => $value) {
@@ -123,19 +127,19 @@ require_once INCLUDES_PATH . '/header.php';
                                 <label class="form-label">Maximum Advance Booking (days)</label>
                                 <input type="number" class="form-control" name="max_advance_booking_days" 
                                        value="<?= e($settings['max_advance_booking_days'] ?? '30') ?>" min="1" max="365">
-                                <small class="text-muted form-help">How far in advance can requests be made</small>
+                                <small class="text-muted form-help">How far ahead the start date can be. 5 = only the next 5 days are selectable. 30 is typical. Allowed 1-365.</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Minimum Notice (hours)</label>
                                 <input type="number" class="form-control" name="min_advance_booking_hours" 
-                                       value="<?= e($settings['min_advance_booking_hours'] ?? '24') ?>" min="0" max="168">
-                                <small class="text-muted form-help">Minimum hours before trip start</small>
+                                       value="<?= e($settings['min_advance_booking_hours'] ?? '0') ?>" min="0" max="168">
+                                <small class="text-muted form-help">Minimum hours before trip start. 0 = same-day bookings allowed (start time cannot be in the past)</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Maximum Trip Duration (hours)</label>
                                 <input type="number" class="form-control" name="max_trip_duration_hours" 
                                        value="<?= e($settings['max_trip_duration_hours'] ?? '72') ?>" min="1" max="720">
-                                <small class="text-muted form-help">Maximum allowed trip length</small>
+                                <small class="text-muted form-help">Hours of trip length. 72 = 3 days. A Mon-Fri trip needs about 120 hours. Allowed 1-720 (up to 30 days).</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Require Return Confirmation</label>
@@ -161,6 +165,19 @@ require_once INCLUDES_PATH . '/header.php';
                                     <option value="1" <?= ($settings['require_travel_order_upload'] ?? '0') === '1' ? 'selected' : '' ?>>Yes — required during application</option>
                                 </select>
                                 <small class="text-muted form-help">When Yes, the application form blocks submission if no TO/OB Slip file is attached. Toggleable by Admin and All Father only.</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Attach OB After Vehicle Request Submit <span class="badge bg-warning text-dark ms-1 badge-keep">All Father</span></label>
+                                <select class="form-select" name="allow_ob_attach_after_submit">
+                                    <option value="0" <?= ($settings['allow_ob_attach_after_submit'] ?? '0') === '0' ? 'selected' : '' ?>>No — attach only during application</option>
+                                    <option value="1" <?= ($settings['allow_ob_attach_after_submit'] ?? '0') === '1' ? 'selected' : '' ?>>Yes — bind an approved OB later</option>
+                                </select>
+                                <small class="text-muted form-help">When Yes, an approved OB Pass Slip can be attached to a vehicle request after it was submitted (from the OB view).</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">OB CoA Client-Link Validity (days)</label>
+                                <input type="number" class="form-control" name="ob_coa_token_days" value="<?= e($settings['ob_coa_token_days'] ?? '7') ?>" min="1" max="60">
+                                <small class="text-muted form-help">How long the one-time public Certificate of Appearance link stays valid (default 7 days).</small>
                             </div>
                         </div>
                     </div>
@@ -217,6 +234,11 @@ require_once INCLUDES_PATH . '/header.php';
                                 <label class="form-label">Evaluation Link Expiry (days)</label>
                                 <input type="number" class="form-control" name="driver_evaluation_expiry_days" value="<?= e($settings['driver_evaluation_expiry_days'] ?? '30') ?>" min="1" max="90">
                                 <small class="text-muted form-help">Token expiry for anonymous evaluation</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Block New Trip At (pending evals)</label>
+                                <input type="number" class="form-control" name="driver_evaluation_block_at" value="<?= e($settings['driver_evaluation_block_at'] ?? '3') ?>" min="1" max="20">
+                                <small class="text-muted form-help">Block new trip requests when the user has this many unfinished ratings (must clear all). Admin exempt.</small>
                             </div>
                         </div>
                     </div>

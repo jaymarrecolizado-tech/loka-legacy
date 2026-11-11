@@ -9,6 +9,9 @@ try {
     // Load .env if not already (like config/database.php)
     if (!isset($_ENV['DB_HOST']) || !isset($_ENV['DB_DATABASE'])) {
         $envFile = __DIR__ . '/.env';
+        if (!file_exists($envFile)) {
+            $envFile = __DIR__ . '/../.env.lokastage';
+        }
         if (file_exists($envFile)) {
             foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
                 $line=trim($line); if($line===''||$line[0]==='#') continue;

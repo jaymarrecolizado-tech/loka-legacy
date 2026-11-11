@@ -44,7 +44,16 @@ class Database
         'vehicle_observations',
         'vehicle_observation_photos',
         'trip_confirmations',
-        'driver_evaluations'
+        'driver_evaluations',
+        'ob_requests',
+        'ob_approvals',
+        'ob_request_participants',
+        'user_channel_bindings',
+        'channel_link_tokens',
+        'channel_logs',
+        'vehicle_repair_entries',
+        'vehicle_repair_items',
+        'trip_gps_points'
     ];
 
     private function __construct()

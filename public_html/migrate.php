@@ -8,6 +8,11 @@
  *   php migrate.php run 001_initial   # Run specific migration
  */
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit('CLI only');
+}
+
 require_once __DIR__ . '/index.php';
 
 $migration = new Migration();

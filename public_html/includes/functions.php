@@ -40,6 +40,30 @@ function e(?string $string): string
 }
 
 /**
+ * True when another active user already has this individual (login) email.
+ * Official/office email is not checked — units may share one mailbox.
+ */
+function userIndividualEmailTaken(string $email, ?int $excludeUserId = null): bool
+{
+    $email = strtolower(trim($email));
+    if ($email === '') {
+        return false;
+    }
+    $sql = "SELECT id FROM users WHERE LOWER(TRIM(email)) = ? AND deleted_at IS NULL";
+    $params = [$email];
+    if ($excludeUserId !== null && $excludeUserId > 0) {
+        $sql .= " AND id != ?";
+        $params[] = $excludeUserId;
+    }
+    return db()->fetch($sql, $params) !== null;
+}
+
+function normalizeOptionalEmail(string $raw): string
+{
+    return strtolower(trim($raw));
+}
+
+/**
  * Redirect to URL
  */
 function redirect(string $url): void
@@ -129,7 +153,9 @@ function currentUser(): ?object
  */
 function hasRole(string $minRole): bool
 {
-    $userLevel = ROLE_LEVELS[userRole()] ?? 0;
+    // Effective role so "View as" impersonation narrows (never widens) every
+    // capability check app-wide; real identity stays in $_SESSION['user_role'].
+    $userLevel = ROLE_LEVELS[effectiveUserRole()] ?? 0;
     $requiredLevel = ROLE_LEVELS[$minRole] ?? 999;
     return $userLevel >= $requiredLevel;
 }
@@ -140,7 +166,7 @@ function hasRole(string $minRole): bool
 function isAdmin(): bool
 {
     if (isViewingAs()) {
-        return userRole() === ROLE_ADMIN;
+        return effectiveUserRole() === ROLE_ADMIN;
     }
     return userRole() === ROLE_ADMIN || isRealAllFather();
 }
@@ -166,7 +192,7 @@ function isMotorpool(): bool
  */
 function isGuard(): bool
 {
-    return userRole() === ROLE_GUARD;
+    return effectiveUserRole() === ROLE_GUARD;
 }
 
 /**
@@ -215,6 +241,81 @@ function canAccessReports(): bool
 }
 
 /**
+ * My Trip Tickets list + vehicle summary generate: approver+ or any tagged driver.
+ * Tagged drivers may generate summaries for the selected vehicle's trips, not only their own.
+ */
+function canAccessMyTripTickets(): bool
+{
+    return isApprover() || isDriver();
+}
+
+/**
+ * Driver Rankings are for approver+ only — the people being ranked must not
+ * see anonymous peer scores. hasRole() is effective-role-based, so View-as a
+ * driver correctly loses access here too.
+ *
+ * Lives in functions.php (not eval_report.php): sidebar.php and nav_search.php
+ * call it on every page.
+ */
+function canViewDriverRankings(): bool
+{
+    return isApprover();
+}
+
+/**
+ * Gate for the Driver Rankings screen and its CSV export (fleet-wide rows).
+ * The shared evaluations PDF keeps requireEvalReportAccess(): self-scoped
+ * drivers legitimately export their own rows through it.
+ */
+function requireDriverRankingsAccess(): void
+{
+    requireReportsAccess();
+    if (!canViewDriverRankings()) {
+        redirectWith('/?page=reports', 'danger', 'Driver Rankings are only visible to approvers and above.');
+    }
+}
+
+/**
+ * Guard, or All Father (not while View-as another role).
+ * Do not fold this into isGuard() — that would lock All Father out of admin pages.
+ */
+function canAccessGuardDashboard(): bool
+{
+    return isGuard() || (isRealAllFather() && !isViewingAs());
+}
+
+/**
+ * Require Guard Dashboard access
+ */
+function requireGuardDashboardAccess(): void
+{
+    requireAuth();
+    if (!canAccessGuardDashboard()) {
+        redirectWith('/?page=dashboard', 'danger', 'You do not have permission to access this page.');
+    }
+}
+
+/**
+ * Motorpool Head, Guard, Admin, All Father — Live Trip Board (Plan #17).
+ * Approver-only and requester accounts do not get access.
+ */
+function canAccessLiveBoard(): bool
+{
+    return isGuard() || isMotorpool() || isAdmin();
+}
+
+/**
+ * Require Live Trip Board access
+ */
+function requireLiveBoardAccess(): void
+{
+    requireAuth();
+    if (!canAccessLiveBoard()) {
+        redirectWith('/?page=dashboard', 'danger', 'You do not have permission to access this page.');
+    }
+}
+
+/**
  * Driver-tagged user who is not approver+ (own Driver Report only)
  */
 function isSelfScopedDriverReporter(): bool
@@ -241,6 +342,22 @@ function isAssignedOrRequestedDriver(object $request): bool
  */
 function isApprover(): bool
 {
+    return hasRole(ROLE_APPROVER);
+}
+
+/**
+ * Plan #30 — system-wide trip visibility: Approver and above (Department
+ * Approver, Motorpool Head, Administrator, All Father) may LIST all vehicle
+ * trip requests/completed trips from every department. Visibility only —
+ * seeing another department's trip grants no edit, cancel, approval, or
+ * dispatch rights. View-as follows the effective role so the real All Father
+ * account's global list does not leak into Requester/Driver/Guard views.
+ */
+function canViewAllTripRequests(): bool
+{
+    if (isViewingAs()) {
+        return in_array(getViewAsRole(), [ROLE_APPROVER, ROLE_MOTORPOOL, ROLE_ADMIN], true);
+    }
     return hasRole(ROLE_APPROVER);
 }
 
@@ -365,6 +482,35 @@ function truncate(string $text, int $length = 50): string
     if (strlen($text) <= $length)
         return e($text);
     return e(substr($text, 0, $length)) . '...';
+}
+
+/**
+ * Destination hops as ASCII " -> " so Helvetica PDFs do not print "?" for Unicode arrows.
+ */
+function formatDestinationChain(?string $destination): string
+{
+    $destination = trim((string) $destination);
+    if ($destination === '') {
+        return '-';
+    }
+    $destination = preg_replace('/\s*(?:\x{2192}|\x{21D2}|\x{2794}|\x{279C}|\x{00BB}|>>)\s*/u', ' -> ', $destination) ?? $destination;
+    $destination = preg_replace('/\s+\?\s+/', ' -> ', $destination) ?? $destination;
+    $destination = preg_replace('/(?:\s*->\s*)+/', ' -> ', $destination) ?? $destination;
+    return trim($destination);
+}
+
+/**
+ * Rows so generated trip-ticket destination/purpose cells wrap instead of clipping.
+ */
+function tripTicketTextareaRows(?string $text, int $charsPerLine = 28, int $min = 2, int $max = 40): int
+{
+    $text = trim((string) $text);
+    if ($text === '' || $text === '-') {
+        return $min;
+    }
+    $hardLines = substr_count($text, "\n") + 1;
+    $wrapLines = (int) ceil(mb_strlen($text) / max(8, $charsPerLine));
+    return min($max, max($min, $hardLines, $wrapLines));
 }
 
 /**
@@ -512,8 +658,105 @@ function auditLog(string $action, string $entityType, ?int $entityId = null, ?ar
 }
 
 /**
+ * Notification family for a notify()/template type: vehicle | gas | ob | system.
+ * Drives the email subject wording and theme color (Plan #32). `gas_voucher_*`
+ * → gas, `ob_*` and `guard_ob_*` → ob, known one-off/system types → system;
+ * every other type is vehicle-flow (the historical blue Control No. family).
+ */
+function notificationFamily(string $type): string
+{
+    if (str_starts_with($type, 'gas_voucher_')) {
+        return 'gas';
+    }
+    if (str_starts_with($type, 'ob_') || str_starts_with($type, 'guard_ob_')) {
+        return 'ob';
+    }
+    if (in_array($type, ['default', 'password_reset', 'system_notification', 'test'], true)) {
+        return 'system';
+    }
+    return 'vehicle';
+}
+
+/**
+ * Family theme: header/CTA color, hover shade, SMS tag, email subject pattern.
+ * Branding (white wordmark + gray footer) stays fixed across families.
+ *
+ * @return array{color:string,colorDark:string,smsTag:string,subjectPattern:string}
+ */
+function notificationTheme(string $family): array
+{
+    return match ($family) {
+        'gas' => [
+            'color'          => '#c2410c',
+            'colorDark'      => '#9a3412',
+            'smsTag'         => '[Gas Voucher]',
+            'subjectPattern' => 'Gas Voucher #{id}: Gas Voucher',
+        ],
+        'ob' => [
+            'color'          => '#0f766e',
+            'colorDark'      => '#115e59',
+            'smsTag'         => '[OB]',
+            'subjectPattern' => 'OB Pass Slip #{id}: Official Business',
+        ],
+        'system' => [
+            'color'          => '#0d6efd',
+            'colorDark'      => '#0b5ed7',
+            'smsTag'         => '',
+            'subjectPattern' => 'LOKA Fleet Notification #{id}',
+        ],
+        default => [ // vehicle
+            'color'          => '#0d6efd',
+            'colorDark'      => '#0b5ed7',
+            'smsTag'         => '[Vehicle]',
+            'subjectPattern' => 'Control No. {id}: Vehicle Request',
+        ],
+    };
+}
+
+/**
+ * Stable per-ID email subject within a family (keeps Gmail/Outlook threading;
+ * event titles stay in the body).
+ */
+function notificationThreadSubject(string $family, int $id): string
+{
+    return str_replace('{id}', (string) $id, notificationTheme($family)['subjectPattern']);
+}
+
+/**
+ * Soft-fail side-channel fan-out for one user: SMS + messenger channels
+ * (Telegram etc.). Shared by notify() and notifyPassengersBatch() so every
+ * participant gets the same delivery regardless of role: a channel message
+ * goes out only when that user has a linked binding (chat id) and the event
+ * is allowed on that channel; unlinked users are silently skipped.
+ */
+function notifyChannelsForUser(int $userId, string $type, string $title, string $message, ?string $link = null, ?int $requestId = null): void
+{
+    // Soft-fail SMS enqueue (does not affect in-app/email)
+    try {
+        if (function_exists('smsNotifyUser')) {
+            smsNotifyUser($userId, $type, $title, $message, $link, $requestId);
+        }
+    } catch (Throwable $e) {
+        error_log("NOTIFY ERROR: SMS queue failed for user #{$userId}: " . $e->getMessage());
+    }
+
+    // Soft-fail messenger channels (Plan #35): Telegram extra beside SMS.
+    // Skips silently when the channel is disabled or the user has
+    // no binding — never blast unlinked users.
+    if (function_exists('channelNotifyUser') && defined('LOKA_CHANNELS')) {
+        foreach (LOKA_CHANNELS as $__channel) {
+            try {
+                channelNotifyUser($userId, $__channel, $type, $title, $message, $link, $requestId);
+            } catch (Throwable $e) {
+                error_log("NOTIFY ERROR: " . ucfirst($__channel) . " queue failed for user #{$userId}: " . $e->getMessage());
+            }
+        }
+    }
+}
+
+/**
  * Create notification and send email
- * 
+ *
  * @param int $userId User ID to notify
  * @param string $type Notification type
  * @param string $title Notification title
@@ -523,6 +766,10 @@ function auditLog(string $action, string $entityType, ?int $entityId = null, ?ar
  */
 function notify(int $userId, string $type, string $title, string $message, ?string $link = null, ?int $requestId = null): void
 {
+    // Plan #32: capture family from the caller's type BEFORE any template rewrite
+    // so unknown types still get the right subject/theme when rendered via 'default'.
+    $family = notificationFamily($type);
+
     // FIX: Validate notification type against known templates
     $validTypes = array_keys(MAIL_TEMPLATES);
     if (!in_array($type, $validTypes)) {
@@ -577,19 +824,21 @@ function notify(int $userId, string $type, string $title, string $message, ?stri
         $requestId = isset($query['id']) ? (int) $query['id'] : null;
     }
 
+    // Family already computed above from the original caller type (Plan #32).
+
     // Queue email notification ONLY - never process during request to prevent lag
     try {
         $user = db()->fetch("SELECT email, name FROM users WHERE id = ? AND deleted_at IS NULL", [$userId]);
         if ($user && $user->email) {
             // Check if template exists, if not use a default one
             $templateKey = isset(MAIL_TEMPLATES[$type]) ? $type : 'default';
-            
+
             $queue = new EmailQueue();
             $emailId = $queue->queueTemplate($user->email, $templateKey, [
                 'message' => $message,
                 'link' => $link,
                 'link_text' => 'View Details'
-            ], $user->name, 5, $requestId);
+            ], $user->name, 5, $requestId, $family);
             
             error_log("NOTIFY: User #{$userId} ({$user->email}) - Notification #{$notifId} created, Email #{$emailId} queued (type: {$type}" . ($requestId ? ", Control No.: {$requestId}" : "") . ")");
         } else {
@@ -599,14 +848,7 @@ function notify(int $userId, string $type, string $title, string $message, ?stri
         error_log("NOTIFY ERROR: Email queue failed for user #{$userId}: " . $e->getMessage());
     }
 
-    // Soft-fail SMS enqueue (does not affect in-app/email)
-    try {
-        if (function_exists('smsNotifyUser')) {
-            smsNotifyUser($userId, $type, $title, $message, $link, $requestId);
-        }
-    } catch (Throwable $e) {
-        error_log("NOTIFY ERROR: SMS queue failed for user #{$userId}: " . $e->getMessage());
-    }
+    notifyChannelsForUser($userId, $type, $title, $message, $link, $requestId);
 }
 
 /**
@@ -731,18 +973,26 @@ function notifyPassengersBatch(int $requestId, string $type, string $title, stri
         if ($passenger->email) {
             try {
                 $templateKey = isset(MAIL_TEMPLATES[$type]) ? $type : 'default';
-                
+                // Plan #32: pass family from the caller's type (not the template key)
+                // so unknown types rewritten to 'default' keep their own theme.
+                $family = notificationFamily($type);
+
                 $queue->queueTemplate($passenger->email, $templateKey, [
                     'message' => $message,
                     'link' => $link,
                     'link_text' => 'View Details'
-                ], $passenger->name, 5, $requestId);
-                
+                ], $passenger->name, 5, $requestId, $family);
+
                 $emailsQueued++;
             } catch (Exception $e) {
                 error_log("NOTIFY PASSENGERS BATCH ERROR: Failed to queue email for {$passenger->email}: " . $e->getMessage());
             }
         }
+
+        // Channel parity (Telegram/SMS): passengers ride the same fan-out as
+        // notify() recipients — delivered only when this passenger has a
+        // linked binding (chat id), silently skipped otherwise.
+        notifyChannelsForUser((int) $passenger->user_id, $type, $title, $message, $link, $requestId);
     }
     
     error_log("NOTIFY PASSENGERS BATCH: Request #{$requestId} - Notified {$notified} passengers, queued {$emailsQueued} emails (type: {$type})");
@@ -1395,7 +1645,8 @@ function canAccessGasVouchers(): bool
         || isApprover()
         || isMotorpool()
         || isAdmin()
-        || isChiefAdminFinance();
+        || isChiefAdminFinance()
+        || isBudgetOfficer();
 }
 
 /**
@@ -1546,13 +1797,63 @@ function passengerInvolvementMessage(int $requestId, string $detail): string
 // GAS VOUCHER HELPERS
 // =============================================================================
 
+/**
+ * Plan #31 — Budget Officer flag (gas voucher pending_budget step).
+ * Flags define who may act: Budget Officer or OIC Budget Officer only.
+ * Roles alone (Admin / Motorpool / CAF) do NOT grant the step, and the real
+ * All Father account only assigns budget officers — it never approves the
+ * budget step, even if flagged.
+ */
+function isBudgetOfficer(): bool
+{
+    if (!isLoggedIn() || isRealAllFather()) {
+        return false;
+    }
+
+    static $loaded = false;
+    static $flagged = false;
+
+    if (!$loaded) {
+        $row = db()->fetch(
+            "SELECT is_budget_officer, is_oic_budget_officer
+             FROM users
+             WHERE id = ? AND status = 'active' AND deleted_at IS NULL
+             LIMIT 1",
+            [userId()]
+        );
+        $flagged = $row !== null && $row !== false
+            && ((int) $row->is_budget_officer === 1 || (int) $row->is_oic_budget_officer === 1);
+        $loaded = true;
+    }
+
+    return $flagged;
+}
+
+/**
+ * Active Budget Officer pool (either flag) for dropdowns and notifications.
+ *
+ * @return list<object>{id:int,name:string,is_budget_officer:int,is_oic_budget_officer:int}
+ */
+function budgetOfficerPool(): array
+{
+    return db()->fetchAll(
+        "SELECT id, name, is_budget_officer, is_oic_budget_officer
+         FROM users
+         WHERE (is_budget_officer = 1 OR is_oic_budget_officer = 1)
+           AND status = 'active' AND deleted_at IS NULL
+         ORDER BY name ASC"
+    );
+}
+
 define('GAS_VOUCHER_STATUSES', [
     'draft'            => ['label' => 'Draft',              'color' => 'secondary'],
     'pending_review'   => ['label' => 'Pending Review',     'color' => 'warning'],
+    'pending_budget'   => ['label' => 'Pending Budget',     'color' => 'primary'],
     'pending_approval' => ['label' => 'Pending Approval',   'color' => 'info'],
     'approved'         => ['label' => 'Approved',           'color' => 'success'],
     'rejected'         => ['label' => 'Rejected',           'color' => 'danger'],
     'cancelled'        => ['label' => 'Cancelled',          'color' => 'dark'],
+    'revision'         => ['label' => 'For Revision',       'color' => 'warning'],
 ]);
 
 /**

@@ -32,9 +32,10 @@ if ($statusFilter) {
 }
 
 if ($searchQuery) {
-    $whereClause .= ' AND (name LIKE ? OR email LIKE ?)';
-    $whereClauseAliased .= ' AND (u.name LIKE ? OR u.email LIKE ?)';
+    $whereClause .= ' AND (name LIKE ? OR email LIKE ? OR official_email LIKE ?)';
+    $whereClauseAliased .= ' AND (u.name LIKE ? OR u.email LIKE ? OR u.official_email LIKE ?)';
     $searchPattern = '%' . $searchQuery . '%';
+    $params[] = $searchPattern;
     $params[] = $searchPattern;
     $params[] = $searchPattern;
 }
@@ -76,7 +77,7 @@ require_once INCLUDES_PATH . '/header.php';
                 <input type="hidden" name="page" value="users">
                 <div class="col-md-3">
                     <label class="form-label">Search (Name/Email)</label>
-                    <input type="text" name="search" class="form-control" placeholder="Search by name or email..." value="<?= e($searchQuery) ?>">
+                    <input type="text" name="search" class="form-control" placeholder="Search name, individual, or office email..." value="<?= e($searchQuery) ?>">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Role</label>
@@ -108,13 +109,14 @@ require_once INCLUDES_PATH . '/header.php';
             <div class="table-responsive">
                 <table class="table table-hover data-table">
                     <thead>
-                        <tr><th>Name</th><th>Email</th><th>Department</th><th>Role</th><th>Status</th><th>Last Login</th><th>Actions</th></tr>
+                        <tr><th>Name</th><th>Individual Email</th><th>Official Email</th><th>Department</th><th>Role</th><th>Status</th><th>Last Login</th><th>Actions</th></tr>
                     </thead>
                     <tbody>
                         <?php foreach ($users as $user): ?>
                         <tr>
                             <td><strong><?= e($user->name) ?></strong></td>
                             <td><?= e($user->email) ?></td>
+                            <td><?= e($user->official_email ?? '') ?: '—' ?></td>
                             <td><span class="badge bg-light text-dark"><?= e($user->department_name ?: 'None') ?></span></td>
                             <td><?= roleBadge($user->role) ?></td>
                             <td><span class="badge bg-<?= $user->status === 'active' ? 'success' : 'secondary' ?>"><?= ucfirst($user->status) ?></span></td>

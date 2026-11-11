@@ -67,7 +67,7 @@ $offset = ($pageNum - 1) * $perPage;
 $requests = db()->fetchAll(
     "SELECT r.id, r.created_at, r.start_datetime, r.end_datetime, r.purpose, r.destination,
             r.status, r.passenger_count, r.actual_dispatch_datetime, r.actual_arrival_datetime,
-            r.mileage_actual,
+            r.mileage_actual, r.has_travel_order, r.travel_order_number, r.has_official_business_slip,
             u.name as requester_name, dept.name as department_name,
             v.plate_number, v.make, v.model,
             dr_user.name as driver_name,
@@ -164,15 +164,18 @@ require_once INCLUDES_PATH . '/header.php';
             if ($filterDriver) $exportParams .= '&driver_id=' . urlencode($filterDriver);
         ?>
         <div class="btn-group">
-            <a href="<?= APP_URL ?>/?page=reports&action=export&<?= $exportParams ?>" 
-               class="btn btn-outline-primary">
+            <a href="<?= APP_URL ?>/?page=reports&action=export&<?= $exportParams ?>"
+               class="btn btn-outline-primary" title="CSV includes up to 10,000 most recent matching rows">
                 <i class="bi bi-file-earmark-csv me-1"></i>Export CSV
             </a>
-            <a href="<?= APP_URL ?>/?page=reports&action=export-pdf&<?= $exportParams ?>" 
-               class="btn btn-outline-danger">
+            <a href="<?= APP_URL ?>/?page=reports&action=export-pdf&<?= $exportParams ?>"
+               class="btn btn-outline-danger" title="PDF includes up to 500 most recent matching rows — narrow the filters to fit more">
                 <i class="bi bi-file-earmark-pdf me-1"></i>Export PDF
             </a>
         </div>
+        <small class="text-muted d-block text-end mt-1" style="max-width:280px;">
+            Exports take the most recent matching rows: CSV up to 10,000 · PDF up to 500. Narrow the date range to capture more.
+        </small>
     </div>
 
     <!-- Filters -->
@@ -241,6 +244,10 @@ require_once INCLUDES_PATH . '/header.php';
                         <i class="bi bi-search me-1"></i>Filter
                     </button>
                     <a href="<?= APP_URL ?>/?page=reports&action=trips" class="btn btn-outline-secondary">Reset</a>
+                    <small class="text-muted d-block mt-2">
+                        <i class="bi bi-info-circle me-1"></i>Note: this report filters by the date the request was <strong>filed</strong> (created date).
+                        Vehicle History and Driver History filter by trip start date instead.
+                    </small>
                 </div>
             </form>
         </div>
@@ -277,6 +284,14 @@ require_once INCLUDES_PATH . '/header.php';
                 <div class="card-body text-center py-2">
                     <h4 class="text-danger mb-0"><?= $stats->rejected ?></h4>
                     <small class="text-muted">Rejected</small>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card bg-opacity-10" style="background:rgba(253,126,20,.1);">
+                <div class="card-body text-center py-2">
+                    <h4 class="mb-0" style="color:#fd7e14;"><?= (int) $stats->revision ?></h4>
+                    <small class="text-muted">Revision</small>
                 </div>
             </div>
         </div>
@@ -379,6 +394,7 @@ require_once INCLUDES_PATH . '/header.php';
                             <th>Vehicle</th>
                             <th>Driver</th>
                             <th>Status</th>
+                            <th>Docs</th>
                             <th>Duration</th>
                             <th>Km</th>
                             <th>Dispatch / Arrival</th>
@@ -414,6 +430,17 @@ require_once INCLUDES_PATH . '/header.php';
                             </td>
                             <td><?= e($req->driver_name ?: '-') ?></td>
                             <td><?= requestStatusBadge($req->status) ?></td>
+                            <td class="text-nowrap">
+                                <?php if (!empty($req->has_travel_order)): ?>
+                                    <span class="badge bg-info text-dark" title="Travel order <?= e($req->travel_order_number ?: 'on file') ?>">TO</span>
+                                <?php endif; ?>
+                                <?php if (!empty($req->has_official_business_slip)): ?>
+                                    <span class="badge bg-teal text-white" style="background:#0f766e;" title="Official Business pass slip attached">OB</span>
+                                <?php endif; ?>
+                                <?php if (empty($req->has_travel_order) && empty($req->has_official_business_slip)): ?>
+                                    <span class="text-muted">-</span>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <?php if ($req->actual_duration): ?>
                                     <span class="text-success"><?= floor($req->actual_duration / 60) ?>h <?= $req->actual_duration % 60 ?>m</span>
