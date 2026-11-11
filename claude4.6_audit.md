@@ -34,7 +34,7 @@ The LOKA Fleet Management System is a mature, feature-rich application with stro
 **Issue:**
 ```
 SMTP_USER=<redacted>
-SMTP_PASSWORD=<redacted — rotate this Gmail App Password>  # ⚠️ EXPOSED APP PASSWORD
+SMTP_PASSWORD=<redacted — rotate this Gmail App Password>
 APP_KEY=<redacted — rotate APP_KEY>
 ```
 
