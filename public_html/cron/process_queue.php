@@ -73,9 +73,9 @@ if (file_exists($envFile)) {
             $_SERVER[$key] = $value;
         }
     }
-    echo date('[Y-m-d H:i:s]') . " .env loaded from: {$envFile}\n";
+    echo date('[Y-m-d H:i:s]') . " .env loaded\n";
 } else {
-    echo date('[Y-m-d H:i:s]') . " WARNING: .env file not found at: {$envFile}\n";
+    echo date('[Y-m-d H:i:s]') . " WARNING: .env file not found\n";
 }
 
 // Load configuration (with error trapping so we can diagnose failures)
@@ -88,7 +88,7 @@ $configFiles = [
 foreach ($configFiles as $cf) {
     $path = __DIR__ . '/../config/' . $cf;
     if (!file_exists($path)) {
-        echo date('[Y-m-d H:i:s]') . " FATAL: Config file missing: {$path}\n";
+        echo date('[Y-m-d H:i:s]') . " FATAL: Config file missing: {$cf}\n";
         exit(1);
     }
     $result = @require_once $path;
@@ -104,7 +104,7 @@ $classFiles = ['Database.php', 'Mailer.php', 'EmailQueue.php'];
 foreach ($classFiles as $cf) {
     $path = __DIR__ . '/../classes/' . $cf;
     if (!file_exists($path)) {
-        echo date('[Y-m-d H:i:s]') . " FATAL: Class file missing: {$path}\n";
+        echo date('[Y-m-d H:i:s]') . " FATAL: Class file missing: {$cf}\n";
         exit(1);
     }
     require_once $path;
@@ -112,7 +112,7 @@ foreach ($classFiles as $cf) {
 
 // Diagnostic output after config loaded
 echo date('[Y-m-d H:i:s]') . " Config loaded. MAIL_ENABLED=" . (defined('MAIL_ENABLED') ? (MAIL_ENABLED ? 'true' : 'false') : 'UNDEF')
-    . " MAIL_HOST=" . (defined('MAIL_HOST') ? MAIL_HOST : 'UNDEF')
+    . " MAIL_HOST=" . (defined('MAIL_HOST') && MAIL_HOST !== '' ? 'SET' : 'EMPTY')
     . " MAIL_USER=" . (defined('MAIL_USERNAME') ? (MAIL_USERNAME ? 'SET' : 'EMPTY') : 'UNDEF') . "\n";
 
 // Configuration

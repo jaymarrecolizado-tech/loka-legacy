@@ -52,16 +52,16 @@ if (file_exists($envFile)) {
         $_ENV[$key] = $value;
         $_SERVER[$key] = $value;
     }
-    echo date('[Y-m-d H:i:s]') . " .env loaded from: {$envFile}\n";
+    echo date('[Y-m-d H:i:s]') . " .env loaded\n";
 } else {
-    echo date('[Y-m-d H:i:s]') . " WARNING: .env file not found at: {$envFile}\n";
+    echo date('[Y-m-d H:i:s]') . " WARNING: .env file not found\n";
 }
 
 $configFiles = ['database.php', 'constants.php', 'security.php', 'mail.php', 'sms.php', 'channels.php'];
 foreach ($configFiles as $cf) {
     $path = __DIR__ . '/../config/' . $cf;
     if (!file_exists($path)) {
-        echo date('[Y-m-d H:i:s]') . " FATAL: Config file missing: {$path}\n";
+        echo date('[Y-m-d H:i:s]') . " FATAL: Config file missing: {$cf}\n";
         exit(1);
     }
     require_once $path;
@@ -71,7 +71,7 @@ $classFiles = ['Database.php', 'Security.php', 'SmsGateway.php', 'SmsQueue.php',
 foreach ($classFiles as $cf) {
     $path = __DIR__ . '/../classes/' . $cf;
     if (!file_exists($path)) {
-        echo date('[Y-m-d H:i:s]') . " FATAL: Class file missing: {$path}\n";
+        echo date('[Y-m-d H:i:s]') . " FATAL: Class file missing: {$cf}\n";
         exit(1);
     }
     require_once $path;
