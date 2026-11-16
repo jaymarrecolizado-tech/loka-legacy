@@ -262,18 +262,23 @@ if ($qrHtml === '') {
         }
         .sig-signed {
             margin-top: auto;
+            position: relative;
+            z-index: 1;
         }
         .sig-mark-wrap {
             flex: 1 1 auto;
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             justify-content: center;
             min-height: 10mm;
-            padding: 1px 2px;
+            padding: 1px 2px 0;
+            margin-bottom: -9px;
+            position: relative;
+            z-index: 2;
         }
         .sig-mark {
             display: block;
-            max-height: 28px;
+            max-height: 42px;
             max-width: 96%;
             width: auto;
             object-fit: contain;
@@ -383,8 +388,8 @@ if ($qrHtml === '') {
         body.layout-triple .sig-signed {
             margin-top: auto;
         }
-        body.layout-triple .sig-mark-wrap { min-height: 8mm; }
-        body.layout-triple .sig-mark { max-height: 28px; }
+        body.layout-triple .sig-mark-wrap { min-height: 9mm; margin-bottom: -7px; }
+        body.layout-triple .sig-mark { max-height: 40px; }
         body.layout-triple .page-fit > .footer-row {
             flex: 0 0 auto;
             margin-top: 4px !important;
@@ -514,8 +519,8 @@ if ($qrHtml === '') {
             body.layout-triple .signatures-row td { padding: 2px 3px 2px !important; height: 15mm !important; vertical-align: top !important; }
             body.layout-triple .sig-stack { min-height: 13mm !important; height: 100% !important; }
             body.layout-triple .sig-label { margin-bottom: 0 !important; font-size: 7pt !important; }
-            body.layout-triple .sig-mark-wrap { min-height: 7mm; }
-            body.layout-triple .sig-mark { max-height: 24px !important; }
+            body.layout-triple .sig-mark-wrap { min-height: 8mm; margin-bottom: -6px !important; }
+            body.layout-triple .sig-mark { max-height: 36px !important; }
             body.layout-triple .sig-name { font-size: 8.5pt !important; }
             body.layout-triple .sig-title { font-size: 7pt !important; }
             body.layout-triple .distribution { margin-top: 2px !important; font-size: 7pt !important; }
