@@ -37,12 +37,10 @@ if ($voucher->requested_by_user_id != userId() && !isAdmin() && !isApprover() &&
     redirectWith('/?page=gas-vouchers', 'danger', 'Access denied.');
 }
 
-// dual = 2 copies on one A4 (default); single = 1 copy per A4 page (fallback)
-$printLayout = strtolower((string) get('layout', 'dual'));
-if (!in_array($printLayout, ['dual', 'single'], true)) {
-    $printLayout = 'dual';
-}
-$copyCount = 2;
+require_once INCLUDES_PATH . '/gas_voucher_print.php';
+$printOpts = gasVoucherPrintLayout(get('layout', 'dual'));
+$printLayout = $printOpts['layout'];
+$copyCount = $printOpts['copyCount'];
 
 // QR Verification -- gas stations scan this to confirm authenticity
 $verifyUrl = gasVoucherVerifyUrl($voucher);
@@ -295,8 +293,21 @@ if ($qrHtml === '') {
             margin: 0 auto;
         }
 
+        body.layout-triple .sheet,
+        body.layout-triple .page {
+            width: 8.5in;
+        }
+        body.layout-triple .page {
+            padding: 8mm 10mm;
+            min-height: 0;
+        }
+
         @media print {
+            <?php if ($printLayout === 'triple'): ?>
+            @page { size: 8.5in 13in portrait; margin: 4.5mm; }
+            <?php else: ?>
             @page { size: A4 portrait; margin: 6mm; }
+            <?php endif; ?>
             body { background: #fff; margin: 0; padding: 0; font-size: 9pt; }
             .sheet { width: 100% !important; margin: 0 !important; }
             .page {
@@ -344,6 +355,31 @@ if ($qrHtml === '') {
             body.layout-single .page { page-break-after: always; break-after: page; }
             body.layout-single .page:last-of-type { page-break-after: auto; break-after: auto; }
             body.layout-single .cut-line-separator { display: none !important; }
+            body.layout-triple .page { page-break-inside: avoid; break-inside: avoid; }
+            body.layout-triple .header-logo { width: 36px !important; }
+            body.layout-triple .header-text .republic { font-size: 7pt !important; }
+            body.layout-triple .header-text .dept { font-size: 8pt !important; }
+            body.layout-triple .header-text .office { font-size: 6.5pt !important; }
+            body.layout-triple .header-title { margin: 1px 0 2px !important; font-size: 10pt !important; letter-spacing: 2px !important; }
+            body.layout-triple .gas-station-title { font-size: 9pt !important; margin-bottom: 2px !important; }
+            body.layout-triple .voucher-row,
+            body.layout-triple .voucher-row td,
+            body.layout-triple .voucher-row th { font-size: 7.5pt !important; padding: 1px 3px !important; }
+            body.layout-triple .auth-row { padding: 2px 4px !important; font-size: 7.5pt !important; }
+            body.layout-triple .article-row td { padding: 2px 3px !important; font-size: 8pt !important; }
+            body.layout-triple .signatures-row td { padding: 2px !important; }
+            body.layout-triple .sig-label { margin-bottom: 8px !important; font-size: 6.5pt !important; }
+            body.layout-triple .sig-name { font-size: 8pt !important; }
+            body.layout-triple .sig-title { font-size: 6.5pt !important; }
+            body.layout-triple .distribution { margin-top: 2px !important; font-size: 6.5pt !important; }
+            body.layout-triple .purpose-cell { max-height: 1.9em !important; font-size: 7pt !important; }
+            body.layout-triple .qr-block .qr-img { width: 52px !important; height: 52px !important; }
+            body.layout-triple .qr-block .qr-svg-pad { padding: 4px !important; }
+            body.layout-triple .qr-block .qr-svg-pad svg { width: 48px !important; height: 48px !important; }
+            body.layout-triple .qr-block .qr-label { font-size: 6pt !important; margin-top: 3px !important; }
+            body.layout-triple .qr-block .qr-sub { font-size: 5.5pt !important; }
+            body.layout-triple .cut-line-separator { padding: 1px 0 !important; margin: 1mm 0 !important; font-size: 6pt !important; }
+            body.layout-triple .footer-row { margin-top: 1px !important; }
         }
 
         .qr-block {
@@ -395,11 +431,15 @@ if ($qrHtml === '') {
 <!-- Print Controls -->
 <div class="no-print" style="text-align:center;padding:12px;background:#f8f9fa;border-bottom:1px solid #ddd;margin-bottom:15px;font-family:sans-serif;">
     <button onclick="window.print()" style="background:#0d6efd;color:#fff;border:none;padding:8px 24px;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;">
-        Print Voucher (A4)
+        Print Voucher (<?= $printLayout === 'triple' ? '8.5×13' : 'A4' ?>)
     </button>
-    <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=dual" style="margin-left:12px;<?= $printLayout === 'dual' ? 'font-weight:bold;' : '' ?>">2-up (1 page)</a>
+    <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=dual" style="margin-left:12px;<?= $printLayout === 'dual' ? 'font-weight:bold;' : '' ?>">2-up A4</a>
+    <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=triple" style="margin-left:8px;<?= $printLayout === 'triple' ? 'font-weight:bold;' : '' ?>">3-up 8.5×13</a>
     <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=single" style="margin-left:8px;<?= $printLayout === 'single' ? 'font-weight:bold;' : '' ?>">1 copy / page</a>
     <a href="javascript:history.back()" style="margin-left:15px;color:#666;text-decoration:none;">&larr; Back to App</a>
+    <?php if ($printLayout === 'triple'): ?>
+    <div style="margin-top:8px;font-size:13px;color:#084298;">In the print dialog, set paper size to <strong>8.5 × 13 in</strong> (Folio / long bond). All three copies print on one sheet.</div>
+    <?php endif; ?>
     <div style="margin-top:10px;padding:8px 12px;background:#e7f1ff;border:1px solid #9ec5fe;border-radius:6px;display:inline-block;max-width:720px;font-size:13px;color:#084298;text-align:left;">
         <strong>Phone scan tip:</strong> Join the same Wi-Fi as this PC, then scan again.<br>
         Verify link: <code style="word-break:break-all;"><?= e($verifyUrl) ?></code>
@@ -411,7 +451,7 @@ if ($qrHtml === '') {
 
 <div class="sheet">
 <?php for ($copy = 1; $copy <= $copyCount; $copy++): ?>
-<?php if ($copy === 2 && $printLayout === 'dual'): ?>
+<?php if ($copy > 1 && $printLayout !== 'single'): ?>
     <div class="cut-line-separator">CUT HERE</div>
 <?php endif; ?>
 <div class="page">

@@ -14,6 +14,7 @@ require_once __DIR__ . '/image_optimize.php';
 require_once __DIR__ . '/vehicle_observations.php';
 require_once __DIR__ . '/vehicle_care.php';
 require_once __DIR__ . '/report_helpers.php';
+require_once __DIR__ . '/gas_voucher_print.php';
 
 /**
  * Get database instance
