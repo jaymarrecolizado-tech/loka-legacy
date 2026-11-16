@@ -12,9 +12,13 @@ if (!$voucherId) {
 $voucher = db()->fetch(
     "SELECT gv.*,
             u.name AS requester_name,
+            u.signature_path AS requester_signature_path,
             reviewer.name AS reviewer_name,
+            reviewer.signature_path AS reviewer_signature_path,
             approver.name AS approver_name_full,
-            budget_officer.name AS budget_officer_name
+            approver.signature_path AS approver_signature_path,
+            budget_officer.name AS budget_officer_name,
+            budget_officer.signature_path AS budget_signature_path
      FROM gas_vouchers gv
      JOIN users u ON gv.requested_by_user_id = u.id
      LEFT JOIN users reviewer ON gv.reviewed_by = reviewer.id
@@ -41,6 +45,12 @@ require_once INCLUDES_PATH . '/gas_voucher_print.php';
 $printOpts = gasVoucherPrintLayout();
 $printLayout = $printOpts['layout'];
 $copyCount = $printOpts['copyCount'];
+$esignMarks = [
+    'driver' => gasVoucherDriverEsignSrc($voucher),
+    'reviewer' => gasVoucherEsignSrc($voucher->reviewer_signature_path ?? null),
+    'budget' => gasVoucherEsignSrc($voucher->budget_signature_path ?? null),
+    'approver' => gasVoucherEsignSrc($voucher->approver_signature_path ?? null),
+];
 
 // QR Verification -- gas stations scan this to confirm authenticity
 $verifyUrl = gasVoucherVerifyUrl($voucher);
@@ -253,6 +263,22 @@ if ($qrHtml === '') {
         .sig-signed {
             margin-top: auto;
         }
+        .sig-mark-wrap {
+            flex: 1 1 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 10mm;
+            padding: 1px 2px;
+        }
+        .sig-mark {
+            display: block;
+            max-height: 28px;
+            max-width: 96%;
+            width: auto;
+            object-fit: contain;
+            mix-blend-mode: multiply;
+        }
         .sig-label {
             font-size: 9pt;
             color: #333;
@@ -357,6 +383,8 @@ if ($qrHtml === '') {
         body.layout-triple .sig-signed {
             margin-top: auto;
         }
+        body.layout-triple .sig-mark-wrap { min-height: 8mm; }
+        body.layout-triple .sig-mark { max-height: 22px; }
         body.layout-triple .page-fit > .footer-row {
             flex: 0 0 auto;
             margin-top: 4px !important;
@@ -486,6 +514,8 @@ if ($qrHtml === '') {
             body.layout-triple .signatures-row td { padding: 2px 3px 2px !important; height: 15mm !important; vertical-align: top !important; }
             body.layout-triple .sig-stack { min-height: 13mm !important; height: 100% !important; }
             body.layout-triple .sig-label { margin-bottom: 0 !important; font-size: 7pt !important; }
+            body.layout-triple .sig-mark-wrap { min-height: 7mm; }
+            body.layout-triple .sig-mark { max-height: 18px !important; }
             body.layout-triple .sig-name { font-size: 8.5pt !important; }
             body.layout-triple .sig-title { font-size: 7pt !important; }
             body.layout-triple .distribution { margin-top: 2px !important; font-size: 7pt !important; }
@@ -719,6 +749,9 @@ if ($qrHtml === '') {
             <td>
                 <div class="sig-stack">
                     <div class="sig-label">Requested by / Bearer:</div>
+                    <?php if ($esignMarks['driver']): ?>
+                    <div class="sig-mark-wrap"><img class="sig-mark" alt="" src="<?= e($esignMarks['driver']) ?>"></div>
+                    <?php endif; ?>
                     <div class="sig-signed">
                         <div class="sig-name"><?= e(strtoupper($voucher->driver_name)) ?></div>
                         <div class="sig-title">Driver</div>
@@ -728,6 +761,9 @@ if ($qrHtml === '') {
             <td>
                 <div class="sig-stack">
                     <div class="sig-label">Reviewed by:</div>
+                    <?php if ($esignMarks['reviewer']): ?>
+                    <div class="sig-mark-wrap"><img class="sig-mark" alt="" src="<?= e($esignMarks['reviewer']) ?>"></div>
+                    <?php endif; ?>
                     <div class="sig-signed">
                         <div class="sig-name"><?= e(strtoupper($voucher->reviewer_name ?? 'ENGR. RONALD S. BARIUAN')) ?></div>
                         <div class="sig-title">OIC, Motor Pool Unit</div>
@@ -737,6 +773,9 @@ if ($qrHtml === '') {
             <td>
                 <div class="sig-stack">
                     <div class="sig-label">Certified by:</div>
+                    <?php if ($esignMarks['budget']): ?>
+                    <div class="sig-mark-wrap"><img class="sig-mark" alt="" src="<?= e($esignMarks['budget']) ?>"></div>
+                    <?php endif; ?>
                     <div class="sig-signed">
                         <div class="sig-name"><?= e(strtoupper($voucher->budget_officer_name ?? '')) ?></div>
                         <div class="sig-title">Budget Officer</div>
@@ -746,6 +785,9 @@ if ($qrHtml === '') {
             <td>
                 <div class="sig-stack">
                     <div class="sig-label">Approved by:</div>
+                    <?php if ($esignMarks['approver']): ?>
+                    <div class="sig-mark-wrap"><img class="sig-mark" alt="" src="<?= e($esignMarks['approver']) ?>"></div>
+                    <?php endif; ?>
                     <div class="sig-signed">
                         <div class="sig-name"><?= e(strtoupper($voucher->approver_name_full ?? 'MINA FLOR T. VILLAFUERTE')) ?></div>
                         <div class="sig-title">Chief, Admin. and Finance Division</div>

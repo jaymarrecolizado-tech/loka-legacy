@@ -202,7 +202,7 @@ require_once INCLUDES_PATH . '/header.php';
                                 </div>
                                 <?php endif; ?>
                                 <input type="file" class="form-control" name="signature_file" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
-                                <small class="text-muted"><?= $esignPath !== null ? 'Upload a new file to replace the specimen.' : 'Used to stamp OB Pass Slips automatically when this user approves or a guard stamps departure.' ?></small>
+                                <small class="text-muted"><?= $esignPath !== null ? 'Upload a new file to replace the specimen.' : 'Stamped on OB Pass Slips and on approved gas vouchers when this user is the driver, reviewer, budget officer, or approver.' ?></small>
                             </div>
                             <div class="col-12">
                                 <label class="form-label d-block">OB Approver</label>
