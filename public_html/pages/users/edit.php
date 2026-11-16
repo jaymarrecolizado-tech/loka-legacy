@@ -88,18 +88,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     channelSetAdminBinding($userId, $plChannel, $plChatId);
                 }
 
-                // Specimen e-sign (Plan #23) — file writes after commit
+                // Specimen e-sign — replace file wins over clear; persist after commit
                 $esignError = null;
-                if (post('clear_signature') === '1') {
-                    obClearUserEsign($userId);
-                }
                 $res = obSaveUserEsignUpload($userId, $_FILES['signature_file'] ?? []);
                 if ($res['error'] !== null) {
                     $esignError = $res['error'];
+                } elseif ($res['path'] === null && post('clear_signature') === '1') {
+                    obClearUserEsign($userId);
                 }
 
-                redirectWith('/?page=users', 'success', 'User updated successfully.'
-                    . ($esignError !== null ? ' (Specimen e-sign failed: ' . $esignError . ')' : ''));
+                $msg = 'User updated successfully.';
+                if ($res['path'] !== null) {
+                    $msg = 'User updated. E-sign saved.';
+                } elseif ($res['error'] === null && post('clear_signature') === '1') {
+                    $msg = 'User updated. E-sign removed.';
+                }
+                if ($esignError !== null) {
+                    $msg .= ' (Specimen e-sign failed: ' . $esignError . ')';
+                }
+                redirectWith('/?page=users&action=edit&id=' . $userId, 'success', $msg);
             }
         } catch (Exception $e) {
             db()->rollback();
@@ -190,19 +197,25 @@ require_once INCLUDES_PATH . '/header.php';
                                 </select>
                             </div>
                             <div class="col-12">
-                                <label class="form-label">Specimen E-sign <span class="text-muted">(PNG/JPG ≤ 1 MB)</span></label>
-                                <?php $esignPath = obUserEsignPath((int) $user->id); ?>
+                                <label class="form-label">Specimen E-sign <span class="text-muted">(PNG/JPG ≤ 3 MB)</span></label>
+                                <?php
+                                $esignPath = obUserEsignPath((int) $user->id);
+                                $esignStamp = ($esignPath !== null && is_file(BASE_PATH . '/' . $esignPath))
+                                    ? (int) filemtime(BASE_PATH . '/' . $esignPath) : time();
+                                ?>
                                 <?php if ($esignPath !== null): ?>
-                                <div class="border rounded bg-white p-2 mb-2 d-flex align-items-center gap-3">
-                                    <img src="?page=file-view&file=<?= urlencode($esignPath) ?>" alt="Specimen e-sign" style="max-height:64px; max-width:200px; object-fit:contain;">
+                                <div class="border rounded bg-white p-2 mb-2 d-flex align-items-center gap-3 flex-wrap">
+                                    <img src="?page=file-view&file=<?= urlencode($esignPath) ?>&t=<?= $esignStamp ?>" alt="Saved e-sign" style="max-height:80px; max-width:280px; object-fit:contain;">
                                     <div class="form-check mb-0">
                                         <input class="form-check-input" type="checkbox" name="clear_signature" value="1" id="clearSigChk">
                                         <label class="form-check-label small" for="clearSigChk">Remove saved e-sign</label>
                                     </div>
                                 </div>
                                 <?php endif; ?>
-                                <input type="file" class="form-control" name="signature_file" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
-                                <small class="text-muted"><?= $esignPath !== null ? 'Upload a new file to replace the specimen.' : 'Stamped on OB Pass Slips and on approved gas vouchers when this user is the driver, reviewer, budget officer, or approver.' ?></small>
+                                <input type="file" class="form-control" name="signature_file" id="signatureFileInput" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
+                                <small class="text-muted"><?= $esignPath !== null
+                                    ? 'Choose a new PNG/JPG and click Save Changes to replace this e-sign.'
+                                    : 'Upload a PNG/JPG, then Save Changes. Stamped on OB Pass Slips and approved gas vouchers.' ?></small>
                             </div>
                             <div class="col-12">
                                 <label class="form-label d-block">OB Approver</label>
@@ -262,5 +275,20 @@ require_once INCLUDES_PATH . '/header.php';
 <?php
 $emailCheckExcludeId = (int) $userId;
 require __DIR__ . '/partials/email_unique_check.php';
+?>
+<script>
+(function () {
+    var file = document.getElementById('signatureFileInput');
+    var clear = document.getElementById('clearSigChk');
+    if (!file || !clear) return;
+    file.addEventListener('change', function () {
+        if (file.files && file.files.length) {
+            clear.checked = false;
+        }
+    });
+})();
+</script>
+<?php
 require_once INCLUDES_PATH . '/footer.php';
+?>
 ?>

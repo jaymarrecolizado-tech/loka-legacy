@@ -186,9 +186,9 @@ require_once INCLUDES_PATH . '/header.php';
                                 </select>
                             </div>
                             <div class="col-12">
-                                <label class="form-label">Specimen E-sign <span class="text-muted">(optional, PNG/JPG ≤ 1 MB)</span></label>
+                                <label class="form-label">Specimen E-sign <span class="text-muted">(optional, PNG/JPG ≤ 3 MB)</span></label>
                                 <input type="file" class="form-control" name="signature_file" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
-                                <small class="text-muted">Used to stamp OB Pass Slips automatically when this user approves or a guard stamps departure.</small>
+                                <small class="text-muted">Saved on this user. You can replace it later from Edit User. Stamped on OB Pass Slips and approved gas vouchers.</small>
                             </div>
                             <div class="col-12">
                                 <label class="form-label d-block">OB Approver</label>

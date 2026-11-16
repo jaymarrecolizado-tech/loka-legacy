@@ -114,7 +114,12 @@ require_once INCLUDES_PATH . '/header.php';
                     <tbody>
                         <?php foreach ($users as $user): ?>
                         <tr>
-                            <td><strong><?= e($user->name) ?></strong></td>
+                            <td>
+                                <strong><?= e($user->name) ?></strong>
+                                <?php if (!empty($user->signature_path)): ?>
+                                    <span class="badge bg-light text-dark ms-1" title="Has saved e-sign"><i class="bi bi-pen"></i></span>
+                                <?php endif; ?>
+                            </td>
                             <td><?= e($user->email) ?></td>
                             <td><?= e($user->official_email ?? '') ?: '—' ?></td>
                             <td><span class="badge bg-light text-dark"><?= e($user->department_name ?: 'None') ?></span></td>

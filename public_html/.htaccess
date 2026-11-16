@@ -5,9 +5,9 @@
 # =============================================================================
 
 # Limit request size (prevents large payload attacks)
-# 1MB max request body - sufficient for normal forms
+# 4MB covers user e-sign specimens plus normal form fields
 <IfModule mod_core.c>
-    LimitRequestBody 1048576
+    LimitRequestBody 4194304
 </IfModule>
 
 # Limit request fields (server-level only; not allowed in .htaccess on XAMPP)
@@ -115,8 +115,8 @@ Options -Indexes
 
     # File upload limits - reduced for security
     # LOKA doesn't require large file uploads
-    php_value upload_max_filesize 2M
-    php_value post_max_size 2M
+    php_value upload_max_filesize 4M
+    php_value post_max_size 4M
     php_value max_file_uploads 5
 
     # Limit max input variables (prevents hash collision attacks)

@@ -11,6 +11,10 @@ if (defined('OB_ESIGN_LOADED')) {
 }
 define('OB_ESIGN_LOADED', 1);
 
+if (!defined('USER_ESIGN_MAX_BYTES')) {
+    define('USER_ESIGN_MAX_BYTES', 3 * 1024 * 1024);
+}
+
 /** The user's saved specimen path, or null when none/no file on disk. */
 function obUserEsignPath(?int $userId): ?string
 {
@@ -107,36 +111,42 @@ function obResolveStaffSignature(int $obId, string $who, int $userId, string $ca
 }
 
 /**
- * Handle the admin specimen upload on User create/edit (multipart).
- * Accepts PNG/JPG up to ~1 MB; stores as uploads/user_signatures/{userId}.{ext}.
+ * Validate and write a specimen onto disk as uploads/user_signatures/{userId}.png.
+ * Replaces any prior png/jpg for that user. Does not touch the database.
  * path null + error null = no file chosen.
  *
  * @return array{path:?string,error:?string}
  */
-function obSaveUserEsignUpload(int $userId, array $file): array
+function obStoreUserEsignFile(int $userId, array $file): array
 {
     if (!isset($file['name']) || $file['name'] === '') {
         return ['path' => null, 'error' => null];
     }
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+    $code = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($code === UPLOAD_ERR_NO_FILE) {
+        return ['path' => null, 'error' => null];
+    }
+    if ($code === UPLOAD_ERR_INI_SIZE || $code === UPLOAD_ERR_FORM_SIZE) {
+        return ['path' => null, 'error' => 'Specimen is too large. Use a PNG or JPG up to 3 MB.'];
+    }
+    if ($code !== UPLOAD_ERR_OK) {
         return ['path' => null, 'error' => 'Specimen upload failed. Please try again.'];
     }
-    if (($file['size'] ?? 0) > 1048576) {
-        return ['path' => null, 'error' => 'Specimen must be 1 MB or smaller.'];
+    if (($file['size'] ?? 0) > USER_ESIGN_MAX_BYTES) {
+        return ['path' => null, 'error' => 'Specimen must be 3 MB or smaller.'];
     }
-    $info = @getimagesize($file['tmp_name'] ?? '');
-    $ext = match ($info[2] ?? null) {
-        IMAGETYPE_PNG => 'png',
-        IMAGETYPE_JPEG => 'jpg',
-        default => null,
-    };
-    if ($ext === null) {
+    $tmp = (string) ($file['tmp_name'] ?? '');
+    $info = @getimagesize($tmp);
+    if (($info[2] ?? null) !== IMAGETYPE_PNG && ($info[2] ?? null) !== IMAGETYPE_JPEG) {
         return ['path' => null, 'error' => 'Specimen must be a PNG or JPG image.'];
     }
 
     $dir = BASE_PATH . '/uploads/user_signatures';
-    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+    if (!is_dir($dir) && !mkdir($dir, 0770, true) && !is_dir($dir)) {
         return ['path' => null, 'error' => 'Could not create the specimen storage folder.'];
+    }
+    if (!is_writable($dir)) {
+        return ['path' => null, 'error' => 'Specimen folder is not writable. Reset uploads/user_signatures permissions.'];
     }
 
     foreach (['png', 'jpg'] as $old) {
@@ -146,14 +156,80 @@ function obSaveUserEsignUpload(int $userId, array $file): array
         }
     }
 
-    $rel = 'uploads/user_signatures/' . $userId . '.' . $ext;
-    if (!move_uploaded_file($file['tmp_name'], BASE_PATH . '/' . $rel)) {
-        return ['path' => null, 'error' => 'Could not store the specimen file.'];
+    $rel = 'uploads/user_signatures/' . $userId . '.png';
+    $dest = BASE_PATH . '/' . $rel;
+    $wrote = obWriteUserEsignPng($tmp, $dest);
+    if (!$wrote) {
+        $ext = (($info[2] ?? null) === IMAGETYPE_JPEG) ? 'jpg' : 'png';
+        $rel = 'uploads/user_signatures/' . $userId . '.' . $ext;
+        $dest = BASE_PATH . '/' . $rel;
+        if (!@move_uploaded_file($tmp, $dest) && !@copy($tmp, $dest)) {
+            return ['path' => null, 'error' => 'Could not store the specimen file.'];
+        }
     }
-    @chmod(BASE_PATH . '/' . $rel, 0644);
-
-    db()->update('users', ['signature_path' => $rel, 'updated_at' => date(DATETIME_FORMAT)], 'id = ?', [$userId]);
+    @chmod($dest, 0660);
     return ['path' => $rel, 'error' => null];
+}
+
+/** Write a compact PNG (max 1400px wide) suitable for stamping. */
+function obWriteUserEsignPng(string $srcAbs, string $destAbs): bool
+{
+    if (!function_exists('imagecreatefromstring') || !function_exists('imagepng')) {
+        return false;
+    }
+    $raw = @file_get_contents($srcAbs);
+    if ($raw === false || $raw === '') {
+        return false;
+    }
+    $img = @imagecreatefromstring($raw);
+    if ($img === false) {
+        return false;
+    }
+    $w = imagesx($img);
+    $h = imagesy($img);
+    $maxW = 1400;
+    if ($w > $maxW && $w > 0) {
+        $nw = $maxW;
+        $nh = max(1, (int) round($h * ($maxW / $w)));
+        $scaled = imagecreatetruecolor($nw, $nh);
+        if ($scaled === false) {
+            imagedestroy($img);
+            return false;
+        }
+        imagealphablending($scaled, false);
+        imagesavealpha($scaled, true);
+        $transparent = imagecolorallocatealpha($scaled, 0, 0, 0, 127);
+        imagefilledrectangle($scaled, 0, 0, $nw, $nh, $transparent);
+        imagecopyresampled($scaled, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+        imagedestroy($img);
+        $img = $scaled;
+    } else {
+        if (function_exists('imagepalettetotruecolor')) {
+            @imagepalettetotruecolor($img);
+        }
+        imagealphablending($img, false);
+        imagesavealpha($img, true);
+    }
+    $ok = imagepng($img, $destAbs, 6);
+    imagedestroy($img);
+    return $ok && is_file($destAbs);
+}
+
+/**
+ * Handle the admin specimen upload on User create/edit (multipart).
+ * Accepts PNG/JPG up to 3 MB; stores as uploads/user_signatures/{userId}.png.
+ * path null + error null = no file chosen.
+ *
+ * @return array{path:?string,error:?string}
+ */
+function obSaveUserEsignUpload(int $userId, array $file): array
+{
+    $stored = obStoreUserEsignFile($userId, $file);
+    if ($stored['error'] !== null || $stored['path'] === null) {
+        return $stored;
+    }
+    db()->update('users', ['signature_path' => $stored['path'], 'updated_at' => date(DATETIME_FORMAT)], 'id = ?', [$userId]);
+    return $stored;
 }
 
 /** Remove a user's specimen (admin "clear"). */
