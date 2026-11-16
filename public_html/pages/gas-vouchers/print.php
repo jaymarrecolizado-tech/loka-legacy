@@ -293,18 +293,27 @@ if ($qrHtml === '') {
             margin: 0 auto;
         }
 
+        body.layout-triple {
+            width: 100%;
+        }
         body.layout-triple .sheet,
         body.layout-triple .page {
-            width: 8.5in;
+            width: 100%;
+            max-width: none;
+            margin: 0;
         }
         body.layout-triple .page {
-            padding: 8mm 10mm;
-            min-height: 0;
+            padding: 6mm 10mm;
+            min-height: 32vh;
         }
+        body.layout-triple .grid-header { margin-bottom: 8px; }
+        body.layout-triple .header-logo { width: 72px; }
+        body.layout-triple .header-title { margin: 8px 0 6px; font-size: 16pt; }
+        body.layout-triple .gas-station-title { font-size: 14pt; margin-bottom: 6px; }
 
         @media print {
             <?php if ($printLayout === 'triple'): ?>
-            @page { size: 8.5in 13in portrait; margin: 4.5mm; }
+            @page { size: 8.5in 13in portrait; margin: 3mm; }
             <?php else: ?>
             @page { size: A4 portrait; margin: 6mm; }
             <?php endif; ?>
@@ -355,31 +364,50 @@ if ($qrHtml === '') {
             body.layout-single .page { page-break-after: always; break-after: page; }
             body.layout-single .page:last-of-type { page-break-after: auto; break-after: auto; }
             body.layout-single .cut-line-separator { display: none !important; }
-            body.layout-triple .page { page-break-inside: avoid; break-inside: avoid; }
-            body.layout-triple .header-logo { width: 36px !important; }
-            body.layout-triple .header-text .republic { font-size: 7pt !important; }
-            body.layout-triple .header-text .dept { font-size: 8pt !important; }
-            body.layout-triple .header-text .office { font-size: 6.5pt !important; }
-            body.layout-triple .header-title { margin: 1px 0 2px !important; font-size: 10pt !important; letter-spacing: 2px !important; }
-            body.layout-triple .gas-station-title { font-size: 9pt !important; margin-bottom: 2px !important; }
+            html, body.layout-triple { width: 100% !important; height: 100% !important; }
+            body.layout-triple .sheet {
+                width: 100% !important;
+                min-height: 12.6in;
+                display: flex;
+                flex-direction: column;
+            }
+            body.layout-triple .page {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                flex: 1 1 0;
+                min-height: 3.95in !important;
+                width: 100% !important;
+                padding: 1.5mm 2.5mm !important;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+            }
+            body.layout-triple .grid-header { margin-bottom: 3px !important; gap: 8px !important; }
+            body.layout-triple .header-logo { width: 52px !important; }
+            body.layout-triple .header-text .republic { font-size: 8.5pt !important; }
+            body.layout-triple .header-text .dept { font-size: 10pt !important; }
+            body.layout-triple .header-text .office { font-size: 8pt !important; }
+            body.layout-triple .header-title { margin: 2px 0 4px !important; font-size: 13pt !important; letter-spacing: 3px !important; }
+            body.layout-triple .gas-station-title { font-size: 11pt !important; margin-bottom: 3px !important; }
             body.layout-triple .voucher-row,
             body.layout-triple .voucher-row td,
-            body.layout-triple .voucher-row th { font-size: 7.5pt !important; padding: 1px 3px !important; }
-            body.layout-triple .auth-row { padding: 2px 4px !important; font-size: 7.5pt !important; }
-            body.layout-triple .article-row td { padding: 2px 3px !important; font-size: 8pt !important; }
-            body.layout-triple .signatures-row td { padding: 2px !important; }
-            body.layout-triple .sig-label { margin-bottom: 8px !important; font-size: 6.5pt !important; }
-            body.layout-triple .sig-name { font-size: 8pt !important; }
-            body.layout-triple .sig-title { font-size: 6.5pt !important; }
-            body.layout-triple .distribution { margin-top: 2px !important; font-size: 6.5pt !important; }
-            body.layout-triple .purpose-cell { max-height: 1.9em !important; font-size: 7pt !important; }
-            body.layout-triple .qr-block .qr-img { width: 52px !important; height: 52px !important; }
-            body.layout-triple .qr-block .qr-svg-pad { padding: 4px !important; }
-            body.layout-triple .qr-block .qr-svg-pad svg { width: 48px !important; height: 48px !important; }
-            body.layout-triple .qr-block .qr-label { font-size: 6pt !important; margin-top: 3px !important; }
-            body.layout-triple .qr-block .qr-sub { font-size: 5.5pt !important; }
-            body.layout-triple .cut-line-separator { padding: 1px 0 !important; margin: 1mm 0 !important; font-size: 6pt !important; }
-            body.layout-triple .footer-row { margin-top: 1px !important; }
+            body.layout-triple .voucher-row th { font-size: 9pt !important; padding: 3px 6px !important; }
+            body.layout-triple .auth-row { padding: 4px 8px !important; font-size: 9pt !important; }
+            body.layout-triple .article-row td { padding: 4px 6px !important; font-size: 9.5pt !important; }
+            body.layout-triple .signatures-row { flex: 1 1 auto; }
+            body.layout-triple .signatures-row td { padding: 6px 4px !important; }
+            body.layout-triple .sig-label { margin-bottom: 18px !important; font-size: 8pt !important; }
+            body.layout-triple .sig-name { font-size: 10pt !important; }
+            body.layout-triple .sig-title { font-size: 8pt !important; }
+            body.layout-triple .distribution { margin-top: 2px !important; font-size: 7.5pt !important; }
+            body.layout-triple .purpose-cell { max-height: 2.6em !important; font-size: 8.5pt !important; }
+            body.layout-triple .qr-block .qr-img { width: 68px !important; height: 68px !important; }
+            body.layout-triple .qr-block .qr-svg-pad { padding: 5px !important; }
+            body.layout-triple .qr-block .qr-svg-pad svg { width: 60px !important; height: 60px !important; }
+            body.layout-triple .qr-block .qr-label { font-size: 7pt !important; margin-top: 3px !important; }
+            body.layout-triple .qr-block .qr-sub { font-size: 6.5pt !important; }
+            body.layout-triple .cut-line-separator { flex: 0 0 auto; padding: 0 !important; margin: 0.7mm 0 !important; font-size: 6.5pt !important; }
+            body.layout-triple .footer-row { margin-top: auto !important; }
         }
 
         .qr-block {
@@ -438,7 +466,7 @@ if ($qrHtml === '') {
     <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=single" style="margin-left:8px;<?= $printLayout === 'single' ? 'font-weight:bold;' : '' ?>">1 copy / page</a>
     <a href="javascript:history.back()" style="margin-left:15px;color:#666;text-decoration:none;">&larr; Back to App</a>
     <?php if ($printLayout === 'triple'): ?>
-    <div style="margin-top:8px;font-size:13px;color:#084298;">In the print dialog, set paper size to <strong>8.5 × 13 in</strong> (Folio / long bond). All three copies print on one sheet.</div>
+    <div style="margin-top:8px;font-size:13px;color:#084298;">In the print dialog, set paper size to <strong>8.5 × 13 in</strong> (Folio / long bond), margins to default/minimum, and scale to <strong>100% / Actual size</strong>. All three copies fill one sheet.</div>
     <?php endif; ?>
     <div style="margin-top:10px;padding:8px 12px;background:#e7f1ff;border:1px solid #9ec5fe;border-radius:6px;display:inline-block;max-width:720px;font-size:13px;color:#084298;text-align:left;">
         <strong>Phone scan tip:</strong> Join the same Wi-Fi as this PC, then scan again.<br>
