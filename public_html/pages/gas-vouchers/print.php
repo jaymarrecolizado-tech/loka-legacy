@@ -243,10 +243,20 @@ if ($qrHtml === '') {
             vertical-align: top;
         }
 
+        .sig-stack {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 52px;
+            height: 100%;
+        }
+        .sig-signed {
+            margin-top: auto;
+        }
         .sig-label {
             font-size: 9pt;
             color: #333;
-            margin-bottom: 40px;
+            margin-bottom: 0;
             text-align: left;
         }
 
@@ -334,6 +344,19 @@ if ($qrHtml === '') {
         body.layout-triple .page-fit > .signatures-row {
             flex: 1 1 auto;
         }
+        body.layout-triple .signatures-row td {
+            height: 16mm;
+            vertical-align: top;
+            padding: 2px 4px 3px;
+        }
+        body.layout-triple .sig-stack {
+            min-height: 14mm;
+            height: 100%;
+            justify-content: space-between;
+        }
+        body.layout-triple .sig-signed {
+            margin-top: auto;
+        }
         body.layout-triple .page-fit > .footer-row {
             flex: 0 0 auto;
             margin-top: 4px !important;
@@ -358,7 +381,7 @@ if ($qrHtml === '') {
         body.layout-triple .voucher-row td,
         body.layout-triple .voucher-row th { padding: 3px 6px; font-size: 8.5pt; }
         body.layout-triple .auth-row { padding: 4px 8px !important; font-size: 8.5pt; }
-        body.layout-triple .sig-label { margin-bottom: 12px; font-size: 7.5pt; }
+        body.layout-triple .sig-label { margin-bottom: 0; font-size: 7.5pt; }
         body.layout-triple .sig-name { font-size: 9pt; }
         body.layout-triple .sig-title { font-size: 7.5pt; }
         body.layout-triple .footer-row { margin-top: 4px !important; }
@@ -396,7 +419,8 @@ if ($qrHtml === '') {
             .articles-header th { padding: 2px !important; }
             .article-row td { padding: 3px 4px !important; font-size: 9pt !important; }
             .signatures-row td { padding: 3px !important; }
-            .sig-label { margin-bottom: 14px !important; font-size: 7.5pt !important; }
+            .sig-stack { min-height: 36px; }
+            .sig-label { margin-bottom: 0 !important; font-size: 7.5pt !important; }
             .sig-name { font-size: 9pt !important; }
             .sig-title { font-size: 7.5pt !important; }
             .distribution { margin-top: 3px !important; font-size: 7pt !important; }
@@ -459,8 +483,9 @@ if ($qrHtml === '') {
             body.layout-triple .voucher-row th { font-size: 8pt !important; padding: 2px 4px !important; }
             body.layout-triple .auth-row { padding: 3px 6px !important; font-size: 8pt !important; }
             body.layout-triple .article-row td { padding: 3px 4px !important; font-size: 8.5pt !important; }
-            body.layout-triple .signatures-row td { padding: 3px !important; }
-            body.layout-triple .sig-label { margin-bottom: 10px !important; font-size: 7pt !important; }
+            body.layout-triple .signatures-row td { padding: 2px 3px 2px !important; height: 15mm !important; vertical-align: top !important; }
+            body.layout-triple .sig-stack { min-height: 13mm !important; height: 100% !important; }
+            body.layout-triple .sig-label { margin-bottom: 0 !important; font-size: 7pt !important; }
             body.layout-triple .sig-name { font-size: 8.5pt !important; }
             body.layout-triple .sig-title { font-size: 7pt !important; }
             body.layout-triple .distribution { margin-top: 2px !important; font-size: 7pt !important; }
@@ -629,24 +654,40 @@ if ($qrHtml === '') {
     <table class="signatures-row">
         <tr>
             <td>
-                <div class="sig-label">Requested by / Bearer:</div>
-                <div class="sig-name"><?= e(strtoupper($voucher->driver_name)) ?></div>
-                <div class="sig-title">Driver</div>
+                <div class="sig-stack">
+                    <div class="sig-label">Requested by / Bearer:</div>
+                    <div class="sig-signed">
+                        <div class="sig-name"><?= e(strtoupper($voucher->driver_name)) ?></div>
+                        <div class="sig-title">Driver</div>
+                    </div>
+                </div>
             </td>
             <td>
-                <div class="sig-label">Reviewed by:</div>
-                <div class="sig-name"><?= e(strtoupper($voucher->reviewer_name ?? 'ENGR. RONALD S. BARIUAN')) ?></div>
-                <div class="sig-title">OIC, Motor Pool Unit</div>
+                <div class="sig-stack">
+                    <div class="sig-label">Reviewed by:</div>
+                    <div class="sig-signed">
+                        <div class="sig-name"><?= e(strtoupper($voucher->reviewer_name ?? 'ENGR. RONALD S. BARIUAN')) ?></div>
+                        <div class="sig-title">OIC, Motor Pool Unit</div>
+                    </div>
+                </div>
             </td>
             <td>
-                <div class="sig-label">Certified by:</div>
-                <div class="sig-name"><?= e(strtoupper($voucher->budget_officer_name ?? '')) ?></div>
-                <div class="sig-title">Budget Officer</div>
+                <div class="sig-stack">
+                    <div class="sig-label">Certified by:</div>
+                    <div class="sig-signed">
+                        <div class="sig-name"><?= e(strtoupper($voucher->budget_officer_name ?? '')) ?></div>
+                        <div class="sig-title">Budget Officer</div>
+                    </div>
+                </div>
             </td>
             <td>
-                <div class="sig-label">Approved by:</div>
-                <div class="sig-name"><?= e(strtoupper($voucher->approver_name_full ?? 'MINA FLOR T. VILLAFUERTE')) ?></div>
-                <div class="sig-title">Chief, Admin. and Finance Division</div>
+                <div class="sig-stack">
+                    <div class="sig-label">Approved by:</div>
+                    <div class="sig-signed">
+                        <div class="sig-name"><?= e(strtoupper($voucher->approver_name_full ?? 'MINA FLOR T. VILLAFUERTE')) ?></div>
+                        <div class="sig-title">Chief, Admin. and Finance Division</div>
+                    </div>
+                </div>
             </td>
         </tr>
     </table>
