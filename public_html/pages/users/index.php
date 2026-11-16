@@ -32,12 +32,20 @@ if ($statusFilter) {
 }
 
 if ($searchQuery) {
-    $whereClause .= ' AND (name LIKE ? OR email LIKE ? OR official_email LIKE ?)';
-    $whereClauseAliased .= ' AND (u.name LIKE ? OR u.email LIKE ? OR u.official_email LIKE ?)';
     $searchPattern = '%' . $searchQuery . '%';
-    $params[] = $searchPattern;
-    $params[] = $searchPattern;
-    $params[] = $searchPattern;
+    $hasOfficialEmail = (bool) db()->fetch("SHOW COLUMNS FROM users LIKE 'official_email'");
+    if ($hasOfficialEmail) {
+        $whereClause .= ' AND (name LIKE ? OR email LIKE ? OR official_email LIKE ?)';
+        $whereClauseAliased .= ' AND (u.name LIKE ? OR u.email LIKE ? OR u.official_email LIKE ?)';
+        $params[] = $searchPattern;
+        $params[] = $searchPattern;
+        $params[] = $searchPattern;
+    } else {
+        $whereClause .= ' AND (name LIKE ? OR email LIKE ?)';
+        $whereClauseAliased .= ' AND (u.name LIKE ? OR u.email LIKE ?)';
+        $params[] = $searchPattern;
+        $params[] = $searchPattern;
+    }
 }
 
 // Get total count for pagination

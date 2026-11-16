@@ -20,7 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $name = postSafe('name', '', 100);
     $email = $security->sanitizeEmail(post('email'));
-    $officialEmail = normalizeOptionalEmail($security->sanitizeEmail(post('official_email')));
+    $officialRaw = (string) $security->sanitizeEmail(post('official_email'));
+    $officialEmail = function_exists('normalizeOptionalEmail')
+        ? normalizeOptionalEmail($officialRaw)
+        : strtolower(trim($officialRaw));
     $password = post('password');
     $phone = postSafe('phone', '', 20);
     $role = (string) post('role');
@@ -48,7 +51,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Re-fetch with lock to ensure atomicity
             $user = db()->fetch("SELECT * FROM users WHERE id = ? AND deleted_at IS NULL FOR UPDATE", [$userId]);
 
-            if ($email && userIndividualEmailTaken($email, $userId)) {
+            $emailTaken = function_exists('userIndividualEmailTaken')
+                ? userIndividualEmailTaken($email, $userId)
+                : (bool) db()->fetch(
+                    "SELECT id FROM users WHERE email = ? AND id != ? AND deleted_at IS NULL",
+                    [$email, $userId]
+                );
+            if ($email && $emailTaken) {
                 db()->rollback();
                 $errors[] = 'This individual email is already registered';
             }
@@ -57,7 +66,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $updateData = [
                     'name' => $name,
                     'email' => $email,
-                    'official_email' => $officialEmail !== '' ? $officialEmail : null,
                     'phone' => $phone,
                     'role' => $role,
                     'department_id' => $departmentId,
@@ -71,21 +79,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $auth = new Auth();
                     $updateData['password'] = $auth->hashPassword($password);
                 }
+                if (db()->fetch("SHOW COLUMNS FROM users LIKE 'official_email'")) {
+                    $updateData['official_email'] = $officialEmail !== '' ? $officialEmail : null;
+                }
 
                 db()->update('users', $updateData, 'id = ?', [$userId]);
                 auditLog('user_updated', 'user', $userId);
                 db()->commit();
                 clearUserCache(); // Clear user cache after updating user
 
-                // Messenger bindings set/cleared by the admin (Plan #35).
-                // Unchanged chat ids keep their original linked_via/linked_at.
-                foreach (LOKA_CHANNELS as $plChannel) {
-                    $plChatId = trim(postSafe($plChannel . '_chat_id', '', 100));
-                    $plExisting = channelGetBinding($userId, $plChannel);
-                    if ($plExisting && (string) $plExisting->chat_id === $plChatId) {
-                        continue;
+                if (defined('LOKA_CHANNELS') && function_exists('channelGetBinding') && function_exists('channelSetAdminBinding')) {
+                    foreach (LOKA_CHANNELS as $plChannel) {
+                        $plChatId = trim(postSafe($plChannel . '_chat_id', '', 100));
+                        $plExisting = channelGetBinding($userId, $plChannel);
+                        if ($plExisting && (string) $plExisting->chat_id === $plChatId) {
+                            continue;
+                        }
+                        channelSetAdminBinding($userId, $plChannel, $plChatId);
                     }
-                    channelSetAdminBinding($userId, $plChannel, $plChatId);
                 }
 
                 // Specimen e-sign — replace file wins over clear; persist after commit
@@ -245,8 +256,10 @@ require_once INCLUDES_PATH . '/header.php';
                                 </div>
                             </div>
                             <?php $editChannelBindings = [];
-                            foreach (channelGetBindings($userId) as $ecb) {
-                                $editChannelBindings[$ecb->channel] = $ecb;
+                            if (function_exists('channelGetBindings')) {
+                                foreach (channelGetBindings($userId) as $ecb) {
+                                    $editChannelBindings[$ecb->channel] = $ecb;
+                                }
                             } ?>
                             <div class="col-12">
                                 <label class="form-label d-block">Messenger chat IDs <span class="text-muted fw-normal">(Plan #35 — optional)</span></label>
@@ -274,7 +287,10 @@ require_once INCLUDES_PATH . '/header.php';
 
 <?php
 $emailCheckExcludeId = (int) $userId;
-require __DIR__ . '/partials/email_unique_check.php';
+$emailCheckPartial = __DIR__ . '/partials/email_unique_check.php';
+if (is_file($emailCheckPartial)) {
+    require $emailCheckPartial;
+}
 ?>
 <script>
 (function () {

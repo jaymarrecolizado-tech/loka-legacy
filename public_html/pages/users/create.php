@@ -19,7 +19,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $name = postSafe('name', '', 100);
     $email = $security->sanitizeEmail(post('email'));
-    $officialEmail = normalizeOptionalEmail($security->sanitizeEmail(post('official_email')));
+    $officialRaw = (string) $security->sanitizeEmail(post('official_email'));
+    $officialEmail = function_exists('normalizeOptionalEmail')
+        ? normalizeOptionalEmail($officialRaw)
+        : strtolower(trim($officialRaw));
     $password = post('password'); // Don't sanitize password
     $phone = postSafe('phone', '', 20);
     $role = post('role');
@@ -49,7 +52,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Invalid role selected';
     }
 
-    if ($email && userIndividualEmailTaken($email))
+    $emailTaken = function_exists('userIndividualEmailTaken')
+        ? userIndividualEmailTaken($email)
+        : (bool) db()->fetch("SELECT id FROM users WHERE email = ? AND deleted_at IS NULL", [$email]);
+    if ($email && $emailTaken)
         $errors[] = 'This individual email is already registered';
 
     if (empty($errors)) {
@@ -57,10 +63,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             $auth = new Auth();
-            $userId = db()->insert('users', [
+            $insertData = [
                 'name' => $name,
                 'email' => $email,
-                'official_email' => $officialEmail !== '' ? $officialEmail : null,
                 'password' => $auth->hashPassword($password),
                 'phone' => $phone,
                 'role' => $role,
@@ -72,13 +77,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'failed_login_attempts' => 0,
                 'created_at' => date(DATETIME_FORMAT),
                 'updated_at' => date(DATETIME_FORMAT)
-            ]);
+            ];
+            if (db()->fetch("SHOW COLUMNS FROM users LIKE 'official_email'")) {
+                $insertData['official_email'] = $officialEmail !== '' ? $officialEmail : null;
+            }
+            $userId = db()->insert('users', $insertData);
 
-            // Messenger bindings set by the admin (Plan #35) — after the insert
-            foreach (LOKA_CHANNELS as $plChannel) {
-                $plChatId = trim(postSafe($plChannel . '_chat_id', '', 100));
-                if ($plChatId !== '') {
-                    channelSetAdminBinding((int) $userId, $plChannel, $plChatId);
+            if (defined('LOKA_CHANNELS') && function_exists('channelSetAdminBinding')) {
+                foreach (LOKA_CHANNELS as $plChannel) {
+                    $plChatId = trim(postSafe($plChannel . '_chat_id', '', 100));
+                    if ($plChatId !== '') {
+                        channelSetAdminBinding((int) $userId, $plChannel, $plChatId);
+                    }
                 }
             }
 
@@ -242,6 +252,9 @@ require_once INCLUDES_PATH . '/header.php';
 
 <?php
 $emailCheckExcludeId = 0;
-require __DIR__ . '/partials/email_unique_check.php';
+$emailCheckPartial = __DIR__ . '/partials/email_unique_check.php';
+if (is_file($emailCheckPartial)) {
+    require $emailCheckPartial;
+}
 require_once INCLUDES_PATH . '/footer.php';
 ?>
