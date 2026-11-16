@@ -384,7 +384,7 @@ if ($qrHtml === '') {
             margin-top: auto;
         }
         body.layout-triple .sig-mark-wrap { min-height: 8mm; }
-        body.layout-triple .sig-mark { max-height: 22px; }
+        body.layout-triple .sig-mark { max-height: 28px; }
         body.layout-triple .page-fit > .footer-row {
             flex: 0 0 auto;
             margin-top: 4px !important;
@@ -515,7 +515,7 @@ if ($qrHtml === '') {
             body.layout-triple .sig-stack { min-height: 13mm !important; height: 100% !important; }
             body.layout-triple .sig-label { margin-bottom: 0 !important; font-size: 7pt !important; }
             body.layout-triple .sig-mark-wrap { min-height: 7mm; }
-            body.layout-triple .sig-mark { max-height: 18px !important; }
+            body.layout-triple .sig-mark { max-height: 24px !important; }
             body.layout-triple .sig-name { font-size: 8.5pt !important; }
             body.layout-triple .sig-title { font-size: 7pt !important; }
             body.layout-triple .distribution { margin-top: 2px !important; font-size: 7pt !important; }

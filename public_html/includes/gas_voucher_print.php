@@ -32,6 +32,9 @@ function gasVoucherEsignSrc(?string $relPath): ?string
     if (!is_file($abs)) {
         return null;
     }
+    if (defined('APP_URL') && APP_URL !== '') {
+        return rtrim((string) APP_URL, '/') . '/?page=file-view&file=' . rawurlencode($relPath);
+    }
     $raw = @file_get_contents($abs);
     if ($raw === false || $raw === '') {
         return null;
