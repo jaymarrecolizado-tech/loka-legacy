@@ -1,6 +1,6 @@
 <?php
 /**
- * Gas voucher print layout: dual A4, triple 8.5×13 (3 copies / sheet), single.
+ * Gas voucher print is mandated as three copies on one 8.5×13 in sheet.
  */
 require_once dirname(__DIR__, 2) . '/public_html/includes/gas_voucher_print.php';
 
@@ -16,27 +16,14 @@ function expect($label, $got, $want): void
     echo "ok {$label}\n";
 }
 
-$dual = gasVoucherPrintLayout('dual');
-expect('dual layout', $dual['layout'], 'dual');
-expect('dual copies', $dual['copyCount'], 2);
-expect('dual page', $dual['pageCssSize'], 'A4');
-expect('dual one sheet', $dual['copiesOnOneSheet'], true);
-
-$triple = gasVoucherPrintLayout('triple');
-expect('triple layout', $triple['layout'], 'triple');
-expect('triple copies', $triple['copyCount'], 3);
-expect('triple page', $triple['pageCssSize'], '8.5in 13in');
-expect('triple one sheet', $triple['copiesOnOneSheet'], true);
-
-$single = gasVoucherPrintLayout('SINGLE');
-expect('single layout', $single['layout'], 'single');
-expect('single copies', $single['copyCount'], 2);
-expect('single not one sheet', $single['copiesOnOneSheet'], false);
-
-$bad = gasVoucherPrintLayout('folio');
-expect('unknown falls back to dual', $bad['layout'], 'dual');
-expect('empty falls back to dual', gasVoucherPrintLayout('')['layout'], 'dual');
-expect('null falls back to dual', gasVoucherPrintLayout(null)['layout'], 'dual');
+foreach (['dual', 'triple', 'single', 'folio', '', null] as $raw) {
+    $got = gasVoucherPrintLayout($raw);
+    $tag = $raw === null ? 'null' : ($raw === '' ? 'empty' : (string) $raw);
+    expect("{$tag} layout", $got['layout'], 'triple');
+    expect("{$tag} copies", $got['copyCount'], 3);
+    expect("{$tag} page", $got['pageCssSize'], '8.5in 13in');
+    expect("{$tag} one sheet", $got['copiesOnOneSheet'], true);
+}
 
 if ($failed > 0) {
     fwrite(STDERR, "{$failed} failed\n");

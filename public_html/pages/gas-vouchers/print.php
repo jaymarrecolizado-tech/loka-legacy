@@ -38,7 +38,7 @@ if ($voucher->requested_by_user_id != userId() && !isAdmin() && !isApprover() &&
 }
 
 require_once INCLUDES_PATH . '/gas_voucher_print.php';
-$printOpts = gasVoucherPrintLayout(get('layout', 'dual'));
+$printOpts = gasVoucherPrintLayout();
 $printLayout = $printOpts['layout'];
 $copyCount = $printOpts['copyCount'];
 
@@ -540,22 +540,85 @@ if ($qrHtml === '') {
             color: #444;
             margin-top: 2px;
         }
+
+        .folio-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            font-family: sans-serif;
+        }
+        .folio-modal-backdrop[hidden] { display: none !important; }
+        .folio-modal {
+            background: #fff;
+            max-width: 480px;
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 16px 40px rgba(0,0,0,.25);
+            padding: 22px 24px 18px;
+            color: #212529;
+            text-align: left;
+        }
+        .folio-modal h2 {
+            margin: 0 0 10px;
+            font-size: 18px;
+            color: #084298;
+        }
+        .folio-modal p { margin: 0 0 10px; font-size: 14px; line-height: 1.45; }
+        .folio-modal .folio-size {
+            display: block;
+            font-size: 20px;
+            font-weight: 700;
+            color: #0d6efd;
+            margin: 8px 0 12px;
+        }
+        .folio-modal .folio-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 16px;
+        }
+        .folio-modal button {
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .folio-btn-secondary { background: #e9ecef; color: #212529; }
+        .folio-btn-primary { background: #0d6efd; color: #fff; }
+        @media print {
+            .folio-modal-backdrop { display: none !important; }
+        }
     </style>
 </head>
 <body class="layout-<?= e($printLayout) ?>">
 
+<div id="folioPaperModal" class="folio-modal-backdrop no-print" role="dialog" aria-modal="true" aria-labelledby="folioPaperTitle">
+    <div class="folio-modal">
+        <h2 id="folioPaperTitle">Use 8.5×13 in / folio paper</h2>
+        <p>Gas vouchers print as <strong>three copies on one sheet</strong>. Please load:</p>
+        <span class="folio-size">8.5 × 13 inches (Folio / long bond)</span>
+        <p>In the print dialog set paper to <strong>8.5 × 13 in</strong>, not A4 or Legal 14 in. Margins <strong>None</strong>, scale <strong>100% / Actual size</strong>.</p>
+        <div class="folio-actions">
+            <button type="button" class="folio-btn-secondary" id="folioModalDismiss">Got it</button>
+            <button type="button" class="folio-btn-primary" id="folioModalPrint">Print now</button>
+        </div>
+    </div>
+</div>
+
 <!-- Print Controls -->
 <div class="no-print" style="text-align:center;padding:12px;background:#f8f9fa;border-bottom:1px solid #ddd;margin-bottom:15px;font-family:sans-serif;">
-    <button onclick="window.print()" style="background:#0d6efd;color:#fff;border:none;padding:8px 24px;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;">
-        Print Voucher (<?= $printLayout === 'triple' ? '8.5×13' : 'A4' ?>)
+    <button type="button" id="folioPrintBtn" style="background:#0d6efd;color:#fff;border:none;padding:8px 24px;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;">
+        Print Voucher (8.5×13)
     </button>
-    <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=dual" style="margin-left:12px;<?= $printLayout === 'dual' ? 'font-weight:bold;' : '' ?>">2-up A4</a>
-    <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=triple" style="margin-left:8px;<?= $printLayout === 'triple' ? 'font-weight:bold;' : '' ?>">3-up 8.5×13</a>
-    <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=single" style="margin-left:8px;<?= $printLayout === 'single' ? 'font-weight:bold;' : '' ?>">1 copy / page</a>
     <a href="javascript:history.back()" style="margin-left:15px;color:#666;text-decoration:none;">&larr; Back to App</a>
-    <?php if ($printLayout === 'triple'): ?>
-    <div style="margin-top:8px;font-size:13px;color:#084298;">In the print dialog choose <strong>8.5 × 13 in</strong> (Folio / long bond — not Legal 14 in), margins <strong>None</strong>, scale <strong>100% / Actual size</strong>.</div>
-    <?php endif; ?>
+    <div style="margin-top:8px;font-size:13px;color:#084298;">Three copies on one sheet. Paper: <strong>8.5 × 13 in</strong> (Folio / long bond).</div>
     <div style="margin-top:10px;padding:8px 12px;background:#e7f1ff;border:1px solid #9ec5fe;border-radius:6px;display:inline-block;max-width:720px;font-size:13px;color:#084298;text-align:left;">
         <strong>Phone scan tip:</strong> Join the same Wi-Fi as this PC, then scan again.<br>
         Verify link: <code style="word-break:break-all;"><?= e($verifyUrl) ?></code>
@@ -715,7 +778,6 @@ if ($qrHtml === '') {
 </div>
 <?php endfor; ?>
 </div>
-<?php if ($printLayout === 'triple'): ?>
 <script>
 (function () {
     function fitTriplePages() {
@@ -733,6 +795,24 @@ if ($qrHtml === '') {
             inner.style.transform = (scale < 0.995) ? ('scale(' + scale + ')') : 'none';
         });
     }
+    var modal = document.getElementById('folioPaperModal');
+    function showFolioModal() {
+        if (modal) modal.removeAttribute('hidden');
+    }
+    function hideFolioModal() {
+        if (modal) modal.setAttribute('hidden', 'hidden');
+        setTimeout(fitTriplePages, 50);
+    }
+    var dismiss = document.getElementById('folioModalDismiss');
+    var printNow = document.getElementById('folioModalPrint');
+    var printBtn = document.getElementById('folioPrintBtn');
+    if (dismiss) dismiss.addEventListener('click', hideFolioModal);
+    if (printNow) printNow.addEventListener('click', function () {
+        hideFolioModal();
+        setTimeout(function () { window.print(); }, 80);
+    });
+    if (printBtn) printBtn.addEventListener('click', showFolioModal);
+    showFolioModal();
     window.addEventListener('load', fitTriplePages);
     window.addEventListener('resize', fitTriplePages);
     if (window.matchMedia) {
@@ -744,7 +824,6 @@ if ($qrHtml === '') {
     setTimeout(fitTriplePages, 300);
 })();
 </script>
-<?php endif; ?>
 </body>
 </html>
 
