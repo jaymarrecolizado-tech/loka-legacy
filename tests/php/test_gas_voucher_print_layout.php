@@ -25,6 +25,11 @@ foreach (['dual', 'triple', 'single', 'folio', '', null] as $raw) {
     expect("{$tag} one sheet", $got['copiesOnOneSheet'], true);
 }
 
+expect('litters', gasVoucherNormalizeUnit('litters'), 'liters');
+expect('Litter', gasVoucherNormalizeUnit('Litter'), 'liters');
+expect('litres', gasVoucherNormalizeUnit('litres'), 'liters');
+expect('FULL TANK keep', gasVoucherNormalizeUnit('FULL TANK'), 'FULL TANK');
+expect('empty unit', gasVoucherNormalizeUnit(null), '');
 expect('empty path', gasVoucherEsignSrc(null), null);
 expect('blank path', gasVoucherEsignSrc(''), null);
 expect('reject traversal', gasVoucherEsignSrc('uploads/../.env'), null);

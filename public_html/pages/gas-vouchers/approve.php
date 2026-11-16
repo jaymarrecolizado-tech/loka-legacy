@@ -30,6 +30,10 @@ if (!$voucher) {
     redirectWith('/?page=gas-vouchers', 'danger', 'Voucher not found.');
 }
 
+require_once INCLUDES_PATH . '/gas_voucher_print.php';
+$voucher->unit = gasVoucherNormalizeUnit($voucher->unit ?? '');
+$voucher->other_unit = gasVoucherNormalizeUnit($voucher->other_unit ?? '');
+
 // Determine which step we're at and what actions are available.
 // Step 2 is flag-gated ONLY (Plan #31 decision 2): Admin / Motorpool / CAF /
 // All Father cannot act on pending_budget unless separately flagged.

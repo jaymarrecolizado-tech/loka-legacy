@@ -111,7 +111,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $otherItems   = postSafe('other_items', '', 500);
     $otherQty     = post('other_qty', '');
-    $otherUnit    = postSafe('other_unit', '', 20);
+    require_once INCLUDES_PATH . '/gas_voucher_print.php';
+    $otherUnit    = gasVoucherNormalizeUnit(postSafe('other_unit', '', 20));
+    if ($quantityMode !== 'full') {
+        $unit = gasVoucherNormalizeUnit($unit) ?: 'Liters';
+    }
     $fundSource   = postSafe('fund_source', '', 100);
     $purpose      = postSafe('purpose', '', 1000);
     $chargeableAgainst = postSafe('chargeable_against', '', 100);
@@ -538,7 +542,14 @@ require_once INCLUDES_PATH . '/header.php';
                                     <input type="number" name="other_qty" class="form-control form-control-sm w-100" step="0.01" min="0.01" placeholder="Qty" value="<?= e($d?->other_qty ?? '') ?>">
                                 </div>
                                 <div class="col-md-3">
-                                    <input type="text" name="other_unit" class="form-control form-control-sm w-100" placeholder="Unit" value="<?= e($d?->other_unit ?? '') ?>">
+                                    <input type="text" name="other_unit" class="form-control form-control-sm w-100" list="otherUnitOptions" placeholder="liters" value="<?= e($d?->other_unit ?? '') ?>">
+                                    <datalist id="otherUnitOptions">
+                                        <option value="liters"></option>
+                                        <option value="pcs"></option>
+                                        <option value="bottles"></option>
+                                        <option value="cans"></option>
+                                        <option value="quarts"></option>
+                                    </datalist>
                                 </div>
                                 <div class="col-md-6">
                                     <input type="text" name="other_items" class="form-control form-control-sm w-100" placeholder="e.g., Engine Oil, Brake Fluid" value="<?= e($d?->other_items ?? '') ?>">

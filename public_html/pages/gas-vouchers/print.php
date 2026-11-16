@@ -42,6 +42,8 @@ if ($voucher->requested_by_user_id != userId() && !isAdmin() && !isApprover() &&
 }
 
 require_once INCLUDES_PATH . '/gas_voucher_print.php';
+$voucher->unit = gasVoucherNormalizeUnit($voucher->unit ?? '');
+$voucher->other_unit = gasVoucherNormalizeUnit($voucher->other_unit ?? '');
 $printOpts = gasVoucherPrintLayout();
 $printLayout = $printOpts['layout'];
 $copyCount = $printOpts['copyCount'];

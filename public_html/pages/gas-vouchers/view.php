@@ -35,6 +35,10 @@ if (!$voucher) {
     redirectWith('/?page=gas-vouchers', 'danger', 'Gas voucher not found.');
 }
 
+require_once INCLUDES_PATH . '/gas_voucher_print.php';
+$voucher->unit = gasVoucherNormalizeUnit($voucher->unit ?? '');
+$voucher->other_unit = gasVoucherNormalizeUnit($voucher->other_unit ?? '');
+
 // Access control: only owner, admin, approvers, Chief Admin/Finance, or Budget Officers can view
 if ($voucher->requested_by_user_id != userId() && !isAdmin() && !isApprover() && !isMotorpool() && !isChiefAdminFinance() && !isBudgetOfficer()) {
     redirectWith('/?page=gas-vouchers', 'danger', 'Access denied.');

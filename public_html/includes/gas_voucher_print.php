@@ -14,6 +14,32 @@ function gasVoucherPrintLayout(?string $raw = null): array
     ];
 }
 
+/** Canonical unit labels for gas voucher articles (corrects common misspellings). */
+function gasVoucherNormalizeUnit(?string $unit): string
+{
+    $raw = trim((string) $unit);
+    if ($raw === '') {
+        return '';
+    }
+    $key = strtolower(preg_replace('/\s+/', ' ', $raw) ?? $raw);
+    $map = [
+        'litter' => 'liters',
+        'litters' => 'liters',
+        'liter' => 'liters',
+        'litre' => 'liters',
+        'litres' => 'liters',
+        'ltr' => 'liters',
+        'ltrs' => 'liters',
+        'pc' => 'pcs',
+        'pcs' => 'pcs',
+        'piece' => 'pcs',
+        'pieces' => 'pcs',
+        'full tank' => 'FULL TANK',
+        'fulltank' => 'FULL TANK',
+    ];
+    return $map[$key] ?? $raw;
+}
+
 /**
  * Embed a user specimen as a data URI for print (no extra HTTP during print).
  * Only paths under uploads/ are accepted.
