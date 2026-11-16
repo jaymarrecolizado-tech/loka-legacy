@@ -601,10 +601,10 @@ if ($qrHtml === '') {
 
 <div id="folioPaperModal" class="folio-modal-backdrop no-print" role="dialog" aria-modal="true" aria-labelledby="folioPaperTitle">
     <div class="folio-modal">
-        <h2 id="folioPaperTitle">Use 8.5×13 in / folio paper</h2>
+        <h2 id="folioPaperTitle">Use 8.5×13 inches / folio paper</h2>
         <p>Gas vouchers print as <strong>three copies on one sheet</strong>. Please load:</p>
         <span class="folio-size">8.5 × 13 inches (Folio / long bond)</span>
-        <p>In the print dialog set paper to <strong>8.5 × 13 in</strong>, not A4 or Legal 14 in. Margins <strong>None</strong>, scale <strong>100% / Actual size</strong>.</p>
+        <p>In the print dialog set paper to <strong>8.5 × 13 inches</strong>, not A4 or Legal 14 inches. Margins <strong>None</strong>, scale <strong>100% / Actual size</strong>.</p>
         <div class="folio-actions">
             <button type="button" class="folio-btn-secondary" id="folioModalDismiss">Got it</button>
             <button type="button" class="folio-btn-primary" id="folioModalPrint">Print now</button>
@@ -615,10 +615,10 @@ if ($qrHtml === '') {
 <!-- Print Controls -->
 <div class="no-print" style="text-align:center;padding:12px;background:#f8f9fa;border-bottom:1px solid #ddd;margin-bottom:15px;font-family:sans-serif;">
     <button type="button" id="folioPrintBtn" style="background:#0d6efd;color:#fff;border:none;padding:8px 24px;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;">
-        Print Voucher (8.5×13)
+        Print Voucher (8.5×13 inches)
     </button>
     <a href="javascript:history.back()" style="margin-left:15px;color:#666;text-decoration:none;">&larr; Back to App</a>
-    <div style="margin-top:8px;font-size:13px;color:#084298;">Three copies on one sheet. Paper: <strong>8.5 × 13 in</strong> (Folio / long bond).</div>
+    <div style="margin-top:8px;font-size:13px;color:#084298;">Three copies on one sheet. Paper: <strong>8.5 × 13 inches</strong> (Folio / long bond).</div>
     <div style="margin-top:10px;padding:8px 12px;background:#e7f1ff;border:1px solid #9ec5fe;border-radius:6px;display:inline-block;max-width:720px;font-size:13px;color:#084298;text-align:left;">
         <strong>Phone scan tip:</strong> Join the same Wi-Fi as this PC, then scan again.<br>
         Verify link: <code style="word-break:break-all;"><?= e($verifyUrl) ?></code>
