@@ -729,15 +729,15 @@ if ($qrHtml === '') {
                 <?= e($voucher->fuel_type) ?>
             </td>
         </tr>
-        <?php if ($voucher->other_items || $voucher->other_qty || $voucher->other_unit): ?>
+        <?php foreach (gasVoucherExtraArticles($voucher) as $extra): ?>
         <tr class="article-row">
-            <td class="center"><?= e($voucher->other_qty) ?></td>
-            <td class="center"><?= e($voucher->other_unit) ?></td>
+            <td class="center"><?= e($extra['qty']) ?></td>
+            <td class="center"><?= e($extra['unit']) ?></td>
             <td colspan="2" style="vertical-align:middle; color:#000;">
-                <?= e($voucher->other_items) ?>
+                <?= e($extra['item']) ?>
             </td>
         </tr>
-        <?php endif; ?>
+        <?php endforeach; ?>
 
         <!-- Purpose & Charging -->
         <tr>

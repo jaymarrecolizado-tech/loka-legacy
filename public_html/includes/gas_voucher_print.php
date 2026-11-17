@@ -36,8 +36,38 @@ function gasVoucherNormalizeUnit(?string $unit): string
         'pieces' => 'pcs',
         'full tank' => 'FULL TANK',
         'fulltank' => 'FULL TANK',
+        'ml' => 'ML',
+        'ml.' => 'ML',
+        'milliliter' => 'ML',
+        'milliliters' => 'ML',
+        'millilitre' => 'ML',
+        'millilitres' => 'ML',
     ];
     return $map[$key] ?? $raw;
+}
+
+/** Extra article lines (engine oil, brake fluid, etc.) after the fuel row. */
+function gasVoucherExtraArticles(object $voucher): array
+{
+    $lines = [];
+    $slots = [
+        ['other_qty', 'other_unit', 'other_items'],
+        ['other_qty_2', 'other_unit_2', 'other_items_2'],
+    ];
+    foreach ($slots as [$qtyKey, $unitKey, $itemKey]) {
+        $qty = $voucher->$qtyKey ?? null;
+        $unit = $voucher->$unitKey ?? null;
+        $item = $voucher->$itemKey ?? null;
+        if (($qty === null || $qty === '') && ($unit === null || $unit === '') && ($item === null || $item === '')) {
+            continue;
+        }
+        $lines[] = [
+            'qty' => $qty,
+            'unit' => gasVoucherNormalizeUnit($unit !== null ? (string) $unit : ''),
+            'item' => trim((string) $item),
+        ];
+    }
+    return $lines;
 }
 
 /**

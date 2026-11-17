@@ -30,6 +30,24 @@ expect('Litter', gasVoucherNormalizeUnit('Litter'), 'liters');
 expect('litres', gasVoucherNormalizeUnit('litres'), 'liters');
 expect('FULL TANK keep', gasVoucherNormalizeUnit('FULL TANK'), 'FULL TANK');
 expect('empty unit', gasVoucherNormalizeUnit(null), '');
+expect('ml to ML', gasVoucherNormalizeUnit('ml'), 'ML');
+expect('milliliters', gasVoucherNormalizeUnit('milliliters'), 'ML');
+
+$extraVoucher = (object) [
+    'other_qty' => 2,
+    'other_unit' => 'litters',
+    'other_items' => 'Engine oil',
+    'other_qty_2' => 270,
+    'other_unit_2' => 'ml',
+    'other_items_2' => 'Brake fluid',
+];
+$extras = gasVoucherExtraArticles($extraVoucher);
+expect('extra count', count($extras), 2);
+expect('extra1 item', $extras[0]['item'], 'Engine oil');
+expect('extra1 unit', $extras[0]['unit'], 'liters');
+expect('extra2 item', $extras[1]['item'], 'Brake fluid');
+expect('extra2 unit', $extras[1]['unit'], 'ML');
+expect('extra2 qty', $extras[1]['qty'], 270);
 expect('empty path', gasVoucherEsignSrc(null), null);
 expect('blank path', gasVoucherEsignSrc(''), null);
 expect('reject traversal', gasVoucherEsignSrc('uploads/../.env'), null);

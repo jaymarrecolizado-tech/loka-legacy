@@ -197,13 +197,13 @@ require_once INCLUDES_PATH . '/header.php';
                                         <td><?= e($voucher->unit) ?></td>
                                         <td><?= e($voucher->fuel_type) ?></td>
                                     </tr>
-                                    <?php if ($voucher->other_items || $voucher->other_qty || $voucher->other_unit): ?>
+                                    <?php foreach (gasVoucherExtraArticles($voucher) as $extra): ?>
                                     <tr>
-                                        <td><?= e($voucher->other_qty) ?></td>
-                                        <td><?= e($voucher->other_unit) ?></td>
-                                        <td><?= e($voucher->other_items) ?></td>
+                                        <td><?= e($extra['qty']) ?></td>
+                                        <td><?= e($extra['unit']) ?></td>
+                                        <td><?= e($extra['item']) ?></td>
                                     </tr>
-                                    <?php endif; ?>
+                                    <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>

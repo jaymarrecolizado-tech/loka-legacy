@@ -480,17 +480,17 @@ require_once INCLUDES_PATH . '/header.php';
                             <small class="text-muted">Purpose</small>
                             <div><?= e($voucher->purpose) ?></div>
                         </div>
-                        <?php if ($voucher->other_items || $voucher->other_qty || $voucher->other_unit): ?>
+                        <?php foreach (gasVoucherExtraArticles($voucher) as $extra): ?>
                         <div class="col-12">
-                            <small class="text-muted">Other Items</small>
+                            <small class="text-muted">Other Item</small>
                             <div>
-                                <?php if ($voucher->other_qty || $voucher->other_unit): ?>
-                                    <strong><?= e($voucher->other_qty) ?> <?= e($voucher->other_unit) ?></strong> - 
+                                <?php if (($extra['qty'] !== null && $extra['qty'] !== '') || $extra['unit'] !== ''): ?>
+                                    <strong><?= e($extra['qty']) ?> <?= e($extra['unit']) ?></strong> -
                                 <?php endif; ?>
-                                <?= e($voucher->other_items) ?>
+                                <?= e($extra['item']) ?>
                             </div>
                         </div>
-                        <?php endif; ?>
+                        <?php endforeach; ?>
                     </div>
                 </div>
             </div>

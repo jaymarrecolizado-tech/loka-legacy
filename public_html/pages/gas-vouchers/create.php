@@ -113,6 +113,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $otherQty     = post('other_qty', '');
     require_once INCLUDES_PATH . '/gas_voucher_print.php';
     $otherUnit    = gasVoucherNormalizeUnit(postSafe('other_unit', '', 20));
+    $otherItems2  = postSafe('other_items_2', '', 500);
+    $otherQty2    = post('other_qty_2', '');
+    $otherUnit2   = gasVoucherNormalizeUnit(postSafe('other_unit_2', '', 20));
     if ($quantityMode !== 'full') {
         $unit = gasVoucherNormalizeUnit($unit) ?: 'Liters';
     }
@@ -180,6 +183,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'requested_budget_officer_id' => $requestedBudgetOfficerId,
             'updated_at'         => date(DATETIME_FORMAT),
         ];
+        if (db()->fetch("SHOW COLUMNS FROM gas_vouchers LIKE 'other_items_2'")) {
+            $data['other_items_2'] = $otherItems2 ?: null;
+            $data['other_qty_2'] = ($otherQty2 !== '' && $otherQty2 !== null) ? (float) $otherQty2 : null;
+            $data['other_unit_2'] = $otherUnit2 ?: null;
+        }
 
         db()->beginTransaction();
         try {
@@ -537,26 +545,38 @@ require_once INCLUDES_PATH . '/header.php';
                         <div class="col-md-12 mt-2">
                             <hr class="border-base-300">
                             <label class="form-label small">Other Articles / Particulars (Optional)</label>
+                            <datalist id="otherUnitOptions">
+                                <option value="liters"></option>
+                                <option value="ML"></option>
+                                <option value="pcs"></option>
+                                <option value="bottles"></option>
+                                <option value="cans"></option>
+                                <option value="quarts"></option>
+                            </datalist>
                             <div class="row g-2">
                                 <div class="col-md-3">
                                     <input type="number" name="other_qty" class="form-control form-control-sm w-100" step="0.01" min="0.01" placeholder="Qty" value="<?= e($d?->other_qty ?? '') ?>">
                                 </div>
                                 <div class="col-md-3">
                                     <input type="text" name="other_unit" class="form-control form-control-sm w-100" list="otherUnitOptions" placeholder="liters" value="<?= e($d?->other_unit ?? '') ?>">
-                                    <datalist id="otherUnitOptions">
-                                        <option value="liters"></option>
-                                        <option value="pcs"></option>
-                                        <option value="bottles"></option>
-                                        <option value="cans"></option>
-                                        <option value="quarts"></option>
-                                    </datalist>
                                 </div>
                                 <div class="col-md-6">
-                                    <input type="text" name="other_items" class="form-control form-control-sm w-100" placeholder="e.g., Engine Oil, Brake Fluid" value="<?= e($d?->other_items ?? '') ?>">
+                                    <input type="text" name="other_items" class="form-control form-control-sm w-100" placeholder="e.g., Engine oil" value="<?= e($d?->other_items ?? '') ?>">
+                                </div>
+                            </div>
+                            <div class="row g-2 mt-1">
+                                <div class="col-md-3">
+                                    <input type="number" name="other_qty_2" class="form-control form-control-sm w-100" step="0.01" min="0.01" placeholder="Qty" value="<?= e($d?->other_qty_2 ?? '') ?>">
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="text" name="other_unit_2" class="form-control form-control-sm w-100" list="otherUnitOptions" placeholder="ML" value="<?= e($d?->other_unit_2 ?? '') ?>">
+                                </div>
+                                <div class="col-md-6">
+                                    <input type="text" name="other_items_2" class="form-control form-control-sm w-100" placeholder="e.g., Brake fluid" value="<?= e($d?->other_items_2 ?? '') ?>">
                                 </div>
                             </div>
                             <label class="form-label">
-                                <span class="form-text text-muted d-block small text-muted">Specify any additional items needing separate quantity and unit on the voucher.</span>
+                                <span class="form-text text-muted d-block small text-muted">Use a separate line for each extra item (qty, unit, article). Example: Engine oil in liters, Brake fluid in ML.</span>
                             </label>
                         </div>
                     </div>

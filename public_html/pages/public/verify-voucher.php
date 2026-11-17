@@ -166,9 +166,12 @@ $paymentNotice = match ($paymentStatus) {
                 <div>
                     <p class="text-uppercase text-muted mb-1" style="font-size:10px;">Fuel / Article</p>
                     <p class="h5 fw-bold mb-0 text-uppercase"><?= e($voucher->fuel_type) ?></p>
-                    <?php if (!empty($voucher->other_items)): ?>
-                    <p class="small text-muted mb-0 mt-1">+ <?= e($voucher->other_items) ?></p>
-                    <?php endif; ?>
+                    <?php
+                    require_once INCLUDES_PATH . '/gas_voucher_print.php';
+                    foreach (gasVoucherExtraArticles($voucher) as $extra):
+                    ?>
+                    <p class="small text-muted mb-0 mt-1">+ <?= e(trim(($extra['qty'] !== null && $extra['qty'] !== '' ? $extra['qty'] . ' ' : '') . $extra['unit'] . ' ' . $extra['item'])) ?></p>
+                    <?php endforeach; ?>
                 </div>
                 <div class="text-end">
                     <p class="text-uppercase text-muted mb-1" style="font-size:10px;">Quantity</p>
