@@ -60,6 +60,10 @@ $isProduction = (getenv('APP_ENV') === 'production');
 // Loading .env unconditionally guarantees SMTP, APP_URL, and all other vars are
 // available in BOTH web and cron contexts, regardless of the hosting panel config.
 $envFile = dirname(__DIR__) . '/.env';
+// Nginx/CloudPanel may serve webroot files; keep secrets outside docroot as ../.env.lokastage when needed
+if (!file_exists($envFile)) {
+    $envFile = dirname(__DIR__) . '/../.env.lokastage';
+}
 if (file_exists($envFile)) {
     loadEnvFile($envFile);
 } else {

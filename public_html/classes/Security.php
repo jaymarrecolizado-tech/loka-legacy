@@ -491,13 +491,27 @@ class Security
     }
 
     /**
+     * Runtime dir for ban/rate JSON (outside the document root when LOKA_LOG_DIR is set).
+     */
+    private function securityDataDir(string $sub): string
+    {
+        $base = defined('LOKA_LOG_DIR') ? LOKA_LOG_DIR : (__DIR__ . '/../logs');
+        $dir = rtrim($base, '/') . '/' . $sub;
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0750, true);
+            @chmod($dir, 0770);
+        }
+        return $dir;
+    }
+
+    /**
      * Get ban file path for an IP
      */
     private function getBanFilePath(string $ip): string
     {
         // Create a hash of the IP to avoid filename issues
         $hash = md5($ip);
-        return __DIR__ . '/../logs/bans/' . $hash . '.json';
+        return $this->securityDataDir('bans') . '/' . $hash . '.json';
     }
 
     /**
@@ -539,7 +553,8 @@ class Security
             // Create directory if needed
             $rateDir = dirname($rateFile);
             if (!is_dir($rateDir)) {
-                @mkdir($rateDir, 0755, true);
+                @mkdir($rateDir, 0750, true);
+                @chmod($rateDir, 0770);
             }
         }
 
@@ -556,7 +571,7 @@ class Security
     private function getRateFilePath(string $ip): string
     {
         $hash = md5($ip);
-        return __DIR__ . '/../logs/rates/' . $hash . '.json';
+        return $this->securityDataDir('rates') . '/' . $hash . '.json';
     }
 
     /**
@@ -623,7 +638,7 @@ class Security
         $now = time();
 
         // Clean up old rate files
-        $rateDir = __DIR__ . '/../logs/rates/';
+        $rateDir = $this->securityDataDir('rates') . '/';
         if (is_dir($rateDir)) {
             foreach (glob($rateDir . '*.json') as $file) {
                 if ($now - filemtime($file) > 3600) { // 1 hour old
@@ -633,7 +648,7 @@ class Security
         }
 
         // Clean up expired ban files
-        $banDir = __DIR__ . '/../logs/bans/';
+        $banDir = $this->securityDataDir('bans') . '/';
         if (is_dir($banDir)) {
             foreach (glob($banDir . '*.json') as $file) {
                 $data = json_decode(file_get_contents($file), true);
@@ -649,8 +664,8 @@ class Security
      */
     public function getSecurityStatus(): array
     {
-        $banDir = __DIR__ . '/../logs/bans/';
-        $rateDir = __DIR__ . '/../logs/rates/';
+        $banDir = $this->securityDataDir('bans') . '/';
+        $rateDir = $this->securityDataDir('rates') . '/';
 
         $activeBans = 0;
         if (is_dir($banDir)) {

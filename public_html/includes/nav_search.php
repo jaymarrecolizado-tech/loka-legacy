@@ -53,17 +53,20 @@ function getNavSearchItems(): array
         $add('My Trips', '/?page=my-trips', 'bi-truck', 'Main', 'my trips driver trips');
     }
     $add('Completed Trips', '/?page=completed-trips', 'bi-check-all', 'Main', 'completed trips history');
+    $add('OB Pass Slips', '/?page=ob-requests', 'bi-file-earmark-ruled', 'Main', 'official business pass slip OB certificate of appearance CoA gate stamp queue departure arrival');
     if (function_exists('canAccessGasVouchers') && canAccessGasVouchers()) {
         $add('Gas Vouchers', '/?page=gas-vouchers', 'bi-fuel-pump', 'Main', 'gas vouchers fuel');
     }
     $add('Availability', '/?page=schedule&action=calendar', 'bi-calendar3', 'Main', 'availability schedule calendar planning');
 
-    if (isApprover()) {
+    if (canAccessMyTripTickets()) {
         $add('My Trip Tickets', '/?page=my-trip-tickets', 'bi-file-earmark-text', 'Main', 'my trip tickets');
     }
-    if (isGuard()) {
+    if (canAccessGuardDashboard()) {
         $add('Guard Dashboard', '/?page=guard', 'bi-shield-check', 'Main', 'guard dispatch arrival');
-        $add('Trip Tickets', '/?page=trip-tickets', 'bi-file-earmark-text', 'Main', 'trip tickets guard');
+    }
+    if (canAccessLiveBoard()) {
+        $add('Live Trip Board', '/?page=live-board', 'bi-display', 'Main', 'live board trips overdue dispatch wall');
     }
     if (isMotorpool() || isAdmin()) {
         $add('Review Trip Tickets', '/?page=trip-tickets', 'bi-clipboard-check', 'Main', 'review trip tickets motorpool');
@@ -92,7 +95,10 @@ function getNavSearchItems(): array
     // Reports
     if (canAccessReports()) {
         $add('Reports', '/?page=reports', 'bi-bar-chart', 'Reports', 'reports analytics');
-        $add('Driver Rankings', '/?page=reports&action=driver-rankings', 'bi-trophy', 'Reports', 'driver rankings evaluation rating anonymous');
+        if (canViewDriverRankings()) {
+            $add('Driver Rankings', '/?page=reports&action=driver-rankings', 'bi-trophy', 'Reports', 'driver rankings evaluation rating anonymous');
+        }
+        $add('Driver Trip Extract', '/?page=reports&action=driver-trip-extract', 'bi-table', 'Reports', 'driver trip extract assigned trips ratings export csv pdf');
         $add('Evaluations', '/?page=evaluations', 'bi-star-half', 'Reports', 'evaluations driver rating feedback anonymous');
         if (isApprover()) {
             $add('Vehicle History', '/?page=reports&action=vehicle-history', 'bi-clock-history', 'Reports', 'vehicle history trips');
@@ -111,7 +117,7 @@ function getNavSearchItems(): array
     }
     if (isAdmin()) {
         $add('Audit Logs', '/?page=audit', 'bi-journal-text', 'Administration', 'audit logs history');
-        $add('Request Rollback', '/?page=rollback', 'bi-arrow-counterclockwise', 'Administration', 'request rollback admin revert');
+        $add('Workflow Rollback', '/?page=rollback', 'bi-arrow-counterclockwise', 'Administration', 'rollback revert admin stage trip ob gas voucher');
         $add('Settings', '/?page=settings', 'bi-gear', 'Administration', 'settings booking rules travel order confirmations');
     }
 

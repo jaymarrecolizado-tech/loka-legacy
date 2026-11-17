@@ -8,7 +8,7 @@
  *  - settings defaults (idempotent)
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'fleetdb';
 $dbUser = 'root';
@@ -99,10 +99,10 @@ try {
     // --- Settings defaults (idempotent) ---
     $now = date('Y-m-d H:i:s');
     $defaults = [
-        ['trip_confirmation_enabled', '1', 'bool', 'trips'],
-        ['trip_confirmation_lead_hours', '24', 'int', 'trips'],
-        ['trip_confirmation_same_day_lead_minutes', '60', 'int', 'trips'],
-        ['trip_confirmation_window_minutes', '60', 'int', 'trips'],
+        ['trip_confirmation_enabled', '1', 'boolean', 'trips'],
+        ['trip_confirmation_lead_hours', '24', 'integer', 'trips'],
+        ['trip_confirmation_same_day_lead_minutes', '60', 'integer', 'trips'],
+        ['trip_confirmation_window_minutes', '60', 'integer', 'trips'],
     ];
 
     $stmt = $pdo->prepare(

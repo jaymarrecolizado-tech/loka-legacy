@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forgot password — DICT Region 2 SSO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=Public+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/sso.css">
+</head>
+<body>
+<main class="shell">
+  {% include "_shell_left.html" %}
+  <div class="shell-right">
+    <div class="desk-top"></div>
+    <div class="form-wrap">
+      <div class="eyebrow fade-up delay-150"><span class="eyebrow-mark"></span>Account Recovery</div>
+      <h1 class="fade-up delay-150">Forgot password</h1>
+      <p class="sub fade-up delay-200">Enter your work email. If an SSO account exists, you will get a one-time set-password link.</p>
+      {% if message %}<div class="alert alert-ok" role="status">{{ message }}</div>{% endif %}
+      {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+      {% if not done %}
+      <form method="POST" action="/forgot-password" autocomplete="off">
+        <div class="field fade-up delay-250">
+          <label for="email">Government Email <span class="req">*</span></label>
+          <input type="email" id="email" name="email" required autofocus placeholder="name@dict.gov.ph">
+        </div>
+        <div class="fade-up delay-300">
+          <button class="btn" type="submit">Send set-password link</button>
+        </div>
+      </form>
+      {% endif %}
+      <a class="link-muted fade-up delay-350" href="/portal-login">Back to sign in</a>
+    </div>
+    <footer class="colophon">
+      Republic of the Philippines • Department of Information and Communications Technology • Region 2 (Cagayan Valley)
+      <div class="sub-line">Government Agency System Authentication Registry</div>
+    </footer>
+  </div>
+</main>
+</body>
+</html>

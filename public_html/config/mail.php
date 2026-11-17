@@ -240,6 +240,132 @@ define('MAIL_TEMPLATES', [
         'template' => 'A trip you are part of may be affected by a vehicle/driver override.'
     ],
     
+    // OB Pass Slip (Plan #22) — OB titles, never "Vehicle Request"
+    'ob_submitted' => [
+        'subject' => 'OB Pass Slip For Your Approval',
+        'template' => 'An Official Business Pass Slip requires your approval as immediate supervisor.'
+    ],
+    'ob_submitted_motorpool' => [
+        'subject' => 'OB Pass Slip Submitted',
+        'template' => 'An Official Business Pass Slip has been filed and will require motorpool approval after the supervisor.'
+    ],
+    'ob_supervisor_approved' => [
+        'subject' => 'OB Pass Slip Approved by Supervisor',
+        'template' => 'Your OB Pass Slip was approved by your immediate supervisor and is now awaiting motorpool approval.'
+    ],
+    'ob_fully_approved' => [
+        'subject' => 'OB Pass Slip Approved',
+        'template' => 'Your OB Pass Slip is fully approved. You can now print it and have the guard record your departure.'
+    ],
+    'ob_rejected' => [
+        'subject' => 'OB Pass Slip Rejected',
+        'template' => 'Your OB Pass Slip was rejected. Please check the comments.'
+    ],
+    'ob_revision' => [
+        'subject' => 'OB Pass Slip Sent Back for Revision',
+        'template' => 'Your OB Pass Slip was sent back for revision. Please review the comments and resubmit.'
+    ],
+    'ob_cancelled' => [
+        'subject' => 'OB Pass Slip Cancelled',
+        'template' => 'An OB Pass Slip you are involved in has been cancelled by the requester.'
+    ],
+    'ob_departed' => [
+        'subject' => 'OB Departure Recorded',
+        'template' => 'Your Official Business departure time has been recorded by the guard on duty.'
+    ],
+    'ob_arrived' => [
+        'subject' => 'OB Arrival Recorded',
+        'template' => 'Your Official Business arrival time has been recorded by the guard on duty.'
+    ],
+    'ob_coa_signed' => [
+        'subject' => 'OB Pass Slip Ready to Finalize',
+        'template' => 'The Certificate of Appearance has been signed. Your OB Pass Slip is ready to finalize.'
+    ],
+    'ob_finalized' => [
+        'subject' => 'OB Pass Slip Completed',
+        'template' => 'Your OB Pass Slip has been finalized. The PDF is now the complete record.'
+    ],
+
+    // Guard gate bells (Plan #27) — stamp work appeared
+    'guard_trip_approved' => [
+        'subject' => 'Vehicle Trip Ready for the Gate',
+        'template' => 'An approved vehicle trip is waiting for dispatch at the gate.'
+    ],
+    'guard_ob_ready' => [
+        'subject' => 'OB Pass Slip Ready for the Gate',
+        'template' => 'An approved Official Business Pass Slip is waiting for its departure stamp.'
+    ],
+
+    // Gas vouchers (incl. Plan #31 budget step)
+    'gas_voucher_submitted' => [
+        'subject' => 'New Gas Voucher Request',
+        'template' => 'A gas voucher has been submitted and needs review.'
+    ],
+    'gas_voucher_reviewed' => [
+        'subject' => 'Gas Voucher Reviewed',
+        'template' => 'A gas voucher has been reviewed by Motorpool and is moving to the next approval step.'
+    ],
+    'gas_voucher_budget_pending' => [
+        'subject' => 'Gas Voucher Awaiting Budget Certification',
+        'template' => 'A gas voucher has been reviewed by Motorpool and requires Budget Officer certification.'
+    ],
+    'gas_voucher_budget_approved' => [
+        'subject' => 'Gas Voucher Budget Certified',
+        'template' => 'A gas voucher has been certified by the Budget Officer and is awaiting final approval.'
+    ],
+    'gas_voucher_approved' => [
+        'subject' => 'Gas Voucher Approved',
+        'template' => 'A gas voucher has been fully approved and may be printed for fuel pickup.'
+    ],
+    'gas_voucher_rejected' => [
+        'subject' => 'Gas Voucher Rejected',
+        'template' => 'A gas voucher has been rejected. Please check the comments.'
+    ],
+    'gas_voucher_revision' => [
+        'subject' => 'Gas Voucher Returned for Revision',
+        'template' => 'A gas voucher was returned for revision. Please correct it and resubmit for Motorpool review.'
+    ],
+    'gas_voucher_cancelled' => [
+        'subject' => 'Gas Voucher Cancelled',
+        'template' => 'A gas voucher has been cancelled.'
+    ],
+    'gas_voucher_payment_updated' => [
+        'subject' => 'Gas Voucher Payment Updated',
+        'template' => 'The payment status of a gas voucher has been updated.'
+    ],
+
+    // Workflow rollback (Plan #39)
+    'request_rolled_back' => [
+        'subject' => 'Request Rolled Back',
+        'template' => 'A vehicle request was rolled back to an earlier workflow stage by an administrator.'
+    ],
+    'ob_rolled_back' => [
+        'subject' => 'OB Pass Slip Rolled Back',
+        'template' => 'An Official Business Pass Slip was rolled back to an earlier workflow stage by an administrator.'
+    ],
+    'gas_voucher_rolled_back' => [
+        'subject' => 'Gas Voucher Rolled Back',
+        'template' => 'A gas voucher was rolled back to an earlier workflow stage by an administrator.'
+    ],
+
+    // Repair tickets (Plan #38 — report filed, scheduled, reminder ladder)
+    'maintenance_reported' => [
+        'subject' => 'New Repair Report',
+        'template' => 'A repair request has been filed and is awaiting Motorpool attention.'
+    ],
+    'maintenance_scheduled' => [
+        'subject' => 'Repair Scheduled',
+        'template' => 'A repair request you reported has been scheduled by Motorpool.'
+    ],
+    'maintenance_reminder' => [
+        'subject' => 'Repair Reminder',
+        'template' => 'A repair request is approaching or past its scheduled date.'
+    ],
+    'care_schedule_reminder' => [
+        'subject' => 'Vehicle Care Reminder',
+        'template' => 'A vehicle care item is approaching or past its due date.'
+    ],
+
     // Default fallback template
     'default' => [
         'subject' => 'LOKA Notification',

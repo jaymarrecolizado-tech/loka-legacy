@@ -7,7 +7,7 @@
 if (!defined('BOOKING_RULE_DEFAULTS')) {
     define('BOOKING_RULE_DEFAULTS', [
         'max_advance_booking_days' => 30,
-        'min_advance_booking_hours' => 24,
+        'min_advance_booking_hours' => 0,
         'max_trip_duration_hours' => 72,
     ]);
 }
@@ -67,7 +67,9 @@ function validateBookingRules(DateTime $startDt, DateTime $endDt): array
 
     $hoursUntilStart = ($startDt->getTimestamp() - $now->getTimestamp()) / 3600;
 
-    if ($hoursUntilStart < $rules['min_advance_booking_hours']) {
+    if ($hoursUntilStart < 0) {
+        $errors[] = 'Start date/time cannot be in the past. You may book for today if the start time is still ahead.';
+    } elseif ($rules['min_advance_booking_hours'] > 0 && $hoursUntilStart < $rules['min_advance_booking_hours']) {
         $errors[] = "Bookings must be made at least {$rules['min_advance_booking_hours']} hours in advance. Please select a later start time.";
     }
 

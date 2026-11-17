@@ -6,6 +6,10 @@
  * This prevents direct access to the uploads directory
  */
 
+if (function_exists('requireAuth')) {
+    requireAuth();
+}
+
 $filePath = get('file', '');
 $fileType = get('type', 'unknown');
 

@@ -643,6 +643,26 @@ try {
         }
     }
 
+    // Guard bell (Plan #27): an approved fleet trip is waiting for gate dispatch.
+    // Skipped when the vehicle already left; bound-OB slips are covered by this
+    // same trip bell (no separate OB bell for bound slips).
+    if ($approvalAction === 'approve' && $newStatus === STATUS_APPROVED
+        && empty($request->actual_dispatch_datetime)) {
+        try {
+            notifyRoleUsers(
+                [ROLE_GUARD],
+                'guard_trip_approved',
+                'Vehicle Trip Ready for the Gate',
+                'Request #' . $requestId . ' to ' . ($request->destination ?? '') . ' is approved and waiting for gate dispatch.',
+                '/?page=guard',
+                null,
+                (int) $requestId
+            );
+        } catch (Throwable $e) {
+            error_log('guard trip-approved bell #' . $requestId . ': ' . $e->getMessage());
+        }
+    }
+
     // =====================================================
     // SEND NOTIFICATIONS AFTER SUCCESSFUL COMMIT
     // This prevents orphaned emails if transaction fails

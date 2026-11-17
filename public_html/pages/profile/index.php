@@ -20,9 +20,54 @@ $departments = db()->fetchAll(
     "SELECT id, name FROM departments WHERE deleted_at IS NULL ORDER BY name"
 );
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// ---- Messenger connections (Plan #35) --------------------------------------
+$channelFlash = null;      // [type, message]
+$connectLinks = [];        // channel => ['token' => ..., 'link' => ..., 'code' => ...]
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('op', '') !== '') {
     requireCsrf();
-    
+    $op = (string) post('op', '');
+    $opChannel = (string) post('channel', '');
+
+    try {
+        if (!in_array($opChannel, LOKA_CHANNELS, true)) {
+            throw new InvalidArgumentException('Unknown messenger channel.');
+        }
+        $label = CHANNEL_DEFAULTS[$opChannel]['label'];
+
+        if ($op === 'connect_channel') {
+            if (!channelEnabled($opChannel)) {
+                throw new RuntimeException(ucfirst($label) . ' notifications are not enabled yet. Ask an administrator.');
+            }
+            $botUser = trim(channelConfig('telegram', 'telegram_bot_username'));
+            if ($botUser === '') {
+                throw new RuntimeException('The Telegram bot is not configured yet. Ask an administrator to set the bot username.');
+            }
+            $token = channelMintLinkToken((int) userId(), 'telegram');
+            $connectLinks['telegram'] = [
+                'token' => $token,
+                'link'  => 'https://t.me/' . $botUser . '?start=' . $token,
+                'code'  => '/start ' . $token,
+            ];
+            $channelFlash = ['info', 'Open the link below (or send the code to the bot) within 30 minutes to link this account.'];
+            auditLog('channel_connect_started', 'user', (int) userId(), null, ['channel' => $opChannel]);
+        } elseif ($op === 'disconnect_channel') {
+            channelClearBinding((int) userId(), $opChannel);
+            $channelFlash = ['success', ucfirst($label) . ' disconnected.'];
+        }
+    } catch (Throwable $e) {
+        $channelFlash = ['danger', $e->getMessage()];
+    }
+
+    // refresh bindings for display
+    $channelBindings = channelGetBindings((int) userId());
+} else {
+    $channelBindings = channelGetBindings((int) userId());
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('op', '') === '') {
+    requireCsrf();
+
     $name = postSafe('name', '', 100);
     $phone = postSafe('phone', '', 20);
     $departmentId = postInt('department_id') ?: null;
@@ -119,6 +164,13 @@ require_once INCLUDES_PATH . '/header.php';
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
     <?php endif; ?>
+
+    <?php if ($channelFlash): ?>
+    <div class="alert alert-<?= e($channelFlash[0]) ?> alert-dismissible fade show">
+        <?= e($channelFlash[1]) ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <?php endif; ?>
     
     <div class="row g-4">
         <div class="col-lg-4">
@@ -129,7 +181,10 @@ require_once INCLUDES_PATH . '/header.php';
                         <?= strtoupper(substr($user->name, 0, 1)) ?>
                     </div>
                     <h5 class="mb-1"><?= e($user->name) ?></h5>
-                    <p class="text-muted mb-2"><?= e($user->email) ?></p>
+                    <p class="text-muted mb-1"><?= e($user->email) ?></p>
+                    <?php if (!empty($user->official_email)): ?>
+                    <p class="small text-muted mb-2">Office: <?= e($user->official_email) ?></p>
+                    <?php endif; ?>
                     <?= roleBadge($user->role) ?>
                     <hr>
                     <div class="text-start">
@@ -137,6 +192,77 @@ require_once INCLUDES_PATH . '/header.php';
                         <p class="mb-1"><strong>Phone:</strong> <?= e($user->phone ?: '-') ?></p>
                         <p class="mb-0"><strong>Member since:</strong> <?= formatDate($user->created_at) ?></p>
                     </div>
+                </div>
+            </div>
+
+            <!-- Messenger connections (Plan #35) -->
+            <div class="card mt-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-chat-heart me-2"></i>Messenger Alerts</h6>
+                </div>
+                <div class="card-body">
+                    <?php foreach (LOKA_CHANNELS as $chName): ?>
+                    <?php
+                        $chLabel = CHANNEL_DEFAULTS[$chName]['label'];
+                        $chIcon = CHANNEL_DEFAULTS[$chName]['icon'];
+                        $chBinding = null;
+                        foreach ($channelBindings as $cb) {
+                            if ($cb->channel === $chName) {
+                                $chBinding = $cb;
+                                break;
+                            }
+                        }
+                    ?>
+                    <div class="d-flex align-items-center justify-content-between border rounded p-2 mb-2">
+                        <div class="me-2">
+                            <div class="fw-semibold"><i class="bi <?= e($chIcon) ?> me-1"></i><?= e($chLabel) ?></div>
+                            <?php if ($chBinding): ?>
+                            <div class="small text-muted">
+                                <span class="badge bg-success">Connected</span>
+                                via <?= e($chBinding->linked_via === 'admin' ? 'administrator' : 'self-link') ?>
+                                · <?= e(date('M j, Y', strtotime((string) $chBinding->linked_at))) ?>
+                            </div>
+                            <?php else: ?>
+                            <div class="small text-muted">Not connected</div>
+                            <?php endif; ?>
+                        </div>
+                        <div class="text-nowrap">
+                            <?php if ($chBinding): ?>
+                            <form method="POST" class="d-inline" onsubmit="return confirm('Disconnect <?= e($chLabel) ?> alerts?');">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="op" value="disconnect_channel">
+                                <input type="hidden" name="channel" value="<?= e($chName) ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Disconnect</button>
+                            </form>
+                            <?php else: ?>
+                            <form method="POST" class="d-inline">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="op" value="connect_channel">
+                                <input type="hidden" name="channel" value="<?= e($chName) ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Connect</button>
+                            </form>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php if ($chBinding): ?>
+                    <div class="small text-muted mb-2">Chat: <code><?= e($chBinding->chat_id) ?></code></div>
+                    <?php endif; ?>
+                    <?php endforeach; ?>
+
+                    <?php foreach ($connectLinks as $chName => $cl): ?>
+                    <div class="alert alert-info small mb-2">
+                        <div class="fw-semibold mb-1">
+                            <i class="bi <?= e(CHANNEL_DEFAULTS[$chName]['icon']) ?> me-1"></i>
+                            Finish linking <?= e(CHANNEL_DEFAULTS[$chName]['label']) ?> (code expires in 30 minutes):
+                        </div>
+                        <div class="mb-1">1. Open this one-time link: <a href="<?= e($cl['link']) ?>" class="fw-bold" rel="noopener"><?= e($cl['link']) ?></a></div>
+                        <div>2. Or send this code to the bot: <code class="user-select-all"><?= e($cl['code']) ?></code></div>
+                    </div>
+                    <?php endforeach; ?>
+
+                    <p class="form-text small mb-0">
+                        Linked accounts receive LOKA Fleet alerts on that messenger. Admins can also set these for you in User Management.
+                    </p>
                 </div>
             </div>
         </div>
@@ -164,9 +290,14 @@ require_once INCLUDES_PATH . '/header.php';
                                 <input type="text" class="form-control" name="name" value="<?= e(post('name', $user->name)) ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Email</label>
+                                <label class="form-label">Individual Email</label>
                                 <input type="email" class="form-control" value="<?= e($user->email) ?>" disabled>
                                 <small class="text-muted">Contact admin to change email</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Official / Office Email</label>
+                                <input type="email" class="form-control" value="<?= e($user->official_email ?? '') ?>" disabled>
+                                <small class="text-muted">Shared unit mailbox; contact admin to change</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Phone</label>

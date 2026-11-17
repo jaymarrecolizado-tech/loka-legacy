@@ -5,7 +5,7 @@
  * Adds trip_type_other column and updates trip_type ENUM to include 'travel_order'
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'loka_fleet';
 $dbUser = 'root';

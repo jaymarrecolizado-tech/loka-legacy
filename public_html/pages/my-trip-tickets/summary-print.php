@@ -413,7 +413,17 @@ if ($__verifyUrl) {
             background: transparent;
             box-sizing: border-box;
             display: block;
+            /* Plan #29: never paint scrollbar chrome (screen or PDF) */
+            overflow: hidden !important;
+            scrollbar-width: none;              /* Firefox */
+            -ms-overflow-style: none;           /* old Edge/IE */
             }
+
+        .tbl-trip textarea.auto-expand::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+            display: none;                      /* Chromium / Safari */
+        }
 
         .tbl-trip textarea.auto-expand::placeholder {
             color: #ccc;
@@ -423,20 +433,33 @@ if ($__verifyUrl) {
         .tbl-trip textarea {
             overflow: hidden;
             resize: none;
+            min-height: 22px;
+            height: auto;
         }
 
         @media print {
             .tbl-trip textarea {
                 -webkit-appearance: none;
                 appearance: none;
-                overflow: visible !important;
-                height: auto !important;
+                /* Plan #29: hidden beats visible in Chromium PDF — a visible
+                   box taller than its content paints scrollbar chrome */
+                overflow: hidden !important;
+                height: auto !important;      /* size from the rows attribute */
+                max-height: none !important;  /* never clip mid-text */
                 white-space: pre-wrap !important;
                 word-break: break-word !important;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+                field-sizing: content;        /* progressive: size to content where supported */
             }
             .tbl-trip textarea.auto-expand {
-                overflow: visible !important;
-                height: auto !important;
+                overflow: hidden !important;
+                max-height: none !important;
+            }
+            .tbl-trip textarea.auto-expand::-webkit-scrollbar {
+                width: 0;
+                height: 0;
+                display: none;
             }
             .tbl-trip td {
                 height: auto !important;
@@ -570,6 +593,47 @@ if ($__verifyUrl) {
 
             .tbl-trip td {
                 padding: 0 !important;
+            }
+
+            /* Empty pad rows: keep the grid, drop placeholder / native date chrome */
+            input::placeholder,
+            textarea::placeholder {
+                color: transparent !important;
+                opacity: 0 !important;
+            }
+
+            input.print-empty,
+            textarea.print-empty {
+                visibility: hidden !important;
+            }
+
+            input.print-empty[type="date"],
+            input.print-empty[type="time"] {
+                color: transparent !important;
+                -webkit-text-fill-color: transparent !important;
+                caret-color: transparent !important;
+            }
+
+            input.print-empty[type="date"]::-webkit-datetime-edit,
+            input.print-empty[type="date"]::-webkit-datetime-edit-fields-wrapper,
+            input.print-empty[type="date"]::-webkit-datetime-edit-text,
+            input.print-empty[type="date"]::-webkit-datetime-edit-month-field,
+            input.print-empty[type="date"]::-webkit-datetime-edit-day-field,
+            input.print-empty[type="date"]::-webkit-datetime-edit-year-field,
+            input.print-empty[type="time"]::-webkit-datetime-edit,
+            input.print-empty[type="time"]::-webkit-datetime-edit-fields-wrapper,
+            input.print-empty[type="time"]::-webkit-datetime-edit-text,
+            input.print-empty[type="time"]::-webkit-datetime-edit-hour-field,
+            input.print-empty[type="time"]::-webkit-datetime-edit-minute-field,
+            input.print-empty[type="time"]::-webkit-datetime-edit-ampm-field {
+                color: transparent !important;
+                -webkit-text-fill-color: transparent !important;
+            }
+
+            input.print-empty[type="date"]::-webkit-calendar-picker-indicator,
+            input.print-empty[type="time"]::-webkit-calendar-picker-indicator {
+                display: none !important;
+                opacity: 0 !important;
             }
         }
 
@@ -824,7 +888,7 @@ if ($__verifyUrl) {
         <a href="<?= APP_URL ?>/" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><span>🏠</span> Home</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">← Back to My Trip Tickets</a>
         <a href="<?= APP_URL ?>/?page=my-trip-tickets&action=generate-summary" class="btn btn-reset" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">↩ Generate</a>
-        <button class="btn btn-print" onclick="if(validateTicket()) window.print()">🖨 Print / Save PDF</button>
+        <button class="btn btn-print" onclick="if(validateTicket()) { resizeTripTextareas(); markEmptyDateTimesForPrint(); requestAnimationFrame(function () { window.print(); }); }">🖨 Print / Save PDF</button>
         <button class="btn btn-reset" onclick="resetForm()">↺ Clear Form</button>
     </div>
     <?php if ($__verifyUrl): ?>
@@ -957,8 +1021,8 @@ if ($__verifyUrl) {
                                 <td rowspan="<?= $peopleCount ?>"><input type="time" value="<?= date('H:i', strtotime($t->end_date)) ?>"></td>
                                 <td rowspan="<?= $peopleCount ?>"><input type="text" placeholder="km" value="<?= $t->start_mileage ?>"></td>
                                 <td rowspan="<?= $peopleCount ?>"><input type="text" placeholder="km" value="<?= $t->end_mileage ?>"></td>
-                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Destination" rows="1" maxlength="500"><?= e($t->destination) ?></textarea></td>
-                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Purpose" rows="1" maxlength="500"><?= e($t->purpose) ?></textarea></td>
+                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Destination" rows="<?= tripTicketTextareaRows($t->destination, 22) ?>"><?= e($t->destination) ?></textarea></td>
+                                <td rowspan="<?= $peopleCount ?>"><textarea class="left auto-expand" placeholder="Purpose" rows="<?= tripTicketTextareaRows($t->purpose, 22) ?>"><?= e($t->purpose) ?></textarea></td>
                             <?php endif; ?>
                             <td style="padding:1px 3px;">
                                 <div style="display:flex; align-items:center; justify-content:flex-start; gap:0; white-space:nowrap; width:100%;">
@@ -977,7 +1041,7 @@ if ($__verifyUrl) {
                     $remaining = 8 - $tripRowCount;
                     for ($j = 0; $j < max(0, $remaining); $j++):
                     ?>
-                        <tr>
+                        <tr class="blank-pad">
                             <td><input type="date"></td>
                             <td><input type="time"></td>
                             <td><input type="time"></td>
@@ -1132,14 +1196,19 @@ if ($__verifyUrl) {
                 <select class="sig-select" id="sigApprover" onchange="updateApproverTitle()">
                     <option value="">Select Approver...</option>
                     <?php
-                    $defaultApprover = 'MINA FLOR T. VILLAFUERTE';
-                    $approverRows = $approvers ?? [];
-                    $hasDefault = false;
+                    $approverRows = array_values(array_filter($approvers ?? [], function ($arow) {
+                        return stripos((string) $arow->name, 'VILLAFUERTE') === false;
+                    }));
+                    $defaultApprover = '';
                     foreach ($approverRows as $arow) {
-                        if (strcasecmp($arow->name, $defaultApprover) === 0) { $hasDefault = true; break; }
+                        $n = strtoupper(preg_replace('/\s+/', ' ', trim((string) $arow->name)));
+                        if (strpos($n, 'JEMAR') !== false && strpos($n, 'DEL ROSARIO') !== false) {
+                            $defaultApprover = $arow->name;
+                            break;
+                        }
                     }
-                    if (!$hasDefault) {
-                        $approverRows[] = (object) ['name' => $defaultApprover, 'role' => ROLE_CHIEF_ADMIN_FINANCE];
+                    if ($defaultApprover === '' && $approverRows) {
+                        $defaultApprover = $approverRows[0]->name;
                     }
                     foreach ($approverRows as $arow): ?>
                         <option value="<?= e($arow->name) ?>" data-role="<?= e($arow->role) ?>" <?= strcasecmp($arow->name, $defaultApprover) === 0 ? 'selected' : '' ?>><?= strtoupper(e($arow->name)) ?></option>
@@ -1245,14 +1314,44 @@ if ($__verifyUrl) {
             el.style.height = el.scrollHeight + 'px';
         }
 
+        function resizeTripTextareas() {
+            document.querySelectorAll('textarea.auto-expand').forEach(el => autoResizeTextarea(el));
+        }
+        window.addEventListener('DOMContentLoaded', resizeTripTextareas); // Plan #29: run before first paint of tall text
         window.addEventListener('load', function() {
+            resizeTripTextareas();
             document.querySelectorAll('textarea.auto-expand').forEach(el => {
-                autoResizeTextarea(el);
                 el.addEventListener('input', function() {
                     autoResizeTextarea(this);
                 });
             });
             calcTotals();
+        });
+        window.addEventListener('beforeprint', resizeTripTextareas);
+
+        function markEmptyDateTimesForPrint() {
+            document.querySelectorAll('input, textarea').forEach(function (el) {
+                if (el.type === 'hidden' || el.type === 'checkbox' || el.type === 'radio') return;
+                if (!el.value) {
+                    el.classList.add('print-empty');
+                    if (el.placeholder) {
+                        el.dataset.printPh = el.placeholder;
+                        el.placeholder = '';
+                    }
+                } else {
+                    el.classList.remove('print-empty');
+                }
+            });
+        }
+        window.addEventListener('beforeprint', markEmptyDateTimesForPrint);
+        window.addEventListener('afterprint', function () {
+            document.querySelectorAll('.print-empty').forEach(function (el) {
+                el.classList.remove('print-empty');
+                if (el.dataset.printPh !== undefined) {
+                    el.placeholder = el.dataset.printPh;
+                    delete el.dataset.printPh;
+                }
+            });
         });
 
         // Handle page numbering with CSS counter (most reliable method)

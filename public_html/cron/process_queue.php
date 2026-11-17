@@ -30,6 +30,8 @@ if (php_sapi_name() !== 'cli') {
     die('CLI access only');
 }
 
+require_once __DIR__ . '/../includes/harden_logs.php';
+
 // Output IMMEDIATELY so we can see the script started (before any config loading)
 echo date('[Y-m-d H:i:s]') . " [PID:" . getmypid() . "] process_queue.php started\n";
 
@@ -50,6 +52,9 @@ chdir(dirname(__DIR__));
 // pre-load, SMTP credentials stay empty and every email silently fails with:
 //   "MAIL_USERNAME and MAIL_PASSWORD must be configured"
 $envFile = __DIR__ . '/../.env';
+if (!file_exists($envFile)) {
+    $envFile = __DIR__ . '/../../.env.lokastage';
+}
 if (file_exists($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
@@ -68,9 +73,9 @@ if (file_exists($envFile)) {
             $_SERVER[$key] = $value;
         }
     }
-    echo date('[Y-m-d H:i:s]') . " .env loaded from: {$envFile}\n";
+    echo date('[Y-m-d H:i:s]') . " .env loaded\n";
 } else {
-    echo date('[Y-m-d H:i:s]') . " WARNING: .env file not found at: {$envFile}\n";
+    echo date('[Y-m-d H:i:s]') . " WARNING: .env file not found\n";
 }
 
 // Load configuration (with error trapping so we can diagnose failures)
@@ -83,7 +88,7 @@ $configFiles = [
 foreach ($configFiles as $cf) {
     $path = __DIR__ . '/../config/' . $cf;
     if (!file_exists($path)) {
-        echo date('[Y-m-d H:i:s]') . " FATAL: Config file missing: {$path}\n";
+        echo date('[Y-m-d H:i:s]') . " FATAL: Config file missing: {$cf}\n";
         exit(1);
     }
     $result = @require_once $path;
@@ -99,7 +104,7 @@ $classFiles = ['Database.php', 'Mailer.php', 'EmailQueue.php'];
 foreach ($classFiles as $cf) {
     $path = __DIR__ . '/../classes/' . $cf;
     if (!file_exists($path)) {
-        echo date('[Y-m-d H:i:s]') . " FATAL: Class file missing: {$path}\n";
+        echo date('[Y-m-d H:i:s]') . " FATAL: Class file missing: {$cf}\n";
         exit(1);
     }
     require_once $path;
@@ -107,7 +112,7 @@ foreach ($classFiles as $cf) {
 
 // Diagnostic output after config loaded
 echo date('[Y-m-d H:i:s]') . " Config loaded. MAIL_ENABLED=" . (defined('MAIL_ENABLED') ? (MAIL_ENABLED ? 'true' : 'false') : 'UNDEF')
-    . " MAIL_HOST=" . (defined('MAIL_HOST') ? MAIL_HOST : 'UNDEF')
+    . " MAIL_HOST=" . (defined('MAIL_HOST') && MAIL_HOST !== '' ? 'SET' : 'EMPTY')
     . " MAIL_USER=" . (defined('MAIL_USERNAME') ? (MAIL_USERNAME ? 'SET' : 'EMPTY') : 'UNDEF') . "\n";
 
 // Configuration

@@ -70,7 +70,8 @@ $pdf->SetHeaderData('', 0, 'DICT - Driver Report',
     $driverInfo->name . ' | Period: ' . $startDate . ' to ' . $endDate);
 $pdf->setHeaderFont([PDF_FONT_NAME_MAIN, '', 10]);
 $pdf->setFooterFont([PDF_FONT_NAME_DATA, '', 8]);
-$pdf->SetMargins(15, 15, 15);
+$pdf->SetMargins(15, 28, 15);
+$pdf->SetHeaderMargin(8);
 $pdf->SetAutoPageBreak(TRUE, 15);
 $pdf->AddPage();
 
@@ -162,17 +163,20 @@ $pdf->Cell(0, 7, 'TRIP HISTORY', 0, 1);
 $columns = ['ID', 'Date/Time', 'Vehicle', 'Destination', 'Purpose', 'Requester', 'Dept', 'Pass', 'Status', 'Duration', 'Km', 'Fuel (L)', 'Fuel Cost', 'Dispatch', 'Arrival'];
 $colWidths = [9, 24, 20, 29, 29, 21, 20, 9, 14, 14, 13, 12, 14, 17, 17];
 
-$pdf->SetFont('helvetica', 'B', 7);
-$pdf->SetFillColor(13, 110, 253);
-$pdf->SetTextColor(255, 255, 255);
-foreach ($columns as $i => $col) {
-    $pdf->Cell($colWidths[$i], 6, $col, 1, 0, 'C', true);
-}
-$pdf->Ln();
+$printTableHeader = function () use ($pdf, $columns, $colWidths) {
+    $pdf->SetFont('helvetica', 'B', 7);
+    $pdf->SetFillColor(13, 110, 253);
+    $pdf->SetTextColor(255, 255, 255);
+    foreach ($columns as $i => $col) {
+        $pdf->Cell($colWidths[$i], 6, $col, 1, 0, 'C', true);
+    }
+    $pdf->Ln();
+    $pdf->SetFillColor(248, 248, 248);
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->SetFont('helvetica', '', 6.5);
+};
 
-$pdf->SetFillColor(248, 248, 248);
-$pdf->SetTextColor(0, 0, 0);
-$pdf->SetFont('helvetica', '', 6.5);
+$printTableHeader();
 
 $lineHeight = 4;
 $fill = false;
@@ -189,7 +193,7 @@ foreach ($trips as $trip) {
         $trip->id,
         $scheduled,
         $vehicle,
-        $trip->destination ?: '-',
+        formatDestinationChain($trip->destination),
         $trip->purpose ?: '-',
         $trip->requester_name ?: '-',
         $trip->department_name ?: '-',
@@ -203,18 +207,26 @@ foreach ($trips as $trip) {
         $trip->actual_arrival_datetime ? date('m/d H:i', strtotime($trip->actual_arrival_datetime)) : '-'
     ];
 
-    // Full text with wrapping - no truncation. Row height = tallest cell.
     $rowMax = 1;
     foreach ($rowData as $i => $val) {
-        $n = $pdf->getNumLines($val, $colWidths[$i]);
+        $n = $pdf->getNumLines((string) $val, $colWidths[$i]);
         if ($n > $rowMax) $rowMax = $n;
     }
     $rowH = $rowMax * $lineHeight;
 
-    foreach ($rowData as $i => $val) {
-        $pdf->MultiCell($colWidths[$i], $lineHeight, $val, 1, 'L', $fill, 0, '', '', true, 0, false, true, $rowH, 'M');
+    if ($pdf->GetY() + $rowH > $pdf->getPageHeight() - 20) {
+        $pdf->AddPage();
+        $printTableHeader();
+        $fill = false;
     }
-    $pdf->Ln($rowH);
+
+    $x = $pdf->GetX();
+    $y = $pdf->GetY();
+    foreach ($rowData as $i => $val) {
+        $pdf->SetXY($x + array_sum(array_slice($colWidths, 0, $i)), $y);
+        $pdf->MultiCell($colWidths[$i], $rowH, (string) $val, 1, 'L', $fill);
+    }
+    $pdf->SetY($y + $rowH);
     $fill = !$fill;
 }
 

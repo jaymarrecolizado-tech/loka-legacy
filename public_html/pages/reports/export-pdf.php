@@ -42,6 +42,7 @@ $requests = db()->fetchAll(
     "SELECT r.id, r.created_at, r.start_datetime, r.end_datetime, r.purpose, r.destination,
             r.passenger_count, r.status, r.notes,
             r.mileage_start, r.mileage_end, r.mileage_actual,
+            r.has_official_business_slip,
             u.name as requester, dept.name as department,
             v.plate_number, v.make as vehicle_make, v.model as vehicle_model,
             dr_u.name as driver,
@@ -78,7 +79,8 @@ $pdf->SetHeaderData('', 0, 'DICT - Fleet Management Report',
     'Period: ' . $startDate . ' to ' . $endDate . ' | Generated: ' . date('Y-m-d H:i:s'));
 $pdf->setHeaderFont([PDF_FONT_NAME_MAIN, '', 10]);
 $pdf->setFooterFont([PDF_FONT_NAME_DATA, '', 8]);
-$pdf->SetMargins(15, 15, 15);
+$pdf->SetMargins(15, 28, 15);
+$pdf->SetHeaderMargin(8);
 $pdf->SetAutoPageBreak(TRUE, 15);
 $pdf->AddPage();
 
@@ -109,20 +111,23 @@ $tripKm = function ($row) {
     return null;
 };
 
-$columns = ['ID', 'Created', 'Scheduled', 'Requester', 'Dept', 'Destination', 'Purpose', 'Vehicle', 'Driver', 'Status', 'Pax', 'Duration', 'Km', 'Fuel (L)', 'Dispatch', 'Arrival'];
-$colWidths = [9, 15, 24, 20, 19, 28, 28, 14, 17, 13, 8, 14, 12, 11, 16, 17];
+$columns = ['ID', 'Created', 'Scheduled', 'Requester', 'Dept', 'Destination', 'Purpose', 'Vehicle', 'Driver', 'Status', 'OB', 'Pax', 'Duration', 'Km', 'Fuel (L)', 'Dispatch', 'Arrival'];
+$colWidths = [9, 15, 24, 20, 19, 25, 24, 14, 17, 13, 9, 8, 14, 12, 11, 16, 17];
 
-$pdf->SetFont('helvetica', 'B', 7);
-$pdf->SetFillColor(13, 110, 253);
-$pdf->SetTextColor(255, 255, 255);
-foreach ($columns as $i => $col) {
-    $pdf->Cell($colWidths[$i], 6, $col, 1, 0, 'C', true);
-}
-$pdf->Ln();
+$printTableHeader = function () use ($pdf, $columns, $colWidths) {
+    $pdf->SetFont('helvetica', 'B', 7);
+    $pdf->SetFillColor(13, 110, 253);
+    $pdf->SetTextColor(255, 255, 255);
+    foreach ($columns as $i => $col) {
+        $pdf->Cell($colWidths[$i], 6, $col, 1, 0, 'C', true);
+    }
+    $pdf->Ln();
+    $pdf->SetFillColor(248, 248, 248);
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->SetFont('helvetica', '', 6.5);
+};
 
-$pdf->SetFillColor(248, 248, 248);
-$pdf->SetTextColor(0, 0, 0);
-$pdf->SetFont('helvetica', '', 6.5);
+$printTableHeader();
 
 $lineHeight = 4;
 $fill = false;
@@ -140,11 +145,12 @@ foreach ($requests as $row) {
         $scheduled,
         $row->requester ?: '-',
         $row->department ?: '-',
-        $row->destination ?: '-',
+        formatDestinationChain($row->destination),
         $row->purpose ?: '-',
         $row->plate_number ?: '-',
         $row->driver ?: '-',
         ucfirst($row->status),
+        $row->has_official_business_slip ? 'OB' : '',
         $row->passenger_count ?: '-',
         $duration,
         $km !== null ? number_format($km) : '-',
@@ -153,18 +159,26 @@ foreach ($requests as $row) {
         $row->actual_arrival_datetime ? date('m/d H:i', strtotime($row->actual_arrival_datetime)) : '-'
     ];
 
-    // Full text with wrapping - no truncation. Row height = tallest cell.
     $rowMax = 1;
     foreach ($rowData as $i => $val) {
-        $n = $pdf->getNumLines($val, $colWidths[$i]);
+        $n = $pdf->getNumLines((string) $val, $colWidths[$i]);
         if ($n > $rowMax) $rowMax = $n;
     }
     $rowH = $rowMax * $lineHeight;
 
-    foreach ($rowData as $i => $val) {
-        $pdf->MultiCell($colWidths[$i], $lineHeight, $val, 1, 'L', $fill, 0, '', '', true, 0, false, true, $rowH, 'M');
+    if ($pdf->GetY() + $rowH > $pdf->getPageHeight() - 20) {
+        $pdf->AddPage();
+        $printTableHeader();
+        $fill = false;
     }
-    $pdf->Ln($rowH);
+
+    $x = $pdf->GetX();
+    $y = $pdf->GetY();
+    foreach ($rowData as $i => $val) {
+        $pdf->SetXY($x + array_sum(array_slice($colWidths, 0, $i)), $y);
+        $pdf->MultiCell($colWidths[$i], $rowH, (string) $val, 1, 'L', $fill);
+    }
+    $pdf->SetY($y + $rowH);
     $fill = !$fill;
 }
 

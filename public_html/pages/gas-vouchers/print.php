@@ -12,12 +12,18 @@ if (!$voucherId) {
 $voucher = db()->fetch(
     "SELECT gv.*,
             u.name AS requester_name,
+            u.signature_path AS requester_signature_path,
             reviewer.name AS reviewer_name,
-            approver.name AS approver_name_full
+            reviewer.signature_path AS reviewer_signature_path,
+            approver.name AS approver_name_full,
+            approver.signature_path AS approver_signature_path,
+            budget_officer.name AS budget_officer_name,
+            budget_officer.signature_path AS budget_signature_path
      FROM gas_vouchers gv
      JOIN users u ON gv.requested_by_user_id = u.id
      LEFT JOIN users reviewer ON gv.reviewed_by = reviewer.id
      LEFT JOIN users approver ON gv.approved_by = approver.id
+     LEFT JOIN users budget_officer ON gv.budget_reviewed_by = budget_officer.id
      WHERE gv.id = ? AND gv.deleted_at IS NULL",
     [$voucherId]
 );
@@ -35,14 +41,20 @@ if ($voucher->requested_by_user_id != userId() && !isAdmin() && !isApprover() &&
     redirectWith('/?page=gas-vouchers', 'danger', 'Access denied.');
 }
 
-// dual = 2 copies on one A4 (default); single = 1 copy per A4 page (fallback)
-$printLayout = strtolower((string) get('layout', 'dual'));
-if (!in_array($printLayout, ['dual', 'single'], true)) {
-    $printLayout = 'dual';
-}
-$copyCount = 2;
+require_once INCLUDES_PATH . '/gas_voucher_print.php';
+$voucher->unit = gasVoucherNormalizeUnit($voucher->unit ?? '');
+$voucher->other_unit = gasVoucherNormalizeUnit($voucher->other_unit ?? '');
+$printOpts = gasVoucherPrintLayout();
+$printLayout = $printOpts['layout'];
+$copyCount = $printOpts['copyCount'];
+$esignMarks = [
+    'driver' => gasVoucherDriverEsignSrc($voucher),
+    'reviewer' => gasVoucherEsignSrc($voucher->reviewer_signature_path ?? null),
+    'budget' => gasVoucherEsignSrc($voucher->budget_signature_path ?? null),
+    'approver' => gasVoucherEsignSrc($voucher->approver_signature_path ?? null),
+];
 
-// QR Verification â€” gas stations scan this to confirm authenticity
+// QR Verification -- gas stations scan this to confirm authenticity
 $verifyUrl = gasVoucherVerifyUrl($voucher);
 $siteLooksLocal = (bool) preg_match('#://(localhost|127\.0\.0\.1)([:/]|$)#i', $verifyUrl);
 
@@ -55,7 +67,7 @@ $pngRaw = function_exists('imagecreate') ? $qrBarcode->getBarcodePngData(6, 6, [
 if (is_string($pngRaw) && $pngRaw !== '' && function_exists('imagecreatefromstring')) {
     $src = @imagecreatefromstring($pngRaw);
     if ($src !== false) {
-        // TCPDF marks white as transparent â€” flatten onto opaque white + quiet zone
+        // TCPDF marks white as transparent -- flatten onto opaque white + quiet zone
         $sw = imagesx($src);
         $sh = imagesy($src);
         $pad = (int) max(28, round(min($sw, $sh) * 0.14));
@@ -123,20 +135,25 @@ if ($qrHtml === '') {
             position: relative;
         }
 
-        /* Header block */
+        /* Header block — logos left/right, agency text centered */
         .grid-header {
-            display: d-flex;
+            display: flex;
             align-items: center;
+            justify-content: space-between;
+            gap: 12px;
             margin-bottom: 20px;
         }
         .header-logo {
             width: 100px;
+            height: auto;
+            flex-shrink: 0;
             object-fit: contain;
             mix-blend-mode: multiply; /* Fixes transparency/white background issues on print */
         }
         .header-text {
-            d-flex: 1;
+            flex: 1;
             text-align: center;
+            min-width: 0;
         }
         .header-text .republic {
             font-size: 10pt;
@@ -234,14 +251,45 @@ if ($qrHtml === '') {
         .signatures-row td {
             border: 1px solid #000;
             padding: 10px;
-            width: 33.33%;
+            width: 25%;
             vertical-align: top;
         }
 
+        .sig-stack {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 52px;
+            height: 100%;
+        }
+        .sig-signed {
+            margin-top: auto;
+            position: relative;
+            z-index: 1;
+        }
+        .sig-mark-wrap {
+            flex: 1 1 auto;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            min-height: 10mm;
+            padding: 1px 2px 0;
+            margin-bottom: -9px;
+            position: relative;
+            z-index: 2;
+        }
+        .sig-mark {
+            display: block;
+            max-height: 42px;
+            max-width: 96%;
+            width: auto;
+            object-fit: contain;
+            mix-blend-mode: multiply;
+        }
         .sig-label {
             font-size: 9pt;
             color: #333;
-            margin-bottom: 40px;
+            margin-bottom: 0;
             text-align: left;
         }
 
@@ -288,8 +336,99 @@ if ($qrHtml === '') {
             margin: 0 auto;
         }
 
+        /* 3-up: one 8.5×13 sheet, three equal slots, voucher scaled to fill each slot */
+        body.layout-triple {
+            background: #e9ecef;
+        }
+        body.layout-triple .sheet {
+            width: 8.5in;
+            height: 13in;
+            margin: 0 auto 24px;
+            background: #fff;
+            box-shadow: 0 0 0 1px #ccc;
+            padding: 5mm 6mm;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+        body.layout-triple .page {
+            width: 100%;
+            flex: 1 1 0;
+            min-height: 0;
+            height: auto;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+            position: relative;
+        }
+        body.layout-triple .page-fit {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            transform-origin: top left;
+        }
+        body.layout-triple .page-fit > .voucher-row,
+        body.layout-triple .page-fit > .grid-header,
+        body.layout-triple .page-fit > .header-title,
+        body.layout-triple .page-fit > .gas-station-title {
+            flex: 0 0 auto;
+        }
+        body.layout-triple .page-fit > .signatures-row {
+            flex: 1 1 auto;
+        }
+        body.layout-triple .signatures-row td {
+            height: 16mm;
+            vertical-align: top;
+            padding: 2px 4px 3px;
+        }
+        body.layout-triple .sig-stack {
+            min-height: 14mm;
+            height: 100%;
+            justify-content: space-between;
+        }
+        body.layout-triple .sig-signed {
+            margin-top: auto;
+        }
+        body.layout-triple .sig-mark-wrap { min-height: 9mm; margin-bottom: -7px; }
+        body.layout-triple .sig-mark { max-height: 40px; }
+        body.layout-triple .page-fit > .footer-row {
+            flex: 0 0 auto;
+            margin-top: 4px !important;
+        }
+        body.layout-triple .cut-line-separator {
+            flex: 0 0 5mm;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 7pt;
+            letter-spacing: 2px;
+        }
+        body.layout-triple .grid-header { margin-bottom: 4px; gap: 8px; }
+        body.layout-triple .header-logo { width: 48px; }
+        body.layout-triple .header-text .republic { font-size: 8pt; }
+        body.layout-triple .header-text .dept { font-size: 9.5pt; margin: 1px 0; }
+        body.layout-triple .header-text .office { font-size: 7.5pt; }
+        body.layout-triple .header-title { margin: 2px 0 3px; font-size: 12pt; letter-spacing: 3px; }
+        body.layout-triple .gas-station-title { font-size: 11pt; margin-bottom: 3px; }
+        body.layout-triple .voucher-row td,
+        body.layout-triple .voucher-row th { padding: 3px 6px; font-size: 8.5pt; }
+        body.layout-triple .auth-row { padding: 4px 8px !important; font-size: 8.5pt; }
+        body.layout-triple .sig-label { margin-bottom: 0; font-size: 7.5pt; }
+        body.layout-triple .sig-name { font-size: 9pt; }
+        body.layout-triple .sig-title { font-size: 7.5pt; }
+        body.layout-triple .footer-row { margin-top: 4px !important; }
+        body.layout-triple .qr-block .qr-img { width: 72px; height: 72px; }
+        body.layout-triple .qr-block .qr-svg-pad svg { width: 64px; height: 64px; }
+
         @media print {
+            <?php if ($printLayout === 'triple'): ?>
+            @page { size: 8.5in 13in portrait; margin: 0; }
+            <?php else: ?>
             @page { size: A4 portrait; margin: 6mm; }
+            <?php endif; ?>
             body { background: #fff; margin: 0; padding: 0; font-size: 9pt; }
             .sheet { width: 100% !important; margin: 0 !important; }
             .page {
@@ -301,8 +440,9 @@ if ($qrHtml === '') {
                 break-inside: avoid;
             }
             .no-print { display: none !important; }
-            .grid-header { margin-bottom: 2px !important; }
-            .header-logo { width: 48px !important; }
+            .grid-header { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 6px !important; margin-bottom: 2px !important; }
+            .header-logo { width: 48px !important; height: auto !important; flex-shrink: 0 !important; }
+            .header-text { flex: 1 !important; }
             .header-text .republic { font-size: 8pt !important; }
             .header-text .dept { font-size: 9pt !important; margin: 1px 0 !important; }
             .header-text .office { font-size: 7.5pt !important; }
@@ -314,7 +454,8 @@ if ($qrHtml === '') {
             .articles-header th { padding: 2px !important; }
             .article-row td { padding: 3px 4px !important; font-size: 9pt !important; }
             .signatures-row td { padding: 3px !important; }
-            .sig-label { margin-bottom: 14px !important; font-size: 7.5pt !important; }
+            .sig-stack { min-height: 36px; }
+            .sig-label { margin-bottom: 0 !important; font-size: 7.5pt !important; }
             .sig-name { font-size: 9pt !important; }
             .sig-title { font-size: 7.5pt !important; }
             .distribution { margin-top: 3px !important; font-size: 7pt !important; }
@@ -332,10 +473,66 @@ if ($qrHtml === '') {
             .qr-block .qr-sub { font-size: 6.5pt !important; }
             .qr-container { margin-top: 0 !important; }
             .cut-line-separator { padding: 2px 0 !important; margin: 1.5mm 0 !important; font-size: 7pt !important; page-break-inside: avoid; }
-            .footer-row { display: d-flex; justify-content: space-between; align-items: d-flex-end; gap: 8px; margin-top: 3px !important; }
+            .footer-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; margin-top: 3px !important; }
             body.layout-single .page { page-break-after: always; break-after: page; }
             body.layout-single .page:last-of-type { page-break-after: auto; break-after: auto; }
             body.layout-single .cut-line-separator { display: none !important; }
+            html, body.layout-triple {
+                width: 8.5in !important;
+                height: 13in !important;
+                background: #fff !important;
+            }
+            body.layout-triple .sheet {
+                width: 8.5in !important;
+                height: 13in !important;
+                margin: 0 !important;
+                padding: 4mm 5mm !important;
+                box-shadow: none !important;
+                page-break-after: avoid;
+            }
+            body.layout-triple .page {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                flex: 1 1 0;
+                min-height: 0 !important;
+                height: auto !important;
+                width: 100% !important;
+                padding: 0 !important;
+                overflow: hidden;
+            }
+            body.layout-triple .cut-line-separator {
+                flex: 0 0 4.5mm;
+                margin: 0 !important;
+                padding: 0 !important;
+                font-size: 6.5pt !important;
+            }
+            body.layout-triple .grid-header { margin-bottom: 2px !important; gap: 6px !important; }
+            body.layout-triple .header-logo { width: 42px !important; }
+            body.layout-triple .header-text .republic { font-size: 7.5pt !important; }
+            body.layout-triple .header-text .dept { font-size: 9pt !important; }
+            body.layout-triple .header-text .office { font-size: 7pt !important; }
+            body.layout-triple .header-title { margin: 1px 0 2px !important; font-size: 11pt !important; letter-spacing: 2px !important; }
+            body.layout-triple .gas-station-title { font-size: 10pt !important; margin-bottom: 2px !important; }
+            body.layout-triple .voucher-row,
+            body.layout-triple .voucher-row td,
+            body.layout-triple .voucher-row th { font-size: 8pt !important; padding: 2px 4px !important; }
+            body.layout-triple .auth-row { padding: 3px 6px !important; font-size: 8pt !important; }
+            body.layout-triple .article-row td { padding: 3px 4px !important; font-size: 8.5pt !important; }
+            body.layout-triple .signatures-row td { padding: 2px 3px 2px !important; height: 15mm !important; vertical-align: top !important; }
+            body.layout-triple .sig-stack { min-height: 13mm !important; height: 100% !important; }
+            body.layout-triple .sig-label { margin-bottom: 0 !important; font-size: 7pt !important; }
+            body.layout-triple .sig-mark-wrap { min-height: 8mm; margin-bottom: -6px !important; }
+            body.layout-triple .sig-mark { max-height: 36px !important; }
+            body.layout-triple .sig-name { font-size: 8.5pt !important; }
+            body.layout-triple .sig-title { font-size: 7pt !important; }
+            body.layout-triple .distribution { margin-top: 2px !important; font-size: 7pt !important; }
+            body.layout-triple .purpose-cell { max-height: 2.2em !important; font-size: 8pt !important; }
+            body.layout-triple .qr-block .qr-img { width: 58px !important; height: 58px !important; }
+            body.layout-triple .qr-block .qr-svg-pad { padding: 4px !important; }
+            body.layout-triple .qr-block .qr-svg-pad svg { width: 52px !important; height: 52px !important; }
+            body.layout-triple .qr-block .qr-label { font-size: 6.5pt !important; margin-top: 2px !important; }
+            body.layout-triple .qr-block .qr-sub { font-size: 6pt !important; }
+            body.layout-triple .footer-row { margin-top: 3px !important; }
         }
 
         .qr-block {
@@ -359,7 +556,7 @@ if ($qrHtml === '') {
         .qr-block .qr-svg-pad {
             display: block;
             background: #fff;
-            padding: 14px; /* quiet zone â€” do not put text here */
+            padding: 14px; /* quiet zone -- do not put text here */
             line-height: 0;
         }
         .qr-block .qr-svg-pad svg {
@@ -380,43 +577,111 @@ if ($qrHtml === '') {
             color: #444;
             margin-top: 2px;
         }
+
+        .folio-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            font-family: sans-serif;
+        }
+        .folio-modal-backdrop[hidden] { display: none !important; }
+        .folio-modal {
+            background: #fff;
+            max-width: 480px;
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 16px 40px rgba(0,0,0,.25);
+            padding: 22px 24px 18px;
+            color: #212529;
+            text-align: left;
+        }
+        .folio-modal h2 {
+            margin: 0 0 10px;
+            font-size: 18px;
+            color: #084298;
+        }
+        .folio-modal p { margin: 0 0 10px; font-size: 14px; line-height: 1.45; }
+        .folio-modal .folio-size {
+            display: block;
+            font-size: 20px;
+            font-weight: 700;
+            color: #0d6efd;
+            margin: 8px 0 12px;
+        }
+        .folio-modal .folio-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 16px;
+        }
+        .folio-modal button {
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .folio-btn-secondary { background: #e9ecef; color: #212529; }
+        .folio-btn-primary { background: #0d6efd; color: #fff; }
+        @media print {
+            .folio-modal-backdrop { display: none !important; }
+        }
     </style>
 </head>
 <body class="layout-<?= e($printLayout) ?>">
 
+<div id="folioPaperModal" class="folio-modal-backdrop no-print" role="dialog" aria-modal="true" aria-labelledby="folioPaperTitle">
+    <div class="folio-modal">
+        <h2 id="folioPaperTitle">Use 8.5×13 inches / folio paper</h2>
+        <p>Gas vouchers print as <strong>three copies on one sheet</strong>. Please load:</p>
+        <span class="folio-size">8.5 × 13 inches (Folio / long bond)</span>
+        <p>In the print dialog set paper to <strong>8.5 × 13 inches</strong>, not A4 or Legal 14 inches. Margins <strong>None</strong>, scale <strong>100% / Actual size</strong>.</p>
+        <div class="folio-actions">
+            <button type="button" class="folio-btn-secondary" id="folioModalDismiss">Got it</button>
+            <button type="button" class="folio-btn-primary" id="folioModalPrint">Print now</button>
+        </div>
+    </div>
+</div>
+
 <!-- Print Controls -->
 <div class="no-print" style="text-align:center;padding:12px;background:#f8f9fa;border-bottom:1px solid #ddd;margin-bottom:15px;font-family:sans-serif;">
-    <button onclick="window.print()" style="background:#0d6efd;color:#fff;border:none;padding:8px 24px;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;">
-        Print Voucher (A4)
+    <button type="button" id="folioPrintBtn" style="background:#0d6efd;color:#fff;border:none;padding:8px 24px;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;">
+        Print Voucher (8.5×13 inches)
     </button>
-    <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=dual" style="margin-left:12px;<?= $printLayout === 'dual' ? 'font-weight:bold;' : '' ?>">2-up (1 page)</a>
-    <a href="<?= APP_URL ?>/?page=gas-vouchers&amp;action=print&amp;id=<?= (int) $voucherId ?>&amp;layout=single" style="margin-left:8px;<?= $printLayout === 'single' ? 'font-weight:bold;' : '' ?>">1 copy / page</a>
-    <a href="javascript:history.back()" style="margin-left:15px;color:#666;text-decoration:none;">â† Back to App</a>
+    <a href="javascript:history.back()" style="margin-left:15px;color:#666;text-decoration:none;">&larr; Back to App</a>
+    <div style="margin-top:8px;font-size:13px;color:#084298;">Three copies on one sheet. Paper: <strong>8.5 × 13 inches</strong> (Folio / long bond).</div>
     <div style="margin-top:10px;padding:8px 12px;background:#e7f1ff;border:1px solid #9ec5fe;border-radius:6px;display:inline-block;max-width:720px;font-size:13px;color:#084298;text-align:left;">
-        <strong>Phone scan tip:</strong> Join the same Wiâ€‘Fi as this PC, then scan again.<br>
+        <strong>Phone scan tip:</strong> Join the same Wi-Fi as this PC, then scan again.<br>
         Verify link: <code style="word-break:break-all;"><?= e($verifyUrl) ?></code>
         <?php if ($siteLooksLocal): ?>
-        <br><span style="color:#664d03;">Still using localhost â€” phones cannot open this. Set <code>SITE_URL</code> in <code>.env</code> to your LAN IP or public domain.</span>
+        <br><span style="color:#664d03;">Still using localhost -- phones cannot open this. Set <code>SITE_URL</code> in <code>.env</code> to your LAN IP or public domain.</span>
         <?php endif; ?>
     </div>
 </div>
 
 <div class="sheet">
 <?php for ($copy = 1; $copy <= $copyCount; $copy++): ?>
-<?php if ($copy === 2 && $printLayout === 'dual'): ?>
+<?php if ($copy > 1 && $printLayout !== 'single'): ?>
     <div class="cut-line-separator">CUT HERE</div>
 <?php endif; ?>
 <div class="page">
+<div class="page-fit">
 
     <!-- Formal Header -->
     <div class="grid-header">
-        <img src="<?= APP_URL ?>/assets/img/dict_logo.png" class="header-logo" alt="DICT Logo" onerror="this.style.display='none'" style="margin-right:15px;">
+        <img src="<?= APP_URL ?>/assets/img/dict_logo.png" class="header-logo" alt="DICT Logo" onerror="this.style.display='none'">
         <div class="header-text">
             <div class="republic">Republic of the Philippines</div>
             <div class="dept">Department of Information and Communications Technology</div>
             <div class="office">Regional Office 02, 02 Bagay Road, San Gabriel, Tuguegarao City, Cagayan 3500</div>
         </div>
-        <img src="<?= APP_URL ?>/assets/img/bp_logo.png" class="header-logo" alt="BP Logo" onerror="this.style.display='none'" style="margin-left:15px;">
+        <img src="<?= APP_URL ?>/assets/img/bp_logo.png" class="header-logo" alt="BP Logo" onerror="this.style.display='none'">
     </div>
 
     <div class="header-title">G A S &nbsp; V O U C H E R</div>
@@ -454,7 +719,7 @@ if ($qrHtml === '') {
         <!-- Articles Data -->
         <?php
         $isFullTank = (strcasecmp((string) $voucher->unit, 'FULL TANK') === 0) || (float) $voucher->quantity <= 0;
-        $printQty = $isFullTank ? 'â€”' : e($voucher->quantity);
+        $printQty = $isFullTank ? '-' : e($voucher->quantity);
         $printUnit = $isFullTank ? 'FULL TANK' : e($voucher->unit);
         ?>
         <tr class="article-row">
@@ -464,15 +729,15 @@ if ($qrHtml === '') {
                 <?= e($voucher->fuel_type) ?>
             </td>
         </tr>
-        <?php if ($voucher->other_items || $voucher->other_qty || $voucher->other_unit): ?>
+        <?php foreach (gasVoucherExtraArticles($voucher) as $extra): ?>
         <tr class="article-row">
-            <td class="center"><?= e($voucher->other_qty) ?></td>
-            <td class="center"><?= e($voucher->other_unit) ?></td>
+            <td class="center"><?= e($extra['qty']) ?></td>
+            <td class="center"><?= e($extra['unit']) ?></td>
             <td colspan="2" style="vertical-align:middle; color:#000;">
-                <?= e($voucher->other_items) ?>
+                <?= e($extra['item']) ?>
             </td>
         </tr>
-        <?php endif; ?>
+        <?php endforeach; ?>
 
         <!-- Purpose & Charging -->
         <tr>
@@ -489,25 +754,58 @@ if ($qrHtml === '') {
     <table class="signatures-row">
         <tr>
             <td>
-                <div class="sig-label">Requested by / Bearer:</div>
-                <div class="sig-name"><?= e(strtoupper($voucher->driver_name)) ?></div>
-                <div class="sig-title">Driver</div>
+                <div class="sig-stack">
+                    <div class="sig-label">Requested by / Bearer:</div>
+                    <?php if ($esignMarks['driver']): ?>
+                    <div class="sig-mark-wrap"><img class="sig-mark" alt="" src="<?= e($esignMarks['driver']) ?>"></div>
+                    <?php endif; ?>
+                    <div class="sig-signed">
+                        <div class="sig-name"><?= e(strtoupper($voucher->driver_name)) ?></div>
+                        <div class="sig-title">Driver</div>
+                    </div>
+                </div>
             </td>
             <td>
-                <div class="sig-label">Reviewed by:</div>
-                <div class="sig-name"><?= e(strtoupper($voucher->reviewer_name ?? 'ENGR. RONALD S. BARIUAN')) ?></div>
-                <div class="sig-title">OIC, Motor Pool Unit</div>
+                <div class="sig-stack">
+                    <div class="sig-label">Reviewed by:</div>
+                    <?php if ($esignMarks['reviewer']): ?>
+                    <div class="sig-mark-wrap"><img class="sig-mark" alt="" src="<?= e($esignMarks['reviewer']) ?>"></div>
+                    <?php endif; ?>
+                    <div class="sig-signed">
+                        <div class="sig-name"><?= e(strtoupper($voucher->reviewer_name ?? 'ENGR. RONALD S. BARIUAN')) ?></div>
+                        <div class="sig-title">OIC, Motor Pool Unit</div>
+                    </div>
+                </div>
             </td>
             <td>
-                <div class="sig-label">Approved by:</div>
-                <div class="sig-name"><?= e(strtoupper($voucher->approver_name_full ?? 'MINA FLOR T. VILLAFUERTE')) ?></div>
-                <div class="sig-title">Chief, Admin. and Finance Division</div>
+                <div class="sig-stack">
+                    <div class="sig-label">Certified by:</div>
+                    <?php if ($esignMarks['budget']): ?>
+                    <div class="sig-mark-wrap"><img class="sig-mark" alt="" src="<?= e($esignMarks['budget']) ?>"></div>
+                    <?php endif; ?>
+                    <div class="sig-signed">
+                        <div class="sig-name"><?= e(strtoupper($voucher->budget_officer_name ?? '')) ?></div>
+                        <div class="sig-title">Budget Officer</div>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <div class="sig-stack">
+                    <div class="sig-label">Approved by:</div>
+                    <?php if ($esignMarks['approver']): ?>
+                    <div class="sig-mark-wrap"><img class="sig-mark" alt="" src="<?= e($esignMarks['approver']) ?>"></div>
+                    <?php endif; ?>
+                    <div class="sig-signed">
+                        <div class="sig-name"><?= e(strtoupper($voucher->approver_name_full ?? 'MINA FLOR T. VILLAFUERTE')) ?></div>
+                        <div class="sig-title">Chief, Admin. and Finance Division</div>
+                    </div>
+                </div>
             </td>
         </tr>
     </table>
 
     
-    <div class="footer-row" style="display: d-flex; justify-content: space-between; align-items: d-flex-end; margin-top: 10px;">
+    <div class="footer-row" style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px;">
         <div class="distribution" style="margin-top: 0;">
             
         <strong>Distribution:</strong> Prepare three (3) copies.<br>
@@ -526,9 +824,55 @@ if ($qrHtml === '') {
     </div>
 
 </div>
+</div>
 <?php endfor; ?>
 </div>
-
+<script>
+(function () {
+    function fitTriplePages() {
+        document.querySelectorAll('body.layout-triple .page').forEach(function (slot) {
+            var inner = slot.querySelector('.page-fit');
+            if (!inner) return;
+            inner.style.transform = 'none';
+            var cw = slot.clientWidth;
+            var ch = slot.clientHeight;
+            var sw = inner.scrollWidth;
+            var sh = inner.scrollHeight;
+            if (cw < 8 || ch < 8 || sw < 8 || sh < 8) return;
+            var scale = Math.min(cw / sw, ch / sh, 1);
+            inner.style.transformOrigin = 'top left';
+            inner.style.transform = (scale < 0.995) ? ('scale(' + scale + ')') : 'none';
+        });
+    }
+    var modal = document.getElementById('folioPaperModal');
+    function showFolioModal() {
+        if (modal) modal.removeAttribute('hidden');
+    }
+    function hideFolioModal() {
+        if (modal) modal.setAttribute('hidden', 'hidden');
+        setTimeout(fitTriplePages, 50);
+    }
+    var dismiss = document.getElementById('folioModalDismiss');
+    var printNow = document.getElementById('folioModalPrint');
+    var printBtn = document.getElementById('folioPrintBtn');
+    if (dismiss) dismiss.addEventListener('click', hideFolioModal);
+    if (printNow) printNow.addEventListener('click', function () {
+        hideFolioModal();
+        setTimeout(function () { window.print(); }, 80);
+    });
+    if (printBtn) printBtn.addEventListener('click', showFolioModal);
+    showFolioModal();
+    window.addEventListener('load', fitTriplePages);
+    window.addEventListener('resize', fitTriplePages);
+    if (window.matchMedia) {
+        window.matchMedia('print').addListener(fitTriplePages);
+    }
+    window.addEventListener('beforeprint', fitTriplePages);
+    window.addEventListener('afterprint', fitTriplePages);
+    setTimeout(fitTriplePages, 50);
+    setTimeout(fitTriplePages, 300);
+})();
+</script>
 </body>
 </html>
 

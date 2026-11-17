@@ -4,7 +4,7 @@
  * Does not alter maintenance_requests.
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'fleetdb';
 $dbUser = 'root';

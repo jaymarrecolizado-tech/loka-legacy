@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your applications — DICT Region 2 SSO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=Public+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/sso.css">
+</head>
+<body>
+<header class="topbar fade-up">
+  <a class="brand" href="/">DICT Region 2 SSO</a>
+  <div class="user-block">
+    <div class="name">{{ user_name }}</div>
+    <div class="email">{{ user_email }}</div>
+    <a class="signout" href="{{ logout_url }}">Sign out</a>
+  </div>
+</header>
+<main class="chooser">
+  <div class="eyebrow fade-up delay-100"><span class="eyebrow-mark"></span>Regional Gateway</div>
+  <h1 class="fade-up delay-150">Your applications</h1>
+  <p class="lead fade-up delay-200">Signed in. Select a system to continue — you will not need to type your password again for this session.</p>
+  {% for app in apps %}
+  {% set aid = (app.id or '')|lower %}
+  {% if aid == 'loka' %}
+    {% set mono = 'LF' %}
+  {% elif aid == 'to' %}
+    {% set mono = 'TO' %}
+  {% else %}
+    {% set mono = (app.name or 'AP')[:2]|upper %}
+  {% endif %}
+  <a class="app-row fade-up {% if loop.index0 == 0 %}delay-250{% elif loop.index0 == 1 %}delay-350{% else %}delay-450{% endif %}" href="{{ app.url }}">
+    <div class="app-mono" aria-hidden="true">{{ mono }}</div>
+    <div class="app-body">
+      <h2>{{ app.name }}</h2>
+      <p>{{ app.description }}</p>
+    </div>
+    <span class="btn btn-sm btn-outline">Open <span class="btn-arrow">→</span></span>
+  </a>
+  {% endfor %}
+  <div class="app-placeholder fade-up delay-450">More regional systems will appear here</div>
+</main>
+</body>
+</html>

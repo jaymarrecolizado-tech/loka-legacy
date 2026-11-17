@@ -2,8 +2,9 @@
 /**
  * LOKA - Cancel Request Page (Hardened Version)
  *
- * Allows requester to cancel their own request
- * Or admin/approver to cancel any request
+ * Allows requesters to cancel their own request.
+ * Administrators / All Father may cancel any request.
+ * Approver and Motorpool all-trip visibility is read-only (Plan #30).
  *
  * Handles:
  * - Status transition to 'cancelled' with state machine validation
@@ -40,17 +41,9 @@ if (!$request) {
     redirectWith('/?page=dashboard', 'danger', 'Request not found.');
 }
 
-// Check permissions
-$canCancel = false;
-$isAdminOrApprover = isAdmin() || isApprover() || isMotorpool();
-
-if ($request->user_id == userId()) {
-    // Requester can cancel their own request if it's not already terminal
-    $canCancel = true;
-} elseif ($isAdminOrApprover) {
-    // Admin/approver can cancel requests
-    $canCancel = true;
-}
+// Visibility does not grant mutation rights: only the owner or an
+// Administrator / All Father may cancel a request (Plan #30).
+$canCancel = (int) $request->user_id === (int) userId() || isAdmin();
 
 if (!$canCancel) {
     redirectWith('/?page=requests&action=view&id=' . $requestId, 'danger', 'You cannot cancel this request.');

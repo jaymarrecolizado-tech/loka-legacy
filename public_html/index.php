@@ -5,8 +5,13 @@
  * Main Entry Point / Router
  */
 
+require_once __DIR__ . '/includes/deny_sensitive_http.php';
+
 // Load environment variables
 $envFile = __DIR__ . '/.env';
+if (!file_exists($envFile)) {
+    $envFile = __DIR__ . '/../.env.lokastage';
+}
 if (file_exists($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
@@ -33,6 +38,8 @@ require_once __DIR__ . '/config/constants.php';
 require_once __DIR__ . '/config/security.php';
 require_once __DIR__ . '/config/mail.php';
 require_once __DIR__ . '/config/sms.php';
+require_once __DIR__ . '/config/channels.php';
+require_once __DIR__ . '/config/sso.php';
 
 // Environment-based error reporting
 // Auto-detect production: check if not localhost and HTTPS is enabled
@@ -44,12 +51,16 @@ if ($isProduction) {
     error_reporting(0);
     ini_set('display_errors', 0);
     ini_set('log_errors', 1);
-    // Try to use Hostinger error log location, fallback to local
-    $errorLogPath = __DIR__ . '/logs/error.log';
-    if (!is_dir(__DIR__ . '/logs')) {
-        @mkdir(__DIR__ . '/logs', 0755, true);
+}
+
+require_once __DIR__ . '/includes/harden_logs.php';
+
+if ($isProduction) {
+    $errorLogDir = defined('LOKA_LOG_DIR') ? LOKA_LOG_DIR : (__DIR__ . '/logs');
+    if (!is_dir($errorLogDir)) {
+        @mkdir($errorLogDir, 0750, true);
     }
-    ini_set('error_log', $errorLogPath);
+    ini_set('error_log', $errorLogDir . '/error.log');
 } else {
     error_reporting(E_ALL);
     ini_set('display_errors', 1);
@@ -64,7 +75,10 @@ require_once __DIR__ . '/classes/Mailer.php';
 require_once __DIR__ . '/classes/EmailQueue.php';
 require_once __DIR__ . '/classes/SmsGateway.php';
 require_once __DIR__ . '/classes/SmsQueue.php';
+require_once __DIR__ . '/classes/ChannelQueue.php';
+require_once __DIR__ . '/classes/TelegramGateway.php';
 require_once __DIR__ . '/classes/NotificationService.php';
+require_once __DIR__ . '/classes/FileUpload.php';
 
 // Load notification templates
 require_once __DIR__ . '/config/notifications.php';
@@ -75,11 +89,14 @@ require_once __DIR__ . '/config/session.php';
 // Load helpers
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/booking-rules.php';
+require_once __DIR__ . '/includes/gps_tracking.php';
 require_once __DIR__ . '/includes/view_as.php';
 require_once __DIR__ . '/includes/sms.php';
+require_once __DIR__ . '/includes/channels.php';
 require_once __DIR__ . '/includes/mail_delivery.php';
 require_once __DIR__ . '/includes/badge_counts.php';
 require_once __DIR__ . '/includes/trip-enhancements.php';
+require_once __DIR__ . '/includes/ob_requests.php';
 
 // Initialize Security and send headers
 $security = Security::getInstance();
@@ -135,12 +152,36 @@ $auth->checkRememberMe();
 $page = get('page', 'dashboard');
 $action = get('action', 'index');
 
+// Plan #25 — CoA kiosk POST carries a hidden `token`. If the query string was
+// stripped, still send the request to the public coa-sign handler so it cannot
+// fall through to requireAuth() → login. Only the CoA form posts `name=token`.
+if (
+    ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+    && trim((string) post('token', '')) !== ''
+    && (isset($_POST['coa_office']) || isset($_POST['coa_representative']) || isset($_POST['coa_signature']))
+) {
+    $page = 'ob-requests';
+    $action = 'coa-sign';
+}
+
 // Public pages (no auth required)
-$publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'verify-ticket', 'cron'];
+// evaluations + ob-requests: only the token-gated actions are public; the
+// case handlers re-gate everything else behind requireAuth().
+// channels: messenger webhooks (Plan #35) — the endpoint validates secrets itself.
+$publicPages = ['login', 'logout', 'forgot-password', 'reset-password', 'qr', 'verify-voucher', 'verify-ticket', 'verify-coa', 'cron', 'evaluations', 'ob-requests', 'channels', 'sso-callback'];
 
 // Route handling
-if (!in_array($page, $publicPages)) {
+// Plan #44: the TO->LOKA authority link is server-to-server (HMAC shared
+// secret, verified inside the endpoint) — no session, so it skips requireAuth.
+$isAuthorityLinkApi = ($page === 'api' && get('action') === 'authority_vehicle_link');
+if (!in_array($page, $publicPages) && !$isAuthorityLinkApi) {
     requireAuth();
+}
+
+// Sidebar badge acks (Plan #27): mark the current page's pending IDs seen so
+// the pill clears until new work appears. Skip the public CoA kiosk.
+if (isLoggedIn() && !($page === 'ob-requests' && $action === 'coa-sign')) {
+    badgeMarkSeenForCurrentPage($page, $action);
 }
 
 // Page routing
@@ -154,8 +195,22 @@ switch ($page) {
         break;
 
     case 'logout':
+        // Plan #43: always end the SSO session (when enabled) and return to the
+        // central portal login — not the app's local login form.
+        require_once CONFIG_PATH . '/sso.php';
         $auth->logout();
+        if (ssoEnabled()) {
+            require_once INCLUDES_PATH . '/sso_client.php';
+            $postLogout = urlencode(rtrim(SSO_BASE_URL, '/') . '/portal-login');
+            session_write_close();
+            header('Location: ' . SSO_BASE_URL . '/logout?post_logout_redirect_uri=' . $postLogout);
+            exit;
+        }
         redirectWith('/?page=login', 'success', 'You have been logged out.');
+        break;
+
+    case 'sso-callback':
+        require_once PAGES_PATH . '/sso-callback.php';
         break;
 
     case 'forgot-password':
@@ -180,6 +235,11 @@ switch ($page) {
 
     case 'verify-ticket':
         require_once PAGES_PATH . '/public/verify-ticket.php';
+        break;
+
+    case 'verify-coa':
+        // Plan #36 — public Certificate of Appearance QR verification
+        require_once PAGES_PATH . '/public/verify-coa.php';
         break;
 
     case 'cron':
@@ -309,9 +369,11 @@ switch ($page) {
 
     case 'reports':
         requireReportsAccess();
-        // Non-approver drivers may only use own Driver Report + exports
+        // Non-approver drivers may only use own Driver Report + own eval
+        // extracts. Driver Rankings stay approver+ (canViewDriverRankings);
+        // the page guards enforce it even if the action is requested directly.
         if (isSelfScopedDriverReporter()) {
-            $driverAllowed = ['index', 'driver', 'export-driver', 'export-driver-csv'];
+            $driverAllowed = ['index', 'driver', 'export-driver', 'export-driver-csv', 'export-driver-evaluations-pdf', 'driver-trip-extract', 'export-driver-trip-extract-csv', 'export-driver-trip-extract-pdf'];
             if (!in_array($action, $driverAllowed, true)) {
                 redirectWith('/?page=reports', 'danger', 'You do not have permission to access that report.');
             }
@@ -344,6 +406,14 @@ switch ($page) {
             require_once PAGES_PATH . '/reports/driver-rankings.php';
         } elseif ($action === 'export-driver-rankings-csv') {
             require_once PAGES_PATH . '/reports/export-driver-rankings-csv.php';
+        } elseif ($action === 'export-driver-evaluations-pdf') {
+            require_once PAGES_PATH . '/reports/export-driver-evaluations-pdf.php';
+        } elseif ($action === 'driver-trip-extract') {
+            require_once PAGES_PATH . '/reports/driver-trip-extract.php';
+        } elseif ($action === 'export-driver-trip-extract-csv') {
+            require_once PAGES_PATH . '/reports/export-driver-trip-extract-csv.php';
+        } elseif ($action === 'export-driver-trip-extract-pdf') {
+            require_once PAGES_PATH . '/reports/export-driver-trip-extract-pdf.php';
         } else {
             require_once PAGES_PATH . '/reports/index.php';
         }
@@ -412,11 +482,28 @@ switch ($page) {
         require_once PAGES_PATH . '/audit/index.php';
         break;
 
+    case 'repair-history':
+        // Plan #38 (experimental). index/toggle/import are All Father; the data
+        // routes also enforce their own feature-flag + role gates.
+        if ($action === 'import') {
+            require_once INCLUDES_PATH . '/repair_history_import.php';
+            require_once PAGES_PATH . '/repair-history/import.php';
+        } elseif ($action === 'create' || $action === 'edit' || $action === 'delete' || $action === 'view' || $action === 'print') {
+            require_once INCLUDES_PATH . '/repair_history.php';
+            require_once PAGES_PATH . '/repair-history/' . $action . '.php';
+        } else {
+            require_once INCLUDES_PATH . '/repair_history.php';
+            require_once PAGES_PATH . '/repair-history/index.php';
+        }
+        break;
+
     case 'rollback':
         requireRole(ROLE_ADMIN);
         if ($action === 'process') {
+            require_once INCLUDES_PATH . '/rollback.php';
             require_once PAGES_PATH . '/requests/rollback.php';
         } else {
+            require_once INCLUDES_PATH . '/rollback.php';
             require_once PAGES_PATH . '/rollback/index.php';
         }
         break;
@@ -430,6 +517,9 @@ switch ($page) {
         requireRole(ROLE_ADMIN);
         if ($action === 'email-queue') {
             require_once PAGES_PATH . '/settings/email-queue.php';
+        } elseif ($action === 'gas-workflow') {
+            // Plan #31 — page itself enforces real All Father (requireSystemControl)
+            require_once PAGES_PATH . '/settings/gas-workflow.php';
         } else {
             require_once PAGES_PATH . '/settings/index.php';
         }
@@ -443,6 +533,14 @@ switch ($page) {
             require_once PAGES_PATH . '/security/sms.php';
         } elseif ($action === 'email') {
             require_once PAGES_PATH . '/security/email.php';
+        } elseif ($action === 'telegram') {
+            require_once PAGES_PATH . '/security/telegram.php';
+        } elseif ($action === 'ai-assistant') {
+            // Plan #40 — page itself enforces real All Father
+            require_once PAGES_PATH . '/security/ai-assistant.php';
+        } elseif ($action === 'gps-tracking') {
+            // Plan #41 — page itself enforces real All Father
+            require_once PAGES_PATH . '/security/gps-tracking.php';
         } elseif ($action === 'odometer') {
             require_once INCLUDES_PATH . '/odometer.php';
             require_once PAGES_PATH . '/security/odometer.php';
@@ -451,9 +549,21 @@ switch ($page) {
         }
         break;
 
+    case 'channels':
+        // Plan #35 — public messenger webhooks (token-gated / secret-checked inside)
+        require_once PAGES_PATH . '/channels/webhook.php';
+        break;
+
     case 'gas-vouchers':
         denyGuardAccess();
-        if ($action === 'create') {
+        if ($action === 'rollback') {
+            // Plan #39 — admin gas voucher workflow rollback (page enforces ROLE_ADMIN)
+            require_once PAGES_PATH . '/gas-vouchers/rollback.php';
+        } elseif ($action === 'create') {
+            require_once PAGES_PATH . '/gas-vouchers/create.php';
+        } elseif ($action === 'edit') {
+            // Plan #19 B1 — create.php handles edit mode ($isEdit); the old
+            // dead link now reaches the real editor instead of the list
             require_once PAGES_PATH . '/gas-vouchers/create.php';
         } elseif ($action === 'view') {
             require_once PAGES_PATH . '/gas-vouchers/view.php';
@@ -511,11 +621,44 @@ switch ($page) {
 
     case 'evaluations':
         if ($action === 'submit') {
-            // Public evaluation form (token-gated, no login)
+            // Public evaluation form (token-gated, no login — token is the capability)
             require_once PAGES_PATH . '/evaluations/submit.php';
+        } elseif ($action === 'rate') {
+            // "Rate now" re-issue handler (page calls requireAuth() itself)
+            require_once PAGES_PATH . '/evaluations/rate.php';
         } else {
             requireReportsAccess();
             require_once PAGES_PATH . '/evaluations/index.php';
+        }
+        break;
+
+    case 'ob-requests':
+        if ($action === 'rollback') {
+            // Plan #39 — admin OB workflow rollback (page enforces ROLE_ADMIN)
+            requireAuth();
+            require_once PAGES_PATH . '/ob-requests/rollback.php';
+        } elseif ($action === 'coa-sign') {
+            // Public Certificate of Appearance (one-time token, no login)
+            require_once PAGES_PATH . '/ob-requests/coa-sign.php';
+        } else {
+            requireAuth();
+            if ($action === 'create') {
+                if (isGuard() && !isAdmin()) {
+                    redirectWith('/?page=ob-requests', 'warning',
+                        'Guards use the stamp queue. Apply for an OB from an employee account.');
+                }
+                require_once PAGES_PATH . '/ob-requests/create.php';
+            } elseif ($action === 'view') {
+                require_once PAGES_PATH . '/ob-requests/view.php';
+            } elseif ($action === 'process') {
+                require_once PAGES_PATH . '/ob-requests/process.php';
+            } elseif ($action === 'print') {
+                require_once PAGES_PATH . '/ob-requests/print.php';
+            } elseif ($action === 'coa') {
+                require_once PAGES_PATH . '/ob-requests/coa.php';
+            } else {
+                require_once PAGES_PATH . '/ob-requests/index.php';
+            }
         }
         break;
 
@@ -524,7 +667,7 @@ switch ($page) {
         break;
 
     case 'guard':
-        requireRole(ROLE_GUARD);
+        requireGuardDashboardAccess();
         if ($action === 'completed') {
             require_once PAGES_PATH . '/guard/completed.php';
         } elseif ($action === 'record_dispatch' || $action === 'record_arrival') {
@@ -534,11 +677,24 @@ switch ($page) {
         }
         break;
 
+    case 'live-board':
+        requireLiveBoardAccess();
+        require_once PAGES_PATH . '/live-board/index.php';
+        break;
+
+    case 'gps-tracking':
+        // Plan #41 — driver Trip Tracking page (feature flag + driver check in page)
+        require_once INCLUDES_PATH . '/gps_tracking.php';
+        require_once PAGES_PATH . '/gps-tracking/index.php';
+        break;
+
     case 'trip-tickets':
         if ($action === 'view') {
             require_once PAGES_PATH . '/trip-tickets/view.php';
         } elseif ($action === 'create_form') {
             require_once PAGES_PATH . '/trip-tickets/create.php';
+        } elseif ($action === 'delete') {
+            require_once PAGES_PATH . '/trip-tickets/delete.php';
         } elseif ($action === 'export-pdf') {
             require_once PAGES_PATH . '/trip-tickets/export-pdf.php';
         } elseif ($action === 'export-excel') {
@@ -550,10 +706,22 @@ switch ($page) {
 
     case 'api':
         $action = get('action');
-        if ($action === 'global_search') {
+        if ($action === 'ai_chat') {
+            // Plan #40 — AI assistant chat endpoint (session + CSRF enforced inside)
+            require_once PAGES_PATH . '/api/ai-chat.php';
+        } elseif ($action === 'gps_ping') {
+            // Plan #41 — driver GPS ping intake (session + CSRF enforced inside)
+            require_once PAGES_PATH . '/api/gps-ping.php';
+        } elseif ($action === 'global_search') {
             require_once PAGES_PATH . '/api/global_search.php';
+        } elseif ($action === 'authority_vehicle_link') {
+            // Plan #44 — TO -> LOKA vehicle-request link (HMAC shared secret,
+            // no session; enforced inside the endpoint).
+            require_once PAGES_PATH . '/api/authority-vehicle-link.php';
         } elseif ($action === 'check_conflict') {
             require_once PAGES_PATH . '/api/check_conflict.php';
+        } elseif ($action === 'check_email') {
+            require_once PAGES_PATH . '/api/check_email.php';
         } elseif ($action === 'list' || $action === 'get' || $action === 'create' || $action === 'update' || $action === 'delete') {
             // Determine API type from query parameter or referer
             $apiType = get('type');

@@ -78,6 +78,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'priority' => $priority,
                 'title' => $title
             ]);
+
+            // Plan #38 decision 7 — Motorpool is told about a new repair report,
+            // and the reporter gets a receipt. Independent of the experimental
+            // Repair History switch (this is about the ticket, not the history).
+            require_once INCLUDES_PATH . '/vehicle_care.php';
+            $plate = getVehicleName($vehicleId);
+            try {
+                notifyRoleUsers(
+                    [ROLE_MOTORPOOL],
+                    'maintenance_reported',
+                    'New Repair Report',
+                    "Repair request #{$maintenanceId} ({$priority} priority) for {$plate}: {$title}",
+                    '/?page=maintenance&action=view&id=' . $maintenanceId,
+                    null
+                );
+                $reporterId = (int) userId();
+                if ($reporterId > 0) {
+                    @notify(
+                        $reporterId,
+                        'maintenance_reported',
+                        'Repair Request Filed',
+                        "Your repair request #{$maintenanceId} for {$plate} (\"{$title}\") was filed and is with Motorpool.",
+                        '/?page=maintenance&action=view&id=' . $maintenanceId
+                    );
+                }
+            } catch (Throwable $e) {
+                error_log('maintenance create notify: ' . $e->getMessage());
+            }
             
             redirectWith('/?page=maintenance&action=view&id=' . $maintenanceId, 'success', 'Maintenance request created successfully.');
             

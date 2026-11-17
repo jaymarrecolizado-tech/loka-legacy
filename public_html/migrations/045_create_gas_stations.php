@@ -3,7 +3,7 @@
  * MIGRATION 045: Gas stations master table
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'old_loka_db';
 $dbUser = 'root';

@@ -136,13 +136,23 @@ $activeLimits = db()->fetchAll(
     [RATE_LIMIT_LOGIN_WINDOW]
 );
 
+$eventsWhere = "event IN ('rate_limit_cleared', 'account_unlocked', 'account_locked', 'login_rate_limited')";
+$eventsCount = db()->fetch(
+    "SELECT COUNT(*) AS c FROM security_logs WHERE {$eventsWhere}"
+);
+$eventsPag = listPaginationState((int) ($eventsCount->c ?? 0));
 $recentLogs = db()->fetchAll(
     "SELECT event, details, ip_address, created_at, user_id
      FROM security_logs
-     WHERE event IN ('rate_limit_cleared', 'account_unlocked', 'account_locked', 'login_rate_limited')
+     WHERE {$eventsWhere}
      ORDER BY created_at DESC
-     LIMIT 30"
+     LIMIT ? OFFSET ?",
+    [$eventsPag['perPage'], $eventsPag['offset']]
 );
+$eventsQuery = [
+    'page' => 'security',
+    'per_page' => $eventsPag['perPage'],
+];
 
 require_once INCLUDES_PATH . '/header.php';
 ?>
@@ -246,7 +256,7 @@ require_once INCLUDES_PATH . '/header.php';
         </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="security-events">
         <div class="card-header fw-semibold">Recent security events</div>
         <div class="table-responsive">
             <table class="table table-striped mb-0 no-datatable">
@@ -264,6 +274,11 @@ require_once INCLUDES_PATH . '/header.php';
                 </tbody>
             </table>
         </div>
+        <?php if ($eventsPag['total'] > 0): ?>
+        <div class="card-body pt-0">
+            <?= listPaginationFooter($eventsPag, $eventsQuery) ?>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 

@@ -2,12 +2,11 @@
 /**
  * LOKA - My Trip Tickets Page
  *
- * Dedicated page for approvers to view trip tickets
+ * Dedicated page for approvers and tagged drivers to view trip tickets
  */
 
-// Only approvers can access this page
-if (!isApprover()) {
-    redirectWith('/?page=dashboard', 'danger', 'This page is only for approvers.');
+if (!canAccessMyTripTickets()) {
+    redirectWith('/?page=dashboard', 'danger', 'You do not have permission to view trip tickets.');
 }
 
 $pageTitle = 'My Trip Tickets';
@@ -323,6 +322,7 @@ require_once INCLUDES_PATH . '/header.php';
                                                 class="btn btn-outline-success" title="Export Excel">
                                                 <i class="bi bi-file-earmark-excel"></i>
                                             </a>
+                                            <?php $ticketId = (int) $tt->id; require PAGES_PATH . '/trip-tickets/partials/delete_form.php'; ?>
                                         </div>
                                     </td>
                                 </tr>

@@ -435,6 +435,11 @@ require_once INCLUDES_PATH . '/header.php';
                 </div>
             </div>
 
+            <!-- Travel documents: uploaded TO/OB file, authority TO, attached OB -->
+            <?php $travelDocsShowLateBind = false; ?>
+            <?php require __DIR__ . '/../requests/partials/travel_documents.php'; ?>
+            <?php unset($travelDocsShowLateBind); ?>
+
             <!-- Vehicle Information -->
             <?php if ($request->vehicle_plate || $approvalType === 'motorpool'): ?>
                 <div class="card mb-4">

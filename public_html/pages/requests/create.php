@@ -6,6 +6,19 @@
 $pageTitle = 'New Request';
 $errors = [];
 
+// Plan #28: soft-block create when the rider has too many unfinished driver ratings
+// (Admin / All Father are never gated — see userExemptFromDriverEvalCreateBlock)
+if (function_exists('userMustClearDriverEvaluations') && userMustClearDriverEvaluations()) {
+    $pendingCount = pendingDriverEvaluationCount(userId());
+    redirectWith(
+        '/?page=requests',
+        'danger',
+        "You have {$pendingCount} unfinished driver evaluation(s). Complete all of them before requesting a new trip. Use Rate now in the banner above."
+    );
+}
+
+$bookingSettings = getBookingRules();
+
 // Get available vehicles for selection (cached)
 $availableVehicles = getAvailableVehicles();
 
@@ -145,8 +158,7 @@ $vehicleId = postInt('vehicle_id') ?: null;
     $motorpoolHeadId = postInt('motorpool_head_id');
     $requestedDriverId = postInt('requested_driver_id') ?: null;
     
-    // Load booking rules settings (shared helper)
-    $bookingSettings = getBookingRules();
+    // Booking rules already loaded above (shared helper)
     $maxAdvanceDays = $bookingSettings['max_advance_booking_days'];
     $minAdvanceHours = $bookingSettings['min_advance_booking_hours'];
     $maxTripHours = $bookingSettings['max_trip_duration_hours'];
@@ -210,9 +222,21 @@ $vehicleId = postInt('vehicle_id') ?: null;
         }
     }
     
-    // Travel Order / OB Slip required check (toggled by admin / all_father)
-    if (requireTravelOrderUpload() && empty($_FILES['travel_order_file']['name'])) {
-        $errors[] = 'A Travel Order / Official Business Slip upload is required for this request.';
+    // Attached OB Pass Slip (Plan #22) — must be the requester's approved slip on the trip date
+    $obRequestId = postInt('ob_request_id') ?: null;
+    if ($obRequestId) {
+        $obError = obValidateBind($obRequestId, (int) userId(), $startDatetime);
+        if ($obError !== null) {
+            $errors[] = $obError;
+        }
+    }
+
+    // Travel document rule (toggled by admin / all_father): an approved OB
+    // Pass Slip OR a Travel Order file satisfies it — one is enough, never both.
+    if ($obRequestId && !empty($_FILES['travel_order_file']['name'])) {
+        $errors[] = 'Attach either an approved OB Pass Slip or a Travel Order file — not both.';
+    } elseif (requireTravelOrderUpload() && empty($_FILES['travel_order_file']['name']) && !$obRequestId) {
+        $errors[] = 'A Travel Order upload is required for this request (or attach your approved OB Pass Slip).';
     }
 
     // Heuristic duplicate backstop: identical request from this user in the last 10 minutes
@@ -255,6 +279,7 @@ $vehicleId = postInt('vehicle_id') ?: null;
                 'passenger_count' => $passengerCount,
                 'notes' => $notes,
                 'status' => STATUS_PENDING,
+                'ob_request_id' => $obRequestId,
                 'idempotency_key' => $idempotencyKey ?: null,
                 'created_at' => date(DATETIME_FORMAT),
                 'updated_at' => date(DATETIME_FORMAT)
@@ -285,10 +310,8 @@ $vehicleId = postInt('vehicle_id') ?: null;
             if (!empty($_FILES['travel_order_file']['name'])) {
                 $travelOrderUpload = handleTravelOrderFileUpload($requestId);
                 if ($travelOrderUpload['error']) {
-                    if (requireTravelOrderUpload()) {
-                        throw new Exception($travelOrderUpload['error']);
-                    }
-                    error_log('Travel Order upload skipped (non-blocking): ' . $travelOrderUpload['error']);
+                    // User selected a file — never silently ignore a failed upload.
+                    throw new Exception($travelOrderUpload['error']);
                 }
             }
             if ($travelOrderUpload && $travelOrderUpload['path']) {
@@ -391,6 +414,10 @@ $vehicleId = postInt('vehicle_id') ?: null;
             ]);
             
             db()->commit();
+
+            if ($obRequestId) {
+                obCopyTripTimesFromRequest((int) $obRequestId, (int) $requestId, userId());
+            }
             
             // =====================================================
             // SEND NOTIFICATIONS AFTER SUCCESSFUL COMMIT
@@ -428,7 +455,10 @@ $vehicleId = postInt('vehicle_id') ?: null;
             error_log("Request creation error: " . $e->getMessage() . "\nTrace: " . $e->getTraceAsString());
             
             // Show detailed error in development
-            if (APP_ENV === 'development') {
+            $uploadErr = function_exists('travelOrderUploadUserError') ? travelOrderUploadUserError($e) : '';
+            if ($uploadErr !== '') {
+                $errors[] = $uploadErr;
+            } elseif (APP_ENV === 'development') {
                 $errors[] = 'Error: ' . $e->getMessage();
             } else {
                 $errors[] = 'Failed to submit request. Please try again.';
@@ -483,6 +513,7 @@ require_once INCLUDES_PATH . '/header.php';
                                 <label for="start_datetime" class="form-label">Start Date/Time <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control datetimepicker" id="start_datetime" 
                                        name="start_datetime" value="<?= e(post('start_datetime', '')) ?>" required>
+                                <small class="text-muted">You can book a start date up to <?= (int) ($bookingSettings['max_advance_booking_days'] ?? 30) ?> days from today.</small>
                                 <div class="invalid-feedback">Please select start date/time</div>
                             </div>
                             
@@ -490,6 +521,7 @@ require_once INCLUDES_PATH . '/header.php';
                                 <label for="end_datetime" class="form-label">End Date/Time <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control datetimepicker" id="end_datetime" 
                                        name="end_datetime" value="<?= e(post('end_datetime', '')) ?>" required>
+                                <small class="text-muted">Return cannot be more than <?= (int) ($bookingSettings['max_trip_duration_hours'] ?? 72) ?> hours after departure.</small>
                                 <div class="invalid-feedback">Please select end date/time</div>
                             </div>
                             
@@ -719,22 +751,69 @@ require_once INCLUDES_PATH . '/header.php';
                             </div>
                         </div>
                         
-                        <!-- Travel Order / Official Business Slip Upload -->
+                        <!-- Travel Order / Official Business Slip Upload + OB attach (Plan #22) -->
                         <div class="card border mb-4">
                             <div class="card-header bg-light py-2">
                                 <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Travel Order / Official Business Slip</h6>
                             </div>
                             <div class="card-body">
+                                <?php
+                                $obBindable = obBindableForRequest((int) userId());
+                                // Plan #44 phase 3 — prefill data per OB (purpose/date/participants)
+                                $obPrefill = [];
+                                if (!empty($obBindable)) {
+                                    $obIds = array_map(fn($o) => (int) $o->id, $obBindable);
+                                    $ph = implode(',', array_fill(0, count($obIds), '?'));
+                                    $pRows = db()->fetchAll(
+                                        "SELECT op.ob_request_id, u.name, u.email
+                                         FROM ob_request_participants op
+                                         JOIN users u ON u.id = op.user_id
+                                         WHERE op.ob_request_id IN ($ph)
+                                         ORDER BY op.ob_request_id, op.sort_order",
+                                        $obIds
+                                    );
+                                    foreach ($pRows as $pr) {
+                                        $obPrefill[(int) $pr->ob_request_id][] = ['name' => $pr->name, 'email' => $pr->email];
+                                    }
+                                }
+                                ?>
+                                <?php if (!empty($obBindable)): ?>
+                                <div class="mb-3">
+                                    <label class="form-label">Attach an approved OB Pass Slip <span class="text-muted">(instead of a TO file)</span></label>
+                                    <select class="form-select" name="ob_request_id" id="ob_request_id">
+                                        <option value="">— None —</option>
+                                        <?php foreach ($obBindable as $obOpt): ?>
+                                        <?php
+                                        $obPre = [
+                                            'purpose' => $obOpt->purpose,
+                                            'ob_date' => $obOpt->ob_date,
+                                            'participants' => $obPrefill[(int) $obOpt->id] ?? [],
+                                        ];
+                                        ?>
+                                        <option value="<?= (int) $obOpt->id ?>" <?= postInt('ob_request_id') === (int) $obOpt->id ? 'selected' : '' ?> data-prefill='<?= e(json_encode($obPre, JSON_UNESCAPED_UNICODE)) ?>'>
+                                            <?= e($obOpt->pass_slip_no) ?> — <?= e(date('M j, Y', strtotime($obOpt->ob_date))) ?> (must match trip date)
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <div id="obPrefillNote" class="small text-muted mt-1 d-none"></div>
+                                    <small class="text-muted">1 OB = 1 vehicle request. If attached, no TO file is needed (and both together are not allowed).</small>
+                                </div>
+                                <?php else: ?>
+                                <div class="mb-3 small text-muted">
+                                    <i class="bi bi-info-circle me-1"></i>No approved OB Pass Slip available to attach.
+                                    <a href="<?= APP_URL ?>/?page=ob-requests&action=create">Apply for OB</a> first if this trip is official business.
+                                </div>
+                                <?php endif; ?>
                                 <div class="mb-2">
                                     <input type="file" class="form-control" id="travel_order_file" name="travel_order_file"
                                            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
                                     <small class="text-muted">
                                         <?php if (requireTravelOrderUpload()): ?>
-                                            <span class="text-danger fw-semibold">Required.</span> 
+                                            <span class="text-danger fw-semibold">Required — unless you attach an approved OB Pass Slip above.</span> 
                                         <?php else: ?>
                                             Optional. 
                                         <?php endif; ?>
-                                        Upload your Travel Order or Official Business Slip (PDF, JPG, PNG - max 5 MB).
+                                        Upload your Travel Order or Official Business Slip (PDF, JPG, PNG — max 12 MB). Phone photos are compressed automatically.
                                     </small>
                                 </div>
                             </div>
@@ -1722,7 +1801,7 @@ ob_start();
     if (typeof flatpickr !== 'undefined') {
         // Get booking rules from PHP settings
         const bookingMaxAdvanceDays = <?= (int) ($bookingSettings['max_advance_booking_days'] ?? 30) ?>;
-        const bookingMinAdvanceHours = <?= (int) ($bookingSettings['min_advance_booking_hours'] ?? 24) ?>;
+        const bookingMinAdvanceHours = <?= (int) ($bookingSettings['min_advance_booking_hours'] ?? 0) ?>;
         const bookingMaxTripHours = <?= (int) ($bookingSettings['max_trip_duration_hours'] ?? 72) ?>;
         
         // Calculate min and max dates
@@ -1770,7 +1849,7 @@ ob_start();
         setTimeout(function() {
             if (typeof flatpickr !== 'undefined') {
                 const bookingMaxAdvanceDays = <?= (int) ($bookingSettings['max_advance_booking_days'] ?? 30) ?>;
-                const bookingMinAdvanceHours = <?= (int) ($bookingSettings['min_advance_booking_hours'] ?? 24) ?>;
+                const bookingMinAdvanceHours = <?= (int) ($bookingSettings['min_advance_booking_hours'] ?? 0) ?>;
                 const bookingMaxTripHours = <?= (int) ($bookingSettings['max_trip_duration_hours'] ?? 72) ?>;
 
                 const today = new Date();
@@ -1817,6 +1896,42 @@ ob_start();
             }
         }, 500);
     }
+})();
+
+// Plan #44 phase 3 — prefill purpose/dates from an attached OB Pass Slip.
+// Destination stays manual (OB has none); participants are surfaced as a
+// reminder so the officer adds them as passengers.
+(function () {
+    var sel = document.getElementById('ob_request_id');
+    if (!sel) return;
+    var note = document.getElementById('obPrefillNote');
+    sel.addEventListener('change', function () {
+        var opt = sel.options[sel.selectedIndex];
+        if (!opt || !opt.value || !opt.dataset.prefill) {
+            if (note) note.classList.add('d-none');
+            return;
+        }
+        var d;
+        try { d = JSON.parse(opt.dataset.prefill); } catch (e) { return; }
+        if (d.purpose) {
+            var purpose = document.getElementById('purpose');
+            if (purpose && !purpose.value.trim()) purpose.value = d.purpose;
+        }
+        if (d.ob_date) {
+            var s = document.getElementById('start_datetime');
+            var e = document.getElementById('end_datetime');
+            if (s && !s.value) s.value = d.ob_date + ' 08:00';
+            if (e && !e.value) e.value = d.ob_date + ' 17:00';
+        }
+        if (note) {
+            var names = (d.participants || []).map(function (p) { return p.name; });
+            note.innerHTML = names.length
+                ? '<i class="bi bi-people me-1"></i>Prefilled from the OB. Participants to add as passengers: <strong>' +
+                  names.join(', ') + '</strong>'
+                : '<i class="bi bi-info-circle me-1"></i>Prefilled purpose and dates from the OB.';
+            note.classList.remove('d-none');
+        }
+    });
 })();
 </script>
 <?php 

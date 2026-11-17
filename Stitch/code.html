@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_blank" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>
+@layer base {
+  html, body { margin: 0; padding: 0; }
+  body { overscroll-behavior: none; }
+  main > :first-child { margin-top: 0 !important; }
+  main > :last-child { margin-bottom: 0 !important; }
+}
+::-webkit-scrollbar { display: none; }
+
+/* Custom Institutional Animations */
+@keyframes subtle-drift-pulse {
+  0% { transform: rotate(0deg) scale(1); opacity: 0.04; }
+  50% { transform: rotate(2deg) scale(1.02); opacity: 0.07; }
+  100% { transform: rotate(0deg) scale(1); opacity: 0.04; }
+}
+
+.animate-watermark {
+  animation: subtle-drift-pulse 24s ease-in-out infinite;
+  transform-origin: center center;
+}
+
+/* Entrada animations with dignified cubic-bezier easing */
+.fade-up-init {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: institutional-fade-up 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes institutional-fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.delay-100 { animation-delay: 100ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-250 { animation-delay: 250ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-350 { animation-delay: 350ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-450 { animation-delay: 450ms; }
+
+/* Error Banner Smooth Toggle Animation */
+#error-banner {
+  transition: all 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+#error-banner.banner-hidden {
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-width: 0;
+  pointer-events: none;
+}
+#error-banner.banner-visible {
+  opacity: 1;
+  max-height: 90px;
+  margin-bottom: 1.5rem;
+  pointer-events: auto;
+}
+
+/* Reduced Motion Fallback */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .fade-up-init {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .animate-watermark {
+    animation: none !important;
+    opacity: 0.05 !important;
+  }
+}
+</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-primary-fixed": "#071c36", "secondary": "#3d5f94", "on-primary": "#ffffff", "surface": "#f9f9ff", "surface-container-lowest": "#ffffff", "on-tertiary-fixed": "#410007", "on-surface-variant": "#44474d", "primary-fixed": "#d6e3ff", "surface-container-high": "#dfe8fd", "primary-fixed-dim": "#b5c7ea", "inverse-on-surface": "#ecf1ff", "on-secondary-fixed": "#001b3d", "primary-container": "#0b1f3a", "inverse-surface": "#283140", "surface-bright": "#f9f9ff", "on-error": "#ffffff", "tertiary-fixed-dim": "#ffb3b1", "surface-variant": "#dae3f7", "surface-dim": "#d1daef", "on-background": "#131c2a", "on-tertiary": "#ffffff", "tertiary": "#170001", "secondary-fixed-dim": "#a9c7ff", "tertiary-container": "#470009", "secondary-container": "#a1c2fd", "surface-container": "#e7eeff", "surface-container-highest": "#dae3f7", "background": "#f9f9ff", "inverse-primary": "#b5c7ea", "on-primary-fixed-variant": "#364764", "outline-variant": "#c4c6ce", "tertiary-fixed": "#ffdad8", "on-error-container": "#93000a", "on-tertiary-container": "#fa3c4c", "surface-container-low": "#f0f3ff", "on-secondary-container": "#2c4f83", "surface-tint": "#4d5f7d", "error": "#ba1a1a", "error-container": "#ffdad6", "on-secondary": "#ffffff", "on-primary-container": "#7587a7", "primary": "#000615", "outline": "#75777e", "on-secondary-fixed-variant": "#22477a", "on-tertiary-fixed-variant": "#92001c", "on-surface": "#131c2a", "secondary-fixed": "#d6e3ff" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-md": "1rem", "space-sm": "0.5rem", "margin": "2rem", "space-xl": "2.5rem", "margin-lg": "3rem", "space-xs": "0.25rem", "gutter": "1.5rem", "margin-sm": "1rem", "gutter-sm": "1rem", "space-lg": "1.5rem", "gutter-lg": "2rem" }, "fontFamily": { "label-lg": [ "IBM Plex Sans" ], "headline-xl-mobile": [ "Public Sans" ], "headline-sm": [ "Public Sans" ], "label-sm": [ "IBM Plex Sans" ], "headline-lg": [ "Public Sans" ], "title-lg": [ "Public Sans" ], "title-md": [ "Public Sans" ], "body-sm": [ "Public Sans" ], "headline-lg-mobile": [ "Public Sans" ], "body-lg": [ "Public Sans" ], "label-md": [ "IBM Plex Sans" ], "headline-md": [ "Public Sans" ], "body-md": [ "Public Sans" ], "headline-xl": [ "Public Sans" ] }, "fontSize": { "label-lg": [ "14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600" } ], "headline-xl-mobile": [ "30px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "800" } ], "headline-sm": [ "20px", { "lineHeight": "28px", "fontWeight": "600" } ], "label-sm": [ "10px", { "lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "700" } ], "headline-lg": [ "32px", { "lineHeight": "40px", "letterSpacing": "-0.015em", "fontWeight": "700" } ], "title-lg": [ "18px", { "lineHeight": "24px", "fontWeight": "600" } ], "title-md": [ "16px", { "lineHeight": "24px", "fontWeight": "600" } ], "body-sm": [ "13px", { "lineHeight": "18px", "fontWeight": "400" } ], "headline-lg-mobile": [ "24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" } ], "body-lg": [ "18px", { "lineHeight": "28px", "fontWeight": "400" } ], "label-md": [ "12px", { "lineHeight": "16px", "letterSpacing": "0.04em", "fontWeight": "600" } ], "headline-md": [ "24px", { "lineHeight": "32px", "fontWeight": "600" } ], "body-md": [ "15px", { "lineHeight": "22px", "fontWeight": "400" } ], "headline-xl": [ "40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800" } ] } } } };</script></head><body class="bg-background font-body-md text-on-surface antialiased min-h-screen selection:bg-secondary-container selection:text-on-secondary-fixed"><main class="min-h-screen w-full"><div class="flex flex-col w-full">
+<div class="flex flex-col lg:flex-row w-full min-h-screen">
+<!-- LEFT PANEL: 46% sovereign navy administrative monolith -->
+<div class="w-full lg:w-[46%] bg-primary-container text-on-primary flex flex-col justify-between p-10 lg:p-16 select-none relative overflow-hidden shrink-0 border-b lg:border-b-0 lg:border-r border-outline-variant/20">
+<!-- Republic Security Watermark Stamp (Minimal Civic Line Work with Ambient Breathing Pulse) -->
+<div class="absolute -right-16 -bottom-16 w-[420px] h-[420px] pointer-events-none text-on-primary animate-watermark">
+<svg class="w-full h-full" fill="none" stroke="currentColor" stroke-width="1.2" viewbox="0 0 100 100">
+<circle cx="50" cy="50" r="46"></circle>
+<circle cx="50" cy="50" r="42"></circle>
+<polygon points="50,15 58,35 80,35 62,49 69,70 50,57 31,70 38,49 20,35 42,35"></polygon>
+</svg>
+</div>
+<!-- Top Authority Header & Massive Wordmark -->
+<div class="flex flex-col z-10">
+<!-- Civic Seal / Minimalist Agency Insignia -->
+<div class="w-12 h-12 mb-10 flex items-center justify-center fade-up-init">
+<svg class="w-12 h-12 text-on-primary" fill="none" viewbox="0 0 44 44">
+<circle cx="22" cy="22" r="20" stroke="currentColor" stroke-width="1.5"></circle>
+<circle cx="22" cy="22" r="16.5" stroke="currentColor" stroke-dasharray="2 2" stroke-width="0.75"></circle>
+<path d="M22 8V36M8 22H36" stroke="currentColor" stroke-width="1"></path>
+<polygon fill="none" points="22,12 25,19 32,19 26,24 28,31 22,27 16,31 18,24 12,19 19,19" stroke="currentColor" stroke-width="1"></polygon>
+</svg>
+</div>
+<!-- Monumental Agency Wordmark -->
+<div class="font-headline-xl text-5xl lg:text-[4.25rem] leading-[0.95] tracking-tight uppercase font-extrabold text-on-primary fade-up-init delay-100">
+          DICT<br/>REGION 2<br/>SSO
+        </div>
+<!-- Republic Division Subtext -->
+<p class="font-body-md text-base text-primary-fixed-dim mt-6 max-w-sm tracking-normal opacity-90 fade-up-init delay-150">
+          One sign-in for regional office systems.
+        </p>
+<!-- Administrative System Directory Metadata -->
+<div class="mt-12 flex flex-col space-y-2.5 text-on-primary-container text-label-md font-label-md uppercase tracking-wider fade-up-init delay-200">
+<div class="flex items-center space-x-2.5 group cursor-default">
+<span class="w-1.5 h-1.5 bg-secondary-container rounded-none transition-transform duration-300 group-hover:scale-125"></span>
+<span class="transition-colors duration-200 group-hover:text-primary-fixed-dim">Gateway Node: R02-TUGUEGARAO-CENTRAL</span>
+</div>
+<div class="flex items-center space-x-2.5 group cursor-default">
+<span class="w-1.5 h-1.5 bg-secondary-container rounded-none transition-transform duration-300 group-hover:scale-125"></span>
+<span class="transition-colors duration-200 group-hover:text-primary-fixed-dim">Directory Version: 4.12.0-STABLE</span>
+</div>
+<div class="flex items-center space-x-2.5 text-primary-fixed-dim/70 text-[11px] pt-1">
+<span class="material-symbols-outlined text-[13px]">verified_user</span>
+<span>Compliance: Republic Act No. 10173</span>
+</div>
+</div>
+</div>
+<!-- Left Bottom Compliance Footnote -->
+<div class="z-10 pt-8 mt-12 border-t border-on-primary-container/20 fade-up-init delay-250">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+<span class="font-label-sm text-label-sm text-primary-fixed-dim uppercase tracking-wider">
+            For authorized DICT Region 2 personnel only.
+          </span>
+<span class="font-label-sm text-label-sm text-primary-fixed-dim/60 font-mono">
+            SEC-PST 2025
+          </span>
+</div>
+</div>
+</div>
+<!-- RIGHT PANEL: 54% official desk sheet / administrative authentication desk -->
+<div class="w-full lg:w-[54%] bg-surface-container-low flex flex-col justify-between px-8 sm:px-14 lg:px-20 py-8 lg:py-12 relative min-h-screen">
+<!-- Top Desk Context Bar with Interactive Error State Switcher -->
+<div class="w-full flex flex-wrap items-center justify-between gap-4 text-outline fade-up-init delay-100">
+<!-- State Testing Pill Toggle -->
+<div class="flex items-center space-x-1.5 bg-surface-container-lowest/80 border border-outline-variant/60 px-2.5 py-1 rounded-[2px] shadow-sm">
+<span class="font-label-sm text-[10px] uppercase text-outline tracking-wider font-semibold">Test Alert:</span>
+<button class="text-[11px] font-label-md font-medium text-secondary hover:text-primary transition-colors focus:outline-none flex items-center space-x-1 underline decoration-dotted underline-offset-2" id="toggle-error-state-btn" title="Toggle error banner to preview both default and error states" type="button">
+<span id="toggle-banner-text">Hide Error</span>
+<span class="material-symbols-outlined text-[14px]">tune</span>
+</button>
+</div>
+<!-- Clock Module -->
+<div class="flex items-center space-x-2 text-outline ml-auto">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant hidden sm:inline">
+          Philippine Standard Time
+        </span>
+<span class="text-outline-variant hidden sm:inline">•</span>
+<span class="font-label-md text-label-md font-mono text-on-surface font-semibold tracking-wide flex items-center space-x-1.5" id="pst-clock">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-600 inline-block animate-pulse"></span>
+<span id="pst-clock-digits">13:39:10 PST</span>
+</span>
+</div>
+</div>
+<!-- Authentication Form Ledger Container -->
+<div class="max-w-[400px] w-full mx-auto my-auto py-8">
+<!-- Section Header -->
+<div class="mb-6 fade-up-init delay-150">
+<div class="flex items-center space-x-2 mb-2">
+<span class="w-2 h-2 bg-primary"></span>
+<span class="font-label-sm text-label-sm uppercase tracking-widest text-secondary font-bold">
+              Identity Verification Desk
+            </span>
+</div>
+<h1 class="font-headline-lg text-3xl font-bold text-on-surface tracking-tight mb-1">
+            Sign in
+          </h1>
+<p class="font-body-sm text-on-surface-variant text-sm">
+            Then choose LOKA Fleet or Travel Order.
+          </p>
+</div>
+<!-- Inline Security Verification Alert Banner -->
+<div class="banner-visible bg-error-container/40 border border-error text-error text-label-md font-label-md px-3.5 py-2.5 rounded-[2px] flex items-center space-x-2.5 fade-up-init delay-200" id="error-banner" role="alert">
+<span class="material-symbols-outlined text-[18px] text-error shrink-0" style="font-variation-settings: 'FILL' 1;">
+            error
+          </span>
+<span class="leading-none tracking-normal flex-1">Wrong email or password.</span>
+<button aria-label="Dismiss error notice" class="text-error/70 hover:text-error transition-colors p-0.5 focus:outline-none" id="dismiss-banner-btn" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+<!-- Validation Feedback Banner (Hidden by default, shown on successful submission test) -->
+<div class="hidden bg-emerald-50 border border-emerald-600 text-emerald-900 text-label-md font-label-md px-3.5 py-2.5 rounded-[2px] mb-6 items-center space-x-2.5" id="success-banner" role="status">
+<span class="material-symbols-outlined text-[18px] text-emerald-600 shrink-0" style="font-variation-settings: 'FILL' 1;">
+            verified
+          </span>
+<span class="leading-none tracking-normal flex-1">Credentials verified. Redirecting to Regional Gateway...</span>
+</div>
+<!-- Credentials Form -->
+<form class="space-y-4" id="auth-form" onsubmit="event.preventDefault();">
+<!-- Field: Government Email -->
+<div class="space-y-1.5 fade-up-init delay-250">
+<label class="block font-label-md text-label-md uppercase tracking-wider text-on-surface transition-colors" for="gov-email" id="label-email">
+              Government Email <span class="text-error font-bold">*</span>
+</label>
+<div class="relative group">
+<input autocomplete="username" class="w-full h-12 px-3.5 bg-surface-container-lowest border border-outline-variant rounded-[2px] font-body-md text-sm text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all duration-150 shadow-none hover:border-outline" id="gov-email" placeholder="name@dict.gov.ph" required="" type="email" value="m.delacruz@dict.gov.ph"/>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-outline-variant group-focus-within:text-primary-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">badge</span>
+</div>
+</div>
+</div>
+<!-- Field: Password -->
+<div class="space-y-1.5 fade-up-init delay-300">
+<div class="flex justify-between items-center">
+<label class="block font-label-md text-label-md uppercase tracking-wider text-on-surface transition-colors" for="gov-password" id="label-password">
+                Password <span class="text-error font-bold">*</span>
+</label>
+</div>
+<div class="relative group">
+<input autocomplete="current-password" class="w-full h-12 pl-3.5 pr-11 bg-surface-container-lowest border border-outline-variant rounded-[2px] font-body-md text-sm text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all duration-150 shadow-none tracking-widest hover:border-outline" id="gov-password" placeholder="••••••••••••" required="" type="password" value="Government2025#"/>
+<button aria-label="Toggle password visibility" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface focus:text-primary-container focus:outline-none flex items-center justify-center p-1 rounded-sm transition-colors duration-150" id="toggle-password" type="button">
+<span class="material-symbols-outlined text-[18px] transition-transform duration-150" id="password-visibility-icon">
+                  visibility
+                </span>
+</button>
+</div>
+</div>
+<!-- Primary Statutory Submission Action -->
+<div class="pt-2 fade-up-init delay-350">
+<button class="w-full h-12 bg-primary-container text-on-primary font-label-lg text-sm font-semibold tracking-wide rounded-[2px] hover:bg-[#123A6D] focus:bg-primary-container active:scale-[0.985] transition-all duration-150 flex items-center justify-center space-x-2 cursor-pointer border border-primary-container group shadow-sm disabled:opacity-85 disabled:cursor-wait" id="submit-btn" type="submit">
+<span class="flex items-center space-x-2" id="btn-text">
+<span>Sign in</span>
+<span class="material-symbols-outlined text-[16px] transition-transform duration-200 group-hover:translate-x-1" id="btn-arrow">arrow_forward</span>
+</span>
+<!-- Dynamic Loading Spinner State -->
+<span class="hidden items-center space-x-2" id="btn-spinner">
+<svg class="animate-spin h-4 w-4 text-white" fill="none" viewbox="0 0 24 24">
+<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+<path class="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"></path>
+</svg>
+<span class="text-xs uppercase tracking-wider font-mono">Verifying...</span>
+</span>
+</button>
+</div>
+</form>
+<!-- Recovery Link -->
+<div class="mt-4 text-center fade-up-init delay-400">
+<a class="inline-block font-label-md text-label-md text-on-surface-variant hover:text-primary-container underline underline-offset-4 decoration-outline-variant hover:decoration-primary-container transition-colors duration-150" href="#">
+            Forgot password?
+          </a>
+</div>
+<!-- Administrative Service Directives -->
+<div class="mt-10 pt-6 border-t border-outline-variant/60 flex items-center justify-between text-outline text-label-sm font-label-sm uppercase fade-up-init delay-450">
+<div class="flex items-center space-x-1.5 hover:text-on-surface transition-colors cursor-default">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span>LOKA FLEET OPS</span>
+</div>
+<span class="text-outline-variant">•</span>
+<div class="flex items-center space-x-1.5 hover:text-on-surface transition-colors cursor-default">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span>TRAVEL ORDER SYSTEM</span>
+</div>
+</div>
+</div>
+<!-- Formal Republic Colophon -->
+<footer class="w-full text-center mt-auto pt-6 pb-2 fade-up-init delay-450">
+<div class="text-[11px] leading-relaxed text-outline font-body-sm tracking-normal">
+          Republic of the Philippines • Department of Information and Communications Technology • Region 2 (Cagayan Valley)
+        </div>
+<div class="text-[10px] text-outline-variant font-label-sm uppercase tracking-widest mt-1">
+          Government Agency System Authentication Registry
+        </div>
+</footer>
+</div>
+</div>
+</div>
+<script>
+  // 1. Real-time Philippine Standard Time Clock Simulation
+  function updatePST() {
+    const digitsEl = document.getElementById('pst-clock-digits');
+    if (!digitsEl) return;
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const pstDate = new Date(utc + (3600000 * 8)); // UTC+8
+    const hours = String(pstDate.getHours()).padStart(2, '0');
+    const minutes = String(pstDate.getMinutes()).padStart(2, '0');
+    const seconds = String(pstDate.getSeconds()).padStart(2, '0');
+    digitsEl.textContent = `${hours}:${minutes}:${seconds} PST`;
+  }
+  setInterval(updatePST, 1000);
+  updatePST();
+
+  // 2. Password Visibility Toggle Interaction with icon flip
+  const toggleBtn = document.getElementById('toggle-password');
+  const passwordInput = document.getElementById('gov-password');
+  const visibilityIcon = document.getElementById('password-visibility-icon');
+
+  if (toggleBtn && passwordInput && visibilityIcon) {
+    toggleBtn.addEventListener('click', () => {
+      const isPassword = passwordInput.getAttribute('type') === 'password';
+      passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+      visibilityIcon.textContent = isPassword ? 'visibility_off' : 'visibility';
+      // If switched to text, subtle tracking adjustment
+      if (isPassword) {
+        passwordInput.classList.remove('tracking-widest');
+      } else {
+        passwordInput.classList.add('tracking-widest');
+      }
+    });
+  }
+
+  // 3. Error Banner Toggle Switcher for reviewer inspection
+  const errorBanner = document.getElementById('error-banner');
+  const toggleErrorStateBtn = document.getElementById('toggle-error-state-btn');
+  const toggleBannerText = document.getElementById('toggle-banner-text');
+  const dismissBannerBtn = document.getElementById('dismiss-banner-btn');
+
+  function setBannerVisible(visible) {
+    if (!errorBanner) return;
+    if (visible) {
+      errorBanner.classList.remove('banner-hidden');
+      errorBanner.classList.add('banner-visible');
+      if (toggleBannerText) toggleBannerText.textContent = 'Hide Error';
+    } else {
+      errorBanner.classList.remove('banner-visible');
+      errorBanner.classList.add('banner-hidden');
+      if (toggleBannerText) toggleBannerText.textContent = 'Show Error';
+    }
+  }
+
+  if (toggleErrorStateBtn) {
+    toggleErrorStateBtn.addEventListener('click', () => {
+      const isVisible = errorBanner.classList.contains('banner-visible');
+      setBannerVisible(!isVisible);
+    });
+  }
+
+  if (dismissBannerBtn) {
+    dismissBannerBtn.addEventListener('click', () => {
+      setBannerVisible(false);
+    });
+  }
+
+  // 4. Interactive Submit Button with Authentic Verification Spinner State
+  const authForm = document.getElementById('auth-form');
+  const submitBtn = document.getElementById('submit-btn');
+  const btnText = document.getElementById('btn-text');
+  const btnSpinner = document.getElementById('btn-spinner');
+  const successBanner = document.getElementById('success-banner');
+
+  if (authForm && submitBtn) {
+    authForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      // Activate loading spinner
+      submitBtn.disabled = true;
+      btnText.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
+      btnSpinner.classList.add('flex');
+      
+      // Reset banners during progress
+      if (successBanner) successBanner.classList.add('hidden');
+
+      setTimeout(() => {
+        // Stop loading spinner
+        submitBtn.disabled = false;
+        btnSpinner.classList.add('hidden');
+        btnSpinner.classList.remove('flex');
+        btnText.classList.remove('hidden');
+
+        const emailVal = document.getElementById('gov-email').value.trim();
+        const passVal = document.getElementById('gov-password').value.trim();
+
+        // Authentic credential check simulation
+        if (emailVal === 'm.delacruz@dict.gov.ph' && passVal === 'Government2025#') {
+          // Success case
+          setBannerVisible(false);
+          if (successBanner) {
+            successBanner.classList.remove('hidden');
+            successBanner.classList.add('flex');
+          }
+        } else {
+          // Show error case with dignified smooth slide-in
+          if (successBanner) successBanner.classList.add('hidden');
+          setBannerVisible(true);
+        }
+      }, 750);
+    });
+  }
+</script></main></body></html>

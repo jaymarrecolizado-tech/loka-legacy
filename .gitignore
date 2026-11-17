@@ -1,5 +1,7 @@
 # Secrets
 .env
+.env.*
+!.env.example
 
 # Runtime data
 logs/*
@@ -35,3 +37,11 @@ _import.bat
 # Production package (generated - rebuild with robocopy, see PRODUCTION_GUIDE.md)
 prod/*
 !prod/PRODUCTION_GUIDE.md
+
+# Local deploy scratch
+_deploy_tmp/
+
+
+# Real DICT operational records (vehicle plates, repair costs). Kept on disk for
+# the Plan #38 importer; deliberately not committed.
+Reference/Repair History/

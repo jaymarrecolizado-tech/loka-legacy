@@ -3,11 +3,11 @@
  * LOKA - Create Trip Ticket Form
  *
  * Pre-filled form for creating trip ticket after trip completion
- * Only drivers can create tickets for their own completed trips
+ * Drivers create tickets for their own completed trips; admins may assist
  */
 
-// Allow drivers and guards to access
-if (!isDriver() && !isGuard() && !isAdmin()) {
+// Guards no longer create trip tickets — drivers/admins only
+if (!isDriver() && !isAdmin()) {
     redirectWith('/?page=dashboard', 'danger', 'You do not have permission to create trip tickets.');
 }
 
@@ -19,8 +19,7 @@ $requestId = (int) get('request_id', 0);
 
 // Validate request ID
 if (!$requestId) {
-    $redirectPage = isDriver() ? 'my-trips' : 'guard';
-    redirectWith('/?page=' . $redirectPage, 'danger', 'Invalid request ID.');
+    redirectWith('/?page=my-trips', 'danger', 'Invalid request ID.');
 }
 
 // Get request with all trip details for pre-filling
@@ -45,7 +44,7 @@ $request = db()->fetch(
 );
 
 if (!$request) {
-    $redirectPage = isDriver() ? 'my-trips' : 'guard';
+    $redirectPage = 'my-trips';
     redirectWith('/?page=' . $redirectPage, 'danger', 'Request not found.');
 }
 
@@ -69,7 +68,7 @@ if (isDriver()) {
 
 // Can only create trip ticket for completed trips
 if ($request->status !== STATUS_COMPLETED) {
-    $redirectPage = isDriver() ? 'my-trips' : 'guard';
+    $redirectPage = 'my-trips';
     redirectWith(
         '/?page=requests&action=view&id=' . $requestId,
         'warning',
@@ -184,7 +183,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tripTypeValue = $tripType;
     $newStartDate = post('start_date');
     $newEndDate = post('end_date');
-    $destinationInput = postSafe('destination', '', 255);
+    $destinationInput = postSafe('destination', '', 500);
     $purposeInput = postSafe('purpose', '', 500);
     if (mb_strlen($purposeInput) > 200) $errors[] = 'Purpose must be 200 characters or fewer (currently ' . mb_strlen($purposeInput) . ').';
     if (mb_strlen($destinationInput) > 100) $errors[] = 'Destination must be 100 characters or fewer (currently ' . mb_strlen($destinationInput) . ').';
@@ -349,7 +348,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'dispatch_guard_id' => $request->dispatch_guard_id ?: userId(),
                 'arrival_guard_id' => userId(),
                 'guard_notes' => $guardNotesValue,
-                'status' => 'draft',
+                // Plan #19 A1: file as submitted so Motorpool review + badges
+                // see what drivers filed (draft never showed in the queue)
+                'status' => 'submitted',
                 'created_by' => userId()
             ]);
             
@@ -385,7 +386,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 redirectWith(
                     '/?page=' . $redirectPage,
                     'success',
-                    'Trip ticket created successfully! You can now review and submit it.'
+                    'Trip ticket created and submitted for Motorpool review.'
                 );
             }
             
@@ -410,8 +411,8 @@ require_once INCLUDES_PATH . '/header.php';
             <p class="text-muted mb-0">Document completed trip details and documents</p>
         </div>
         <div>
-            <a href="?page=<?= isDriver() ? 'my-trips' : 'guard' ?>" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1"></i>Back to <?= isDriver() ? 'My Trips' : 'Guard Dashboard' ?>
+            <a href="?page=my-trips" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Back to My Trips
             </a>
             <?php if (!isDriver()): ?>
             <a href="?page=trip-tickets" class="btn btn-outline-primary">
@@ -650,11 +651,11 @@ require_once INCLUDES_PATH . '/header.php';
 
                 <!-- Destination (Pre-filled but editable) -->
                 <div class="mb-3">
-                    <label class="form-label">Destination <span class="text-danger">*</span> <small class="text-muted">(max 100)</small></label>
-                    <input type="text" class="form-control" name="destination" value="<?= e($destinationValue) ?>" maxlength="100" required oninput="document.getElementById('destCount').textContent=this.value.length">
+                    <label class="form-label">Destination <span class="text-danger">*</span> <small class="text-muted">(multi-stop chains can be long — max 500)</small></label>
+                    <input type="text" class="form-control" name="destination" value="<?= e($destinationValue) ?>" maxlength="500" required oninput="document.getElementById('destCount').textContent=this.value.length">
                     <div class="d-flex justify-content-between">
                         <small class="text-muted">From request: <?= e($destination) ?></small>
-                        <small class="text-muted"><span id="destCount"><?= mb_strlen($destinationValue) ?></span>/100</small>
+                        <small class="text-muted"><span id="destCount"><?= mb_strlen($destinationValue) ?></span>/500</small>
                     </div>
                 </div>
 
@@ -771,7 +772,7 @@ require_once INCLUDES_PATH . '/header.php';
 
                 <!-- Action Buttons -->
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <a href="?page=<?= isDriver() ? 'my-trips' : 'guard' ?>" class="btn btn-outline-secondary">
+                    <a href="?page=my-trips" class="btn btn-outline-secondary">
                         <i class="bi bi-x-circle me-1"></i>
                         Cancel
                     </a>

@@ -3,8 +3,13 @@
  * LOKA - View Trip Ticket
  *
  * View details of a trip ticket
- * Drivers can view their own tickets, guards/admins can view all
+ * Drivers can view their own tickets; motorpool/admin/approvers can view for review
  */
+
+// Guards do not have trip-ticket access
+if (isGuard() && !isMotorpool() && !isAdmin() && !isDriver() && !isApprover()) {
+    redirectWith('/?page=guard', 'danger', 'You do not have access to trip tickets.');
+}
 
 $ticketId = (int) get('id', 0);
 if (!$ticketId) {
@@ -480,6 +485,7 @@ require_once INCLUDES_PATH . '/header.php';
                         <a href="?page=requests&action=view&id=<?= $ticket->request_id ?>" class="btn btn-info">
                             <i class="bi bi-eye me-1"></i>View Request
                         </a>
+                        <?php $ticketId = (int) $ticket->id; require PAGES_PATH . '/trip-tickets/partials/delete_form.php'; ?>
                     </div>
                 </div>
             </div>

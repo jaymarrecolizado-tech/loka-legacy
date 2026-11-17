@@ -12,25 +12,37 @@ if (!$user)
 
 $errors = [];
 $departments = getDepartments(); // Use cached departments
+$validRoles = array_keys(ROLE_LABELS);
+$security = Security::getInstance();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
 
     $name = postSafe('name', '', 100);
-    $email = post('email');
+    $email = $security->sanitizeEmail(post('email'));
+    $officialRaw = (string) $security->sanitizeEmail(post('official_email'));
+    $officialEmail = function_exists('normalizeOptionalEmail')
+        ? normalizeOptionalEmail($officialRaw)
+        : strtolower(trim($officialRaw));
     $password = post('password');
     $phone = postSafe('phone', '', 20);
-    $role = postSafe('role', '', 20);
+    $role = (string) post('role');
     $departmentId = postInt('department_id') ?: null;
 
     if (empty($name))
         $errors[] = 'Name is required';
     if (empty($email))
-        $errors[] = 'Email is required';
+        $errors[] = 'Individual email is required';
     elseif (!filter_var($email, FILTER_VALIDATE_EMAIL))
-        $errors[] = 'Invalid email format';
+        $errors[] = 'Invalid individual email format';
+    if ($officialEmail !== '' && !filter_var($officialEmail, FILTER_VALIDATE_EMAIL))
+        $errors[] = 'Invalid official email format';
     if ($password && strlen($password) < 8)
         $errors[] = 'Password must be at least 8 characters';
+    if ($role === '')
+        $errors[] = 'Role is required';
+    elseif (!in_array($role, $validRoles, true))
+        $errors[] = 'Invalid role selected';
 
     if (empty($errors)) {
         db()->beginTransaction();
@@ -39,13 +51,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Re-fetch with lock to ensure atomicity
             $user = db()->fetch("SELECT * FROM users WHERE id = ? AND deleted_at IS NULL FOR UPDATE", [$userId]);
 
-            // Check unique email (exclude current)
-            if ($email && $email !== $user->email) {
-                $existing = db()->fetch("SELECT id FROM users WHERE email = ? AND id != ? AND deleted_at IS NULL", [$email, $userId]);
-                if ($existing) {
-                    db()->rollback();
-                    $errors[] = 'Email already exists';
-                }
+            $emailTaken = function_exists('userIndividualEmailTaken')
+                ? userIndividualEmailTaken($email, $userId)
+                : (bool) db()->fetch(
+                    "SELECT id FROM users WHERE email = ? AND id != ? AND deleted_at IS NULL",
+                    [$email, $userId]
+                );
+            if ($email && $emailTaken) {
+                db()->rollback();
+                $errors[] = 'This individual email is already registered';
             }
 
             if (empty($errors)) {
@@ -55,6 +69,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'phone' => $phone,
                     'role' => $role,
                     'department_id' => $departmentId,
+                    'is_ob_approver' => post('is_ob_approver') === '1' ? 1 : 0,
+                    'is_budget_officer' => post('is_budget_officer') === '1' ? 1 : 0,
+                    'is_oic_budget_officer' => post('is_oic_budget_officer') === '1' ? 1 : 0,
                     'updated_at' => date(DATETIME_FORMAT)
                 ];
 
@@ -62,16 +79,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $auth = new Auth();
                     $updateData['password'] = $auth->hashPassword($password);
                 }
+                if (db()->fetch("SHOW COLUMNS FROM users LIKE 'official_email'")) {
+                    $updateData['official_email'] = $officialEmail !== '' ? $officialEmail : null;
+                }
 
                 db()->update('users', $updateData, 'id = ?', [$userId]);
                 auditLog('user_updated', 'user', $userId);
                 db()->commit();
                 clearUserCache(); // Clear user cache after updating user
-                redirectWith('/?page=users', 'success', 'User updated successfully.');
+
+                if (defined('LOKA_CHANNELS') && function_exists('channelGetBinding') && function_exists('channelSetAdminBinding')) {
+                    foreach (LOKA_CHANNELS as $plChannel) {
+                        $plChatId = trim(postSafe($plChannel . '_chat_id', '', 100));
+                        $plExisting = channelGetBinding($userId, $plChannel);
+                        if ($plExisting && (string) $plExisting->chat_id === $plChatId) {
+                            continue;
+                        }
+                        channelSetAdminBinding($userId, $plChannel, $plChatId);
+                    }
+                }
+
+                // Specimen e-sign — replace file wins over clear; persist after commit
+                $esignError = null;
+                $res = obSaveUserEsignUpload($userId, $_FILES['signature_file'] ?? []);
+                if ($res['error'] !== null) {
+                    $esignError = $res['error'];
+                } elseif ($res['path'] === null && post('clear_signature') === '1') {
+                    obClearUserEsign($userId);
+                }
+
+                $msg = 'User updated successfully.';
+                if ($res['path'] !== null) {
+                    $msg = 'User updated. E-sign saved.';
+                } elseif ($res['error'] === null && post('clear_signature') === '1') {
+                    $msg = 'User updated. E-sign removed.';
+                }
+                if ($esignError !== null) {
+                    $msg .= ' (Specimen e-sign failed: ' . $esignError . ')';
+                }
+                redirectWith('/?page=users&action=edit&id=' . $userId, 'success', $msg);
             }
         } catch (Exception $e) {
             db()->rollback();
-            $errors[] = 'Failed to update user';
+            error_log('Failed to update user #' . $userId . ': ' . $e->getMessage());
+            $dup = $e instanceof PDOException && (int) ($e->errorInfo[1] ?? 0) === 1062;
+            $errors[] = $dup ? 'This individual email is already registered' : 'Failed to update user';
         }
     }
 }
@@ -106,7 +158,7 @@ require_once INCLUDES_PATH . '/header.php';
                             </ul>
                         </div><?php endif; ?>
 
-                    <form method="POST">
+                    <form method="POST" enctype="multipart/form-data">
                         <?= csrfField() ?>
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -115,9 +167,17 @@ require_once INCLUDES_PATH . '/header.php';
                                     value="<?= e(post('name', $user->name)) ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Email <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" name="email"
-                                    value="<?= e(post('email', $user->email)) ?>" required>
+                                <label class="form-label">Individual Email <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" name="email" id="individualEmail"
+                                    value="<?= e(post('email', $user->email)) ?>" required autocomplete="off">
+                                <small class="text-muted">Login and notifications. Must be unique.</small>
+                                <div id="individualEmailHint" class="form-text"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Official / Office Email</label>
+                                <input type="email" class="form-control" name="official_email"
+                                    value="<?= e(post('official_email', $user->official_email ?? '')) ?>">
+                                <small class="text-muted">Shared unit mailbox is allowed (not unique).</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">New Password</label>
@@ -147,6 +207,72 @@ require_once INCLUDES_PATH . '/header.php';
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                            <div class="col-12">
+                                <label class="form-label">Specimen E-sign <span class="text-muted">(PNG/JPG ≤ 3 MB)</span></label>
+                                <?php
+                                $esignPath = obUserEsignPath((int) $user->id);
+                                $esignStamp = ($esignPath !== null && is_file(BASE_PATH . '/' . $esignPath))
+                                    ? (int) filemtime(BASE_PATH . '/' . $esignPath) : time();
+                                ?>
+                                <?php if ($esignPath !== null): ?>
+                                <div class="border rounded bg-white p-2 mb-2 d-flex align-items-center gap-3 flex-wrap">
+                                    <img src="?page=file-view&file=<?= urlencode($esignPath) ?>&t=<?= $esignStamp ?>" alt="Saved e-sign" style="max-height:80px; max-width:280px; object-fit:contain;">
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input" type="checkbox" name="clear_signature" value="1" id="clearSigChk">
+                                        <label class="form-check-label small" for="clearSigChk">Remove saved e-sign</label>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                                <input type="file" class="form-control" name="signature_file" id="signatureFileInput" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
+                                <small class="text-muted"><?= $esignPath !== null
+                                    ? 'Choose a new PNG/JPG and click Save Changes to replace this e-sign.'
+                                    : 'Upload a PNG/JPG, then Save Changes. Stamped on OB Pass Slips and approved gas vouchers.' ?></small>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label d-block">OB Approver</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="is_ob_approver" value="1"
+                                        role="switch" id="obApproverChk" <?= post('is_ob_approver', $user->is_ob_approver ? '1' : '0') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="obApproverChk">
+                                        Can act as <strong>Immediate Supervisor</strong> for OB Pass Slips
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label d-block">Budget Officer</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="is_budget_officer" value="1"
+                                        role="switch" id="budgetOfficerChk" <?= post('is_budget_officer', $user->is_budget_officer ? '1' : '0') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="budgetOfficerChk">
+                                        Can act as <strong>Budget Officer</strong> on gas vouchers (pending budget step)
+                                    </label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="is_oic_budget_officer" value="1"
+                                        role="switch" id="oicBudgetOfficerChk" <?= post('is_oic_budget_officer', $user->is_oic_budget_officer ? '1' : '0') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="oicBudgetOfficerChk">
+                                        Can act as <strong>OIC Budget Officer</strong> on gas vouchers
+                                    </label>
+                                </div>
+                            </div>
+                            <?php $editChannelBindings = [];
+                            if (function_exists('channelGetBindings')) {
+                                foreach (channelGetBindings($userId) as $ecb) {
+                                    $editChannelBindings[$ecb->channel] = $ecb;
+                                }
+                            } ?>
+                            <div class="col-12">
+                                <label class="form-label d-block">Messenger chat IDs <span class="text-muted fw-normal">(Plan #35 — optional)</span></label>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1">Telegram chat ID</label>
+                                        <input type="text" class="form-control form-control-sm" name="telegram_chat_id"
+                                               value="<?= e(postSafe('telegram_chat_id', $editChannelBindings['telegram']->chat_id ?? '', 100)) ?>"
+                                               placeholder="e.g. 123456789">
+                                    </div>
+                                </div>
+                                <small class="text-muted">Clear a field to unlink that messenger. Unchanged values keep the original link source (self / administrator).</small>
+                            </div>
                         </div>
                         <hr class="my-4">
                         <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save
@@ -159,4 +285,26 @@ require_once INCLUDES_PATH . '/header.php';
     </div>
 </div>
 
-<?php require_once INCLUDES_PATH . '/footer.php'; ?>
+<?php
+$emailCheckExcludeId = (int) $userId;
+$emailCheckPartial = __DIR__ . '/partials/email_unique_check.php';
+if (is_file($emailCheckPartial)) {
+    require $emailCheckPartial;
+}
+?>
+<script>
+(function () {
+    var file = document.getElementById('signatureFileInput');
+    var clear = document.getElementById('clearSigChk');
+    if (!file || !clear) return;
+    file.addEventListener('change', function () {
+        if (file.files && file.files.length) {
+            clear.checked = false;
+        }
+    });
+})();
+</script>
+<?php
+require_once INCLUDES_PATH . '/footer.php';
+?>
+?>

@@ -2,17 +2,20 @@
 /**
  * LOKA - Completed Trips Page
  *
- * Role-based view of completed trips:
- * - Driver: Only their completed trips
- * - Guard: Trips they dispatched/received
- * - Approver: Department completed trips
- * - Motorpool Head: All completed trips
- * - Admin: All completed trips
+ * Role-based view of completed trips (Plan #30):
+ * - Approver and above (Department Approver, Motorpool Head, Admin, All
+ *   Father): all completed trips in the system — evaluated before the
+ *   driver/guard scopes so a privileged account tagged as a driver keeps
+ *   the system-wide view
+ * - Driver-only accounts: only their completed trips
+ * - Guard: trips they dispatched/received
+ * - Requester and other roles: their own completed trips
  */
 
 $pageTitle = 'Completed Trips';
 
 $role = userRole();
+$canViewAll = canViewAllTripRequests();
 $showAll = get('all', '1'); // Default to show all completed trips
 $search = get('search', '');
 $page = getInt('p', 1); // Use 'p' for pagination, not 'page' (which is for routing)
@@ -75,9 +78,13 @@ $sql = "SELECT r.*,
 
 $params = [STATUS_COMPLETED];
 
-// Role-based filtering
-if ($isDriver) {
-    // Drivers see only their completed trips
+// Role-based filtering — all-trip visibility is evaluated FIRST so a
+// privileged account tagged as a driver keeps the system-wide view (Plan #30)
+if ($canViewAll) {
+    // Approver and above see all completed trips in the system.
+    // No additional filtering needed.
+} elseif ($isDriver) {
+    // Driver-only accounts see their own completed trips
     $sql .= " AND (r.driver_id = ? OR r.requested_driver_id = ?)";
     $params[] = $driver->id;
     $params[] = $driver->id;
@@ -86,19 +93,8 @@ if ($isDriver) {
     $sql .= " AND (r.dispatch_guard_id = ? OR r.arrival_guard_id = ?)";
     $params[] = userId();
     $params[] = userId();
-} elseif ($role === ROLE_APPROVER) {
-    // Approvers see completed trips from their department
-    $userDepartmentId = db()->fetchColumn(
-        "SELECT department_id FROM users WHERE id = ?",
-        [userId()]
-    );
-    $sql .= " AND r.department_id = ?";
-    $params[] = $userDepartmentId;
-} elseif ($role === ROLE_MOTORPOOL || $role === ROLE_ADMIN) {
-    // Motorpool heads and admins see all completed trips
-    // No additional filtering needed
 } else {
-    // Requesters see only their own completed trips
+    // Requesters and other roles see only their own completed trips
     $sql .= " AND r.user_id = ?";
     $params[] = userId();
 }
@@ -170,14 +166,12 @@ require_once INCLUDES_PATH . '/header.php';
         <div>
             <h4 class="mb-1"><i class="bi bi-check-all me-2"></i>Completed Trips</h4>
             <p class="text-muted mb-0">
-                <?php if ($isDriver): ?>
+                <?php if ($canViewAll): ?>
+                    All completed trips in the system
+                <?php elseif ($isDriver): ?>
                     Your completed trip history
                 <?php elseif ($role === ROLE_GUARD): ?>
                     Trips you tracked at the gate
-                <?php elseif ($role === ROLE_APPROVER): ?>
-                    Your department's completed trips
-                <?php elseif (in_array($role, [ROLE_MOTORPOOL, ROLE_ADMIN])): ?>
-                    All completed trips in the system
                 <?php else: ?>
                     Your completed trip history
                 <?php endif; ?>

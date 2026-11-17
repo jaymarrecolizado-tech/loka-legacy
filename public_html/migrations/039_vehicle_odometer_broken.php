@@ -3,7 +3,7 @@
  * MIGRATION 039: vehicles.odometer_broken + seed known broken plates
  */
 
-$envFile = __DIR__ . '/../.env';
+require __DIR__ . '/_load_env.php';
 $dbHost = 'localhost';
 $dbName = 'fleetdb';
 $dbUser = 'root';

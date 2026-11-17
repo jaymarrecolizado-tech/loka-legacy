@@ -8,6 +8,9 @@
 
 // Load environment variables
 $envFile = __DIR__ . '/../.env';
+if (!file_exists($envFile)) {
+    $envFile = __DIR__ . '/../../.env.lokastage';
+}
 if (file_exists($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
@@ -44,6 +47,10 @@ require_once __DIR__ . '/../classes/EmailQueue.php';
 require_once __DIR__ . '/sms.php';
 require_once __DIR__ . '/../classes/SmsGateway.php';
 require_once __DIR__ . '/../classes/SmsQueue.php';
+require_once __DIR__ . '/../classes/FileUpload.php';
+require_once __DIR__ . '/../config/channels.php';
+require_once __DIR__ . '/../classes/ChannelQueue.php';
+require_once __DIR__ . '/../classes/TelegramGateway.php';
 
 // Load session (needs Security class)
 require_once __DIR__ . '/session.php';
@@ -53,10 +60,12 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/booking-rules.php';
 require_once __DIR__ . '/../includes/view_as.php';
 require_once __DIR__ . '/../includes/sms.php';
+require_once __DIR__ . '/../includes/channels.php';
 require_once __DIR__ . '/../includes/mail_delivery.php';
 require_once __DIR__ . '/../includes/badge_counts.php';
 require_once __DIR__ . '/../includes/vehicle_care.php';
 require_once __DIR__ . '/../includes/trip-enhancements.php';
+require_once __DIR__ . '/../includes/ob_requests.php';
 
 // Initialize Security
 $security = Security::getInstance();
